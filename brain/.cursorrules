@@ -1,0 +1,674 @@
+# Scrollio - React Native + TypeScript + Supabase Coding Rules
+
+## Project Context
+Scrollio is a micro-learning mobile app built with React Native (Expo), TypeScript, Supabase, and AWS S3.
+This file defines coding standards and rules for consistent development across the team and AI agents.
+
+## Language & Framework
+- React Native with Expo
+- TypeScript (strict mode)
+- Expo Router for navigation
+- Redux Toolkit for state management
+- Supabase for backend (Auth, Database, Storage)
+- AWS S3 + CloudFront for video storage
+
+## TypeScript Rules
+
+### Strict Mode
+- Always use TypeScript strict mode
+- Enable all strict flags in tsconfig.json
+- No implicit `any` types
+
+### Type Definitions
+- Define interfaces for all component props
+- Use `type` for unions and intersections, `interface` for object shapes
+- Export types that are used across files
+- Use explicit return types for functions
+
+```typescript
+// ✅ Good
+interface ButtonProps {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: 'primary' | 'secondary';
+}
+
+export const Button: React.FC<ButtonProps> = ({ title, onPress, disabled = false, variant = 'primary' }) => {
+  // Implementation
+};
+
+// ❌ Bad
+export const Button = ({ title, onPress, disabled, variant }: any) => {
+  // Implementation
+};
+```
+
+### Avoid `any`
+- Never use `any` unless absolutely necessary
+- Use `unknown` for truly unknown types, then narrow with type guards
+- Document why `any` is used if unavoidable
+
+```typescript
+// ✅ Good
+const handleData = (data: unknown) => {
+  if (typeof data === 'object' && data !== null && 'id' in data) {
+    // Type narrowed, safe to use
+  }
+};
+
+// ❌ Bad
+const handleData = (data: any) => {
+  // No type safety
+};
+```
+
+## React Native Component Rules
+
+### Functional Components Only
+- Use functional components with hooks
+- No class components
+
+### Component Structure
+```typescript
+// Standard component structure:
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+
+// 1. Type definitions
+interface ComponentProps {
+  // Props interface
+}
+
+// 2. Component definition
+export const ComponentName: React.FC<ComponentProps> = ({ prop1, prop2 }) => {
+  // 3. Hooks
+  const [state, setState] = useState();
+
+  // 4. Event handlers
+  const handlePress = () => {
+    // Implementation
+  };
+
+  // 5. Render
+  return (
+    <View style={styles.container}>
+      {/* JSX */}
+    </View>
+  );
+};
+
+// 6. Styles
+const styles = StyleSheet.create({
+  container: {
+    // Styles
+  },
+});
+```
+
+### Hooks Rules
+- Follow Rules of Hooks (only call at top level, only in functional components)
+- Custom hooks must start with `use` prefix
+- Extract complex logic into custom hooks
+
+```typescript
+// ✅ Good - Custom hook
+const useVideoPlayer = (videoUrl: string) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // Hook logic
+
+  return { isPlaying, progress, play, pause };
+};
+
+// Usage
+const { isPlaying, play, pause } = useVideoPlayer(video.url);
+```
+
+### Performance Optimization
+- Use `React.memo()` for components that render frequently with same props
+- Use `useMemo()` for expensive calculations
+- Use `useCallback()` for function references passed to memoized children
+- Use `FlatList` for long lists, not `ScrollView` with `.map()`
+
+```typescript
+// ✅ Good - Memoized component
+export const VideoCard = React.memo<VideoCardProps>(({ video, onPress }) => {
+  return (
+    <TouchableOpacity onPress={onPress}>
+      {/* Content */}
+    </TouchableOpacity>
+  );
+});
+
+// ✅ Good - Memoized callback
+const handleVideoPress = useCallback((videoId: string) => {
+  navigation.navigate('VideoDetail', { videoId });
+}, [navigation]);
+```
+
+## File Naming & Organization
+
+### File Naming Conventions
+- Components: PascalCase (e.g., `VideoPlayer.tsx`, `QuizCard.tsx`)
+- Utilities: camelCase (e.g., `formatDate.ts`, `validators.ts`)
+- Hooks: camelCase with `use` prefix (e.g., `useAuth.ts`, `useVideoPlayer.ts`)
+- Types: camelCase (e.g., `types.ts`, `database.types.ts`)
+- Tests: Same as file being tested with `.test.ts(x)` suffix
+
+### Folder Structure
+```
+src/
+├── components/          # Reusable components
+│   ├── common/         # Buttons, Inputs, Cards
+│   ├── video/          # Video-related components
+│   └── quiz/           # Quiz-related components
+├── features/           # Feature-based modules
+│   ├── feed/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── screens/
+│   │   └── types.ts
+│   └── auth/
+├── hooks/              # Shared hooks
+├── services/           # API services
+├── store/              # Redux store
+├── utils/              # Utility functions
+├── types/              # Shared types
+├── theme/              # Design system
+└── config/             # Configuration
+```
+
+### Import Organization
+Organize imports in this order:
+1. React and React Native imports
+2. Third-party libraries
+3. Local components
+4. Hooks
+5. Services
+6. Utils
+7. Types
+8. Styles
+
+```typescript
+// ✅ Good import order
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+
+import { Button } from '@/components/common/Button';
+import { VideoCard } from '@/components/video/VideoCard';
+
+import { useAuth } from '@/hooks/useAuth';
+import { useVideoPlayer } from '@/hooks/useVideoPlayer';
+
+import { supabase } from '@/services/supabase/client';
+
+import { formatDuration } from '@/utils/formatters';
+
+import { Video, User } from '@/types/models';
+
+import { styles } from './styles';
+```
+
+### Path Aliases
+Use path aliases for cleaner imports:
+- `@/` - src directory
+- `@components/` - components directory
+- `@features/` - features directory
+- `@hooks/` - hooks directory
+- `@services/` - services directory
+- `@utils/` - utils directory
+- `@types/` - types directory
+
+## Naming Conventions
+
+### Variables & Functions
+- Variables: camelCase (e.g., `videoUrl`, `isPlaying`)
+- Functions: camelCase, descriptive verbs (e.g., `fetchVideos`, `handlePress`)
+- Boolean variables: prefix with `is`, `has`, `should` (e.g., `isLoading`, `hasError`)
+- Event handlers: prefix with `handle` (e.g., `handlePress`, `handleSubmit`)
+
+### Constants
+- Constants: SCREAMING_SNAKE_CASE (e.g., `MAX_VIDEO_DURATION`, `API_BASE_URL`)
+- Place constants in `utils/constants.ts`
+
+```typescript
+// ✅ Good
+const MAX_VIDEO_DURATION = 60;
+const API_BASE_URL = 'https://api.scrollio.com';
+const DEFAULT_THEME_COLOR = '#007AFF';
+```
+
+### Components
+- Components: PascalCase (e.g., `VideoPlayer`, `QuizCard`)
+- One component per file
+- File name matches component name
+
+### Interfaces & Types
+- Interfaces: PascalCase (e.g., `VideoProps`, `User`, `QuizQuestion`)
+- Props interfaces: Suffix with `Props` (e.g., `ButtonProps`, `VideoCardProps`)
+- State interfaces: Suffix with `State` (e.g., `FeedState`, `AuthState`)
+
+## State Management
+
+### Redux Toolkit
+- Use Redux Toolkit slices
+- Define typed hooks in `store/hooks.ts`
+- Keep slices focused on single feature
+- Use async thunks for API calls
+
+```typescript
+// ✅ Good - Redux slice
+import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import type { RootState } from '@/store/store';
+
+interface FeedState {
+  videos: Video[];
+  loading: boolean;
+  error: string | null;
+}
+
+const initialState: FeedState = {
+  videos: [],
+  loading: false,
+  error: null,
+};
+
+export const fetchVideos = createAsyncThunk(
+  'feed/fetchVideos',
+  async (topicId: string) => {
+    const response = await fetchVideosAPI(topicId);
+    return response;
+  }
+);
+
+const feedSlice = createSlice({
+  name: 'feed',
+  initialState,
+  reducers: {
+    clearVideos: (state) => {
+      state.videos = [];
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchVideos.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchVideos.fulfilled, (state, action) => {
+        state.loading = false;
+        state.videos = action.payload;
+      })
+      .addCase(fetchVideos.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch videos';
+      });
+  },
+});
+
+export const { clearVideos } = feedSlice.actions;
+export default feedSlice.reducer;
+
+// Selectors
+export const selectVideos = (state: RootState) => state.feed.videos;
+export const selectFeedLoading = (state: RootState) => state.feed.loading;
+```
+
+### Local State
+- Use `useState` for component-local state
+- Use `useReducer` for complex state logic
+- Lift state up only when necessary
+
+## Styling
+
+### StyleSheet API
+- Always use `StyleSheet.create()` for styles
+- Define styles at bottom of component file
+- Use theme constants for colors, spacing, typography
+
+```typescript
+// ✅ Good
+import { StyleSheet } from 'react-native';
+import { colors, spacing } from '@/theme';
+
+const styles = StyleSheet.create({
+  container: {
+    padding: spacing.md,
+    backgroundColor: colors.background,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+});
+```
+
+### Theme System
+- Use centralized theme from `src/theme/`
+- Never hardcode colors, spacing, or typography
+- Support light/dark mode from the start
+
+```typescript
+// theme/colors.ts
+export const colors = {
+  primary: '#007AFF',
+  background: '#FFFFFF',
+  text: {
+    primary: '#000000',
+    secondary: '#666666',
+  },
+  error: '#FF3B30',
+};
+
+// theme/spacing.ts
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+};
+```
+
+## API & Services
+
+### Supabase Client
+- Single Supabase client instance in `services/supabase/client.ts`
+- Organize API calls by domain (auth, database, storage)
+- Always handle errors
+
+```typescript
+// ✅ Good - Supabase service
+import { supabase } from './client';
+import { Video } from '@/types/models';
+
+export const fetchVideosByTopic = async (topicId: string): Promise<Video[]> => {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*, topics(*)')
+    .eq('topic_id', topicId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch videos: ${error.message}`);
+  }
+
+  return data;
+};
+```
+
+### Error Handling
+- Always handle errors from API calls
+- Provide user-friendly error messages
+- Log errors for debugging
+
+```typescript
+// ✅ Good
+try {
+  const videos = await fetchVideosByTopic(topicId);
+  dispatch(setVideos(videos));
+} catch (error) {
+  console.error('Error fetching videos:', error);
+  dispatch(setError('Failed to load videos. Please try again.'));
+}
+```
+
+### AWS S3
+- Use pre-signed URLs for video uploads
+- Keep AWS logic in `services/aws/`
+- Never expose AWS credentials in code
+
+## Testing
+
+### Unit Tests
+- Write tests for utilities and hooks
+- Use Jest and React Native Testing Library
+- Test file naming: `ComponentName.test.tsx`
+
+```typescript
+// ✅ Good - Component test
+import { render, fireEvent } from '@testing-library/react-native';
+import { Button } from './Button';
+
+describe('Button', () => {
+  it('calls onPress when pressed', () => {
+    const onPress = jest.fn();
+    const { getByText } = render(<Button title="Click me" onPress={onPress} />);
+
+    fireEvent.press(getByText('Click me'));
+
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+### Test Coverage
+- Aim for >80% coverage on utilities and hooks
+- Test critical user flows
+- Mock Supabase and AWS services in tests
+
+## Security
+
+### Row Level Security (RLS)
+- Enable RLS on ALL Supabase tables
+- Document RLS policies in `brain/06-security/rls-policies.md`
+- Test RLS policies thoroughly
+
+### Secrets Management
+- Never commit secrets, API keys, or credentials
+- Use environment variables for all sensitive data
+- Use `.env.example` to document required variables
+
+```bash
+# .env.example
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
+AWS_S3_BUCKET=your_bucket_name
+```
+
+### Input Validation
+- Validate all user input
+- Sanitize data before storing in database
+- Use TypeScript for type safety
+
+## Accessibility
+
+### WCAG 2.1 AA Compliance
+- Add `accessibilityLabel` to all interactive elements
+- Add `accessibilityHint` for non-obvious actions
+- Support screen readers
+- Ensure minimum 4.5:1 contrast ratio for text
+
+```typescript
+// ✅ Good
+<TouchableOpacity
+  onPress={handlePress}
+  accessibilityLabel="Play video"
+  accessibilityHint="Starts playing the educational video"
+  accessibilityRole="button"
+>
+  <Text>Play</Text>
+</TouchableOpacity>
+```
+
+## Performance
+
+### FlatList Optimization
+```typescript
+// ✅ Good - Optimized FlatList
+<FlatList
+  data={videos}
+  renderItem={renderVideoCard}
+  keyExtractor={(item) => item.id}
+  getItemLayout={(data, index) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  })}
+  removeClippedSubviews={true}
+  maxToRenderPerBatch={5}
+  updateCellsBatchingPeriod={100}
+  windowSize={10}
+/>
+```
+
+### Image Optimization
+- Use optimized image formats (WebP)
+- Lazy load images
+- Cache images appropriately
+
+### Video Optimization
+- Use adaptive bitrate streaming (HLS/DASH)
+- Preload next video in feed
+- Cache viewed videos
+
+## Comments & Documentation
+
+### Code Comments
+- Write self-documenting code (clear variable names, small functions)
+- Add comments for complex logic or business rules
+- Link to brain documentation for architecture context
+
+```typescript
+// ✅ Good
+// Algorithm: brain/02-features/personalization/algorithm-overview.md
+const calculateRecommendationScore = (video: Video, userProfile: UserProfile): number => {
+  // Implementation
+};
+```
+
+### JSDoc for Public APIs
+```typescript
+/**
+ * Fetches videos for a specific topic with pagination support.
+ *
+ * @param topicId - The UUID of the topic
+ * @param limit - Maximum number of videos to return (default: 20)
+ * @param offset - Number of videos to skip (default: 0)
+ * @returns Promise<Video[]> - Array of video objects
+ * @throws Error if the API request fails
+ */
+export const fetchVideosByTopic = async (
+  topicId: string,
+  limit: number = 20,
+  offset: number = 0
+): Promise<Video[]> => {
+  // Implementation
+};
+```
+
+## Git Workflow
+
+### Branch Naming
+- Feature: `feature/video-feed-implementation`
+- Bug fix: `fix/quiz-score-calculation`
+- Refactor: `refactor/auth-service`
+
+### Commit Messages
+- Use conventional commits format
+- Format: `type(scope): description`
+- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+```
+feat(feed): implement vertical scrolling video feed
+fix(quiz): correct score calculation for multiple choice
+docs(api): update Supabase authentication guide
+refactor(components): extract common button styles
+test(auth): add unit tests for login flow
+chore(deps): update React Native to 0.74
+```
+
+## Documentation
+
+### Update Documentation
+- Update feature docs when implementing features
+- Add code examples to `brain/08-examples/`
+- Update component library docs for new components
+- Create ADRs for architectural decisions
+
+### Linking Code to Documentation
+```typescript
+// Link to relevant brain docs in code
+// Feature spec: brain/02-features/video-feed/overview.md
+// Component docs: brain/05-components/video-player.md
+```
+
+## Environment Variables
+
+### Required Variables
+Document all environment variables in `.env.example`:
+
+```bash
+# Supabase
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+
+# AWS
+AWS_S3_BUCKET=
+AWS_REGION=
+AWS_CLOUDFRONT_DOMAIN=
+
+# AI Services
+OPENAI_API_KEY=
+ELEVENLABS_API_KEY=
+
+# App Config
+APP_ENV=development
+```
+
+## Special Considerations
+
+### COPPA Compliance
+- No personalized ads for users under 13
+- Parental consent required for data collection
+- See `brain/06-security/data-privacy.md`
+
+### Offline Support
+- Use AsyncStorage for offline data
+- Queue actions when offline, sync when online
+- Provide offline indicators to users
+
+### Localization
+- Use i18n for all user-facing strings
+- Never hardcode text in components
+- Support RTL languages
+
+```typescript
+// ✅ Good
+import { useTranslation } from 'react-i18next';
+
+const { t } = useTranslation();
+<Text>{t('common.play')}</Text>
+
+// ❌ Bad
+<Text>Play</Text>
+```
+
+## Code Review Checklist
+
+Before submitting a PR, ensure:
+- [ ] TypeScript strict mode passes with no errors
+- [ ] All tests pass
+- [ ] Code follows styling conventions
+- [ ] No hardcoded secrets or API keys
+- [ ] Accessibility labels added to interactive elements
+- [ ] Documentation updated (brain docs, component docs)
+- [ ] RLS policies added for new tables
+- [ ] Performance considerations addressed
+- [ ] Error handling implemented
+- [ ] Comments added for complex logic
+
+## Resources
+
+- **Project Brain:** `/brain/` directory
+- **Quick Start:** `brain/00-core/QUICK_START.md`
+- **Architecture:** `brain/01-architecture/`
+- **API Docs:** `brain/03-api/`
+- **Examples:** `brain/08-examples/`
+
+---
+
+**Remember:** Consistency is key. When in doubt, check existing code patterns or consult the brain documentation.
