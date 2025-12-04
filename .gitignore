@@ -1,0 +1,151 @@
+# ===========================================
+# SCROLLIO - GITIGNORE
+# ===========================================
+
+# ===========================================
+# ENVIRONMENT & SECRETS
+# ===========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ===========================================
+# DEPENDENCIES
+# ===========================================
+node_modules/
+.pnp
+.pnp.js
+
+# ===========================================
+# BUILD OUTPUTS
+# ===========================================
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# ===========================================
+# EXPO / REACT NATIVE
+# ===========================================
+.expo/
+web-build/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# Expo EAS
+.eas/
+
+# Metro bundler
+.metro-health-check*
+
+# ===========================================
+# NESTJS
+# ===========================================
+# Already covered by dist/ above
+
+# ===========================================
+# TYPESCRIPT
+# ===========================================
+*.js.map
+*.d.ts.map
+
+# ===========================================
+# TESTING
+# ===========================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ===========================================
+# LOGS
+# ===========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ===========================================
+# IDE & EDITORS
+# ===========================================
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ===========================================
+# OS FILES
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.lnk
+
+# ===========================================
+# SUPABASE LOCAL
+# ===========================================
+.supabase/
+supabase/.temp/
+
+# ===========================================
+# AWS
+# ===========================================
+.aws/
+aws-exports.js
+
+# ===========================================
+# MISC
+# ===========================================
+*.tmp
+*.temp
+*.bak
+*.cache
+.cache/
+tmp/
+temp/
+
+# Local Netlify folder
+.netlify
+
+# Storybook
+storybook-static/
+
+# PWA files
+**/public/sw.js
+**/public/workbox-*.js
+
+# ===========================================
+# PROJECT SPECIFIC
+# ===========================================
+# Sensitive PDF docs (keep in cloud storage)
+*.pdf
+
+# Large media files (should be in S3/CDN)
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# But keep logo and app assets
+!code/mobile-app/assets/*.png
+!code/mobile-app/assets/*.jpg
+
