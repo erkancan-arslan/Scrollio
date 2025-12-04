@@ -144,31 +144,6 @@ Scrollio transforms passive scrolling time into measurable learning progress usi
 
 ---
 
-## Key Features
-
-### Phase 1: MVP (Months 1-3)
-- ✅ Personalized video feed (TikTok-style)
-- ✅ User authentication (Supabase Auth)
-- ✅ Interactive quizzes
-- ✅ Gamification (XP, levels)
-- ✅ AWS S3 video storage
-- ✅ Database with RLS security
-
-### Phase 2: Kids Version (Months 4-6)
-- 🔲 Parental controls dashboard
-- 🔲 AI character generation from child's drawing
-- 🔲 Content safety filtering
-- 🔲 COPPA compliance
-
-### Phase 3: Content Platform (Months 7-9)
-- 🔲 Content creator platform
-- 🔲 Expert verification
-- 🔲 Revenue sharing
-
-### Phase 4: B2B (Months 10-12)
-- 🔲 White-label solution
-- 🔲 Enterprise dashboard
-
 **Detailed roadmap:** [brain/00-core/PROJECT_OVERVIEW.md](brain/00-core/PROJECT_OVERVIEW.md)
 
 ---
