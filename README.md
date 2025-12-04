@@ -6,13 +6,13 @@ Scrollio is a TikTok-style educational video platform that delivers personalized
 
 ---
 
-## 🎯 Project Structure
+## Project Structure
 
 This repository is organized as a **monorepo** with two main directories:
 
 ```
 scrollio-v1/
-├── brain/                    # 🧠 Documentation & AI Context
+├── brain/                    # Documentation & AI Context
 │   ├── CLAUDE.md            # Primary AI context file
 │   ├── .cursorrules         # Coding standards
 │   ├── 00-core/             # Foundation docs
@@ -26,7 +26,7 @@ scrollio-v1/
 │   ├── 08-examples/         # Code examples
 │   └── 09-references/       # External resources
 │
-└── code/                    # 💻 Source Code
+└── code/                    # Source Code
     ├── mobile-app/          # React Native application
     ├── supabase/            # Database migrations & Edge Functions
     └── infrastructure/      # AWS infrastructure as code
@@ -34,7 +34,7 @@ scrollio-v1/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### For Developers
 
@@ -80,7 +80,7 @@ scrollio-v1/
 
 ---
 
-## 📱 Product Overview
+## Product Overview
 
 ### What is Scrollio?
 
@@ -102,7 +102,7 @@ Scrollio transforms passive scrolling time into measurable learning progress usi
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Frontend
 - **React Native** with **Expo** and **TypeScript**
@@ -127,7 +127,7 @@ Scrollio transforms passive scrolling time into measurable learning progress usi
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 ### Essential Reading
 
@@ -144,7 +144,7 @@ Scrollio transforms passive scrolling time into measurable learning progress usi
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
 ### Phase 1: MVP (Months 1-3)
 - ✅ Personalized video feed (TikTok-style)
@@ -173,7 +173,7 @@ Scrollio transforms passive scrolling time into measurable learning progress usi
 
 ---
 
-## 🧪 Development
+## Development
 
 ### Prerequisites
 
@@ -220,7 +220,7 @@ supabase db reset   # Reset database
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### High-Level Architecture
 
@@ -247,7 +247,7 @@ OpenAI + ElevenLabs (AI Content & Voices)
 
 ---
 
-## 🔒 Security
+## Security
 
 ### Row Level Security (RLS)
 
@@ -267,7 +267,7 @@ All Supabase tables have RLS enabled:
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Test Strategy
 
@@ -292,7 +292,7 @@ npm run test:e2e
 
 ---
 
-## 📦 Deployment
+## Deployment
 
 ### Environments
 
@@ -310,7 +310,7 @@ npm run test:e2e
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 ### Guidelines
 
@@ -337,32 +337,7 @@ npm run test:e2e
 **Development standards:** [brain/04-development/standards/](brain/04-development/standards/)
 
 ---
-
-## 📄 License
-
-[Your License Here]
-
----
-
-## 👥 Team
-
-- **Product Lead:** [Name]
-- **Tech Lead:** [Name]
-- **Frontend Engineers:** [Names]
-- **Backend Engineers:** [Names]
-- **Design:** [Name]
-
----
-
-## 📞 Contact
-
-- **Issues:** [GitHub Issues](your-repo-issues-url)
-- **Documentation:** [brain/](brain/)
-- **Email:** [your-email]
-
----
-
-## 🎓 Resources
+## Resources
 
 ### Documentation
 - [Complete Brain Documentation](brain/README.md)
@@ -378,8 +353,7 @@ npm run test:e2e
 
 ---
 
-**Built with ❤️ for lifelong learners**
 
-🧠 **Project Brain:** [brain/](brain/)
-💻 **Source Code:** [code/](code/)
-🚀 **Get Started:** [brain/00-core/QUICK_START.md](brain/00-core/QUICK_START.md)
+**Project Brain:** [brain/](brain/)
+**Source Code:** [code/](code/)
+**Get Started:** [brain/00-core/QUICK_START.md](brain/00-core/QUICK_START.md)
