@@ -18,7 +18,7 @@ This "brain" serves as a comprehensive knowledge base for:
 
 ```
 brain/
-├── CLAUDE.md                    # ⭐ START HERE - Primary AI context file
+├── ENTRY.md                    # ⭐ START HERE - Primary AI context file
 ├── .cursorrules                 # Coding standards and rules
 │
 ├── 00-core/                     # Foundation documents
@@ -85,7 +85,7 @@ brain/
 ## 🚀 Quick Navigation
 
 ### For AI Agents
-1. **Start here:** [CLAUDE.md](CLAUDE.md) - Complete project context
+1. **Start here:** [ENTRY.md](ENTRY.md) - Complete project context
 2. **Understand the product:** [00-core/PROJECT_OVERVIEW.md](00-core/PROJECT_OVERVIEW.md)
 3. **Know the stack:** [00-core/TECH_STACK.md](00-core/TECH_STACK.md)
 4. **Review architecture:** [01-architecture/](01-architecture/)
