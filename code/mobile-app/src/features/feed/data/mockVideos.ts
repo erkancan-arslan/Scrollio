@@ -1,0 +1,231 @@
+/**
+ * Mock video data for development
+ * These will be replaced with real API calls later
+ */
+
+import { Video } from '../types';
+
+export const mockVideos: Video[] = [
+  {
+    id: '1',
+    title: 'Why do we dream?',
+    description: 'Exploring the fascinating science behind dreams and what happens in our brain while we sleep. #science #psychology #dreams',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/dream/400/700',
+    duration: 45,
+    creator: {
+      id: 'c1',
+      username: 'sciencewithsara',
+      displayName: 'Sara Science',
+      avatarUrl: 'https://i.pravatar.cc/150?u=sara',
+      isVerified: true,
+    },
+    stats: {
+      views: 125000,
+      likes: 8420,
+      comments: 342,
+      bookmarks: 1203,
+    },
+    topic: 'Psychology',
+    tags: ['science', 'psychology', 'dreams', 'sleep'],
+    createdAt: '2024-12-15T10:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '2',
+    title: 'How black holes form',
+    description: 'A quick explanation of how massive stars collapse to form black holes - the most mysterious objects in the universe! ✨🌌',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/blackhole/400/700',
+    duration: 58,
+    creator: {
+      id: 'c2',
+      username: 'astromax',
+      displayName: 'Max Astronomy',
+      avatarUrl: 'https://i.pravatar.cc/150?u=max',
+      isVerified: true,
+    },
+    stats: {
+      views: 89000,
+      likes: 6100,
+      comments: 198,
+      bookmarks: 890,
+    },
+    topic: 'Astronomy',
+    tags: ['space', 'astronomy', 'blackholes', 'physics'],
+    createdAt: '2024-12-14T15:30:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '3',
+    title: 'The power of compound interest',
+    description: 'Learn how compound interest can turn small savings into big wealth over time. Start early! 💰📈 #finance #investing',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/finance/400/700',
+    duration: 42,
+    creator: {
+      id: 'c3',
+      username: 'moneyminute',
+      displayName: 'Finance in a Minute',
+      avatarUrl: 'https://i.pravatar.cc/150?u=finance',
+      isVerified: true,
+    },
+    stats: {
+      views: 203000,
+      likes: 15200,
+      comments: 567,
+      bookmarks: 4500,
+    },
+    topic: 'Finance',
+    tags: ['finance', 'investing', 'money', 'savings'],
+    createdAt: '2024-12-13T09:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '4',
+    title: 'JavaScript closures explained',
+    description: 'Understanding closures is key to mastering JavaScript. Here\'s the simplest explanation! 💻🚀 #coding #javascript #webdev',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/coding/400/700',
+    duration: 55,
+    creator: {
+      id: 'c4',
+      username: 'codewithjane',
+      displayName: 'Jane Codes',
+      avatarUrl: 'https://i.pravatar.cc/150?u=jane',
+      isVerified: false,
+    },
+    stats: {
+      views: 67000,
+      likes: 4300,
+      comments: 289,
+      bookmarks: 2100,
+    },
+    topic: 'Programming',
+    tags: ['coding', 'javascript', 'programming', 'webdev'],
+    createdAt: '2024-12-12T14:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '5',
+    title: 'Why do we yawn?',
+    description: 'Is yawning really contagious? The science behind this everyday phenomenon might surprise you! 🥱🧠',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/yawn/400/700',
+    duration: 38,
+    creator: {
+      id: 'c5',
+      username: 'curiositydaily',
+      displayName: 'Curiosity Daily',
+      avatarUrl: 'https://i.pravatar.cc/150?u=curious',
+      isVerified: true,
+    },
+    stats: {
+      views: 156000,
+      likes: 11200,
+      comments: 423,
+      bookmarks: 1800,
+    },
+    topic: 'Biology',
+    tags: ['biology', 'science', 'health', 'curiosity'],
+    createdAt: '2024-12-11T11:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '6',
+    title: 'Ancient Rome in 60 seconds',
+    description: 'From a small village to the greatest empire - the rise and fall of Rome condensed! 🏛️⚔️ #history #rome #ancient',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/rome/400/700',
+    duration: 60,
+    creator: {
+      id: 'c6',
+      username: 'historyflash',
+      displayName: 'History Flash',
+      avatarUrl: 'https://i.pravatar.cc/150?u=history',
+      isVerified: true,
+    },
+    stats: {
+      views: 245000,
+      likes: 19800,
+      comments: 734,
+      bookmarks: 5200,
+    },
+    topic: 'History',
+    tags: ['history', 'rome', 'ancient', 'civilization'],
+    createdAt: '2024-12-10T16:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '7',
+    title: 'How to solve any Rubik\'s cube',
+    description: 'The beginner-friendly method to solve any Rubik\'s cube. You CAN learn this! 🧩✨ #puzzle #rubikscube #learn',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/rubik/400/700',
+    duration: 52,
+    creator: {
+      id: 'c7',
+      username: 'puzzlemaster',
+      displayName: 'Puzzle Master',
+      avatarUrl: 'https://i.pravatar.cc/150?u=puzzle',
+      isVerified: false,
+    },
+    stats: {
+      views: 178000,
+      likes: 14500,
+      comments: 892,
+      bookmarks: 8900,
+    },
+    topic: 'Skills',
+    tags: ['puzzle', 'rubikscube', 'howto', 'skills'],
+    createdAt: '2024-12-09T12:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+  {
+    id: '8',
+    title: 'Quantum entanglement simplified',
+    description: 'Einstein called it "spooky action at a distance" - here\'s what quantum entanglement really means! ⚛️🔮',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    thumbnailUrl: 'https://picsum.photos/seed/quantum/400/700',
+    duration: 48,
+    creator: {
+      id: 'c8',
+      username: 'quantumquick',
+      displayName: 'Quantum Quick',
+      avatarUrl: 'https://i.pravatar.cc/150?u=quantum',
+      isVerified: true,
+    },
+    stats: {
+      views: 92000,
+      likes: 7800,
+      comments: 456,
+      bookmarks: 3400,
+    },
+    topic: 'Physics',
+    tags: ['physics', 'quantum', 'science', 'einstein'],
+    createdAt: '2024-12-08T08:00:00Z',
+    isLiked: false,
+    isBookmarked: false,
+  },
+];
+
+/**
+ * Helper function to format view counts
+ */
+export const formatCount = (count: number): string => {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  }
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
+};
+

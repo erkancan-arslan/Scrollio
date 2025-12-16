@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { HomeScreen } from '../features/home/screens/HomeScreen';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
+import { MainTabNavigator } from './MainTabNavigator';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { TicTacToeScreen } from '../features/playground/games/tictactoe/TicTacToeScreen';
 import { FourInARowScreen } from '../features/playground/games/fourinarow/FourInARowScreen';
@@ -18,7 +18,8 @@ import { TurkishWordleScreen } from '../features/playground/games/turkishwordle/
 export type RootStackParamList = {
     SignIn: undefined;
     SignUp: undefined;
-    Home: undefined;
+    MainTabs: undefined;
+    Home: undefined; // Keep for backwards compatibility
     Playground: undefined;
     TicTacToe: undefined;
     FourInARow: undefined;
@@ -52,16 +53,17 @@ export const AppNavigator = () => {
                     component={SignUpScreen} 
                 />
 
-                {/* Main App Screens */}
+                {/* Main App with Bottom Tabs */}
                 <Stack.Screen 
-                    name="Home" 
-                    component={HomeScreen} 
-                    options={{ 
-                        headerShown: true,
-                        title: 'Scrollio',
-                        headerBackVisible: false,
-                    }} 
+                    name="MainTabs" 
+                    component={MainTabNavigator}
+                    options={{
+                        headerShown: false,
+                        gestureEnabled: false, // Prevent swipe back to auth screens
+                    }}
                 />
+
+                {/* Additional Screens (accessible from anywhere) */}
                 <Stack.Screen 
                     name="Playground" 
                     component={PlaygroundScreen} 

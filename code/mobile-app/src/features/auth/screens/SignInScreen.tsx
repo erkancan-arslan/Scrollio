@@ -43,10 +43,10 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            // Navigate to Home on successful sign in
+            // Navigate to main app (Feed) on successful sign in
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'Home' }],
+                routes: [{ name: 'MainTabs' }],
             });
         } else {
             setError(result.error || 'Sign in failed. Please try again.');
@@ -202,7 +202,10 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
                     {/* Skip for Development */}
                     <TouchableOpacity 
                         style={styles.skipButton}
-                        onPress={() => navigation.navigate('Home')}
+                        onPress={() => navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'MainTabs' }],
+                        })}
                     >
                         <Text style={styles.skipButtonText}>Skip for now →</Text>
                     </TouchableOpacity>
