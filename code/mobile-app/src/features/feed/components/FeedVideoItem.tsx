@@ -21,24 +21,28 @@ import { VideoInfo } from './VideoInfo';
 interface FeedVideoItemProps {
   video: Video;
   isActive: boolean;
+  isMuted: boolean;
   onLike: (videoId: string) => void;
   onComment: (videoId: string) => void;
   onBookmark: (videoId: string) => void;
   onShare: (videoId: string) => void;
   onCreatorPress: (creatorId: string) => void;
   onTopicPress: (topic: string) => void;
+  onVideoEnd?: () => void;
   itemHeight: number;
 }
 
 export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   video,
   isActive,
+  isMuted,
   onLike,
   onComment,
   onBookmark,
   onShare,
   onCreatorPress,
   onTopicPress,
+  onVideoEnd,
   itemHeight,
 }) => {
   const { width } = Dimensions.get('window');
@@ -51,9 +55,32 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
 
   // Create video player with expo-video
   const player = useVideoPlayer(video.videoUrl, (player) => {
-    player.loop = true;
-    player.muted = false;
+    player.loop = !onVideoEnd; // Only loop if no onVideoEnd handler (auto-advance disabled)
+    player.muted = isMuted;
   });
+
+  // Update muted state when prop changes
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
+  // Listen for video end when auto-advance is enabled
+  useEffect(() => {
+    if (!onVideoEnd) {
+      player.loop = true;
+      return;
+    }
+
+    player.loop = false;
+    
+    const subscription = player.addListener('playToEnd', () => {
+      onVideoEnd();
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [player, onVideoEnd]);
 
   // Play/pause based on whether video is active in viewport
   useEffect(() => {

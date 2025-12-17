@@ -273,16 +273,6 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                         </View>
                     </View>
 
-                    {/* Skip for Development */}
-                    <TouchableOpacity 
-                        style={styles.skipButton}
-                        onPress={() => navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'MainTabs' }],
-                        })}
-                    >
-                        <Text style={styles.skipButtonText}>Skip for now →</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
@@ -550,16 +540,5 @@ const styles = StyleSheet.create({
         fontSize: typography.fontSize.sm,
         color: ACCENT_COLOR,
         fontWeight: '600',
-    },
-    skipButton: {
-        alignSelf: 'center',
-        marginTop: spacing.lg,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-    },
-    skipButtonText: {
-        fontSize: typography.fontSize.md,
-        color: '#888888',
-        fontWeight: '500',
     },
 });

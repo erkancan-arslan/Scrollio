@@ -5,5 +5,7 @@ export type { User, Session, AuthResponse, SignUpParams, SignInParams, AuthState
 export { apiClient } from './api/apiClient';
 export type { ApiResponse } from './api/apiClient';
 
+export { feedService } from './feed/feedService';
+
 export { secureStorage, STORAGE_KEYS } from './storage/secureStorage';
 

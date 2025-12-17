@@ -3,7 +3,7 @@
  * Main screen after user signs in
  */
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,18 +11,39 @@ import {
   StatusBar,
   ViewToken,
   Dimensions,
+  ActivityIndicator,
+  RefreshControl,
+  Text,
 } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { FeedVideoItem } from '../components';
-import { Video } from '../types';
+import { FeedVideoItem, FeedOptionsButton } from '../components';
+import { Video, FeedState } from '../types';
 import { mockVideos } from '../data/mockVideos';
+import { feedService } from '../../../services';
+import { colors } from '../../../theme';
 
 export const FeedScreen: React.FC = () => {
   const { height: windowHeight } = Dimensions.get('window');
   const tabBarHeight = useBottomTabBarHeight();
-  const [videos, setVideos] = useState<Video[]>(mockVideos);
+  
+  // Feed state
+  const [feedState, setFeedState] = useState<FeedState>({
+    videos: [],
+    currentIndex: 0,
+    loading: true,
+    refreshing: false,
+    error: null,
+    nextCursor: null,
+    hasMore: true,
+  });
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const isLoadingMore = useRef(false);
+
+  // Playback options state
+  const [isMuted, setIsMuted] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
   
   // Calculate the exact height for each video item
   // Subtract tab bar height so content doesn't overflow behind it
@@ -31,45 +52,185 @@ export const FeedScreen: React.FC = () => {
     return calculated > 0 ? calculated : windowHeight;
   }, [windowHeight, tabBarHeight]);
 
-  // Handle like action
-  const handleLike = useCallback((videoId: string) => {
-    setVideos((prevVideos) =>
-      prevVideos.map((video) =>
-        video.id === videoId
-          ? {
-              ...video,
-              isLiked: !video.isLiked,
-              stats: {
-                ...video.stats,
-                likes: video.isLiked
-                  ? video.stats.likes - 1
-                  : video.stats.likes + 1,
-              },
-            }
-          : video
-      )
-    );
+  // Fetch feed from API
+  const fetchFeed = useCallback(async (refresh = false) => {
+    if (refresh) {
+      setFeedState((prev) => ({ ...prev, refreshing: true }));
+    } else if (!feedState.hasMore || isLoadingMore.current) {
+      return;
+    }
+
+    try {
+      const cursor = refresh ? undefined : feedState.nextCursor || undefined;
+      const response = await feedService.getFeed({ limit: 10, cursor });
+
+      if (response.data) {
+        setFeedState((prev) => ({
+          ...prev,
+          videos: refresh
+            ? response.data!.videos
+            : [...prev.videos, ...response.data!.videos],
+          nextCursor: response.data!.nextCursor,
+          hasMore: response.data!.hasMore,
+          loading: false,
+          refreshing: false,
+          error: null,
+        }));
+      } else {
+        // Fallback to mock data if API fails
+        console.log('API failed, using mock data:', response.error);
+        setFeedState((prev) => ({
+          ...prev,
+          videos: mockVideos,
+          loading: false,
+          refreshing: false,
+          error: null,
+          hasMore: false,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching feed:', error);
+      // Fallback to mock data on error
+      setFeedState((prev) => ({
+        ...prev,
+        videos: mockVideos,
+        loading: false,
+        refreshing: false,
+        error: null,
+        hasMore: false,
+      }));
+    } finally {
+      isLoadingMore.current = false;
+    }
+  }, [feedState.nextCursor, feedState.hasMore]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchFeed(true);
   }, []);
 
-  // Handle bookmark action
-  const handleBookmark = useCallback((videoId: string) => {
-    setVideos((prevVideos) =>
-      prevVideos.map((video) =>
-        video.id === videoId
+  // Handle pull to refresh
+  const handleRefresh = useCallback(() => {
+    fetchFeed(true);
+  }, [fetchFeed]);
+
+  // Handle load more when reaching end
+  const handleEndReached = useCallback(() => {
+    if (!isLoadingMore.current && feedState.hasMore && !feedState.loading) {
+      isLoadingMore.current = true;
+      fetchFeed(false);
+    }
+  }, [fetchFeed, feedState.hasMore, feedState.loading]);
+
+  // Handle like action with optimistic update
+  const handleLike = useCallback(async (videoId: string) => {
+    const video = feedState.videos.find((v) => v.id === videoId);
+    if (!video) return;
+
+    const wasLiked = video.isLiked;
+
+    // Optimistic update
+    setFeedState((prev) => ({
+      ...prev,
+      videos: prev.videos.map((v) =>
+        v.id === videoId
           ? {
-              ...video,
-              isBookmarked: !video.isBookmarked,
+              ...v,
+              isLiked: !v.isLiked,
               stats: {
-                ...video.stats,
-                bookmarks: video.isBookmarked
-                  ? video.stats.bookmarks - 1
-                  : video.stats.bookmarks + 1,
+                ...v.stats,
+                likes: v.isLiked ? v.stats.likes - 1 : v.stats.likes + 1,
               },
             }
-          : video
-      )
-    );
-  }, []);
+          : v
+      ),
+    }));
+
+    // API call
+    try {
+      const response = wasLiked
+        ? await feedService.unlikeVideo(videoId)
+        : await feedService.likeVideo(videoId);
+
+      if (!response.data?.success) {
+        // Revert on failure
+        setFeedState((prev) => ({
+          ...prev,
+          videos: prev.videos.map((v) =>
+            v.id === videoId
+              ? {
+                  ...v,
+                  isLiked: wasLiked,
+                  stats: {
+                    ...v.stats,
+                    likes: wasLiked ? v.stats.likes + 1 : v.stats.likes - 1,
+                  },
+                }
+              : v
+          ),
+        }));
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  }, [feedState.videos]);
+
+  // Handle bookmark action with optimistic update
+  const handleBookmark = useCallback(async (videoId: string) => {
+    const video = feedState.videos.find((v) => v.id === videoId);
+    if (!video) return;
+
+    const wasBookmarked = video.isBookmarked;
+
+    // Optimistic update
+    setFeedState((prev) => ({
+      ...prev,
+      videos: prev.videos.map((v) =>
+        v.id === videoId
+          ? {
+              ...v,
+              isBookmarked: !v.isBookmarked,
+              stats: {
+                ...v.stats,
+                bookmarks: v.isBookmarked
+                  ? v.stats.bookmarks - 1
+                  : v.stats.bookmarks + 1,
+              },
+            }
+          : v
+      ),
+    }));
+
+    // API call
+    try {
+      const response = wasBookmarked
+        ? await feedService.unbookmarkVideo(videoId)
+        : await feedService.bookmarkVideo(videoId);
+
+      if (!response.data?.success) {
+        // Revert on failure
+        setFeedState((prev) => ({
+          ...prev,
+          videos: prev.videos.map((v) =>
+            v.id === videoId
+              ? {
+                  ...v,
+                  isBookmarked: wasBookmarked,
+                  stats: {
+                    ...v.stats,
+                    bookmarks: wasBookmarked
+                      ? v.stats.bookmarks + 1
+                      : v.stats.bookmarks - 1,
+                  },
+                }
+              : v
+          ),
+        }));
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+    }
+  }, [feedState.videos]);
 
   // Handle comment action (placeholder for now)
   const handleComment = useCallback((videoId: string) => {
@@ -95,6 +256,27 @@ export const FeedScreen: React.FC = () => {
     // TODO: Navigate to topic feed
   }, []);
 
+  // Handle mute toggle
+  const handleToggleMute = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
+
+  // Handle auto-advance toggle
+  const handleToggleAutoAdvance = useCallback(() => {
+    setAutoAdvance((prev) => !prev);
+  }, []);
+
+  // Handle video end (auto-advance to next video)
+  const handleVideoEnd = useCallback(() => {
+    if (autoAdvance && currentIndex < feedState.videos.length - 1) {
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true,
+      });
+    }
+  }, [autoAdvance, currentIndex, feedState.videos.length]);
+
   // Track viewable items for auto-play
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -115,23 +297,28 @@ export const FeedScreen: React.FC = () => {
       <FeedVideoItem
         video={item}
         isActive={index === currentIndex}
+        isMuted={isMuted}
         onLike={handleLike}
         onComment={handleComment}
         onBookmark={handleBookmark}
         onShare={handleShare}
         onCreatorPress={handleCreatorPress}
         onTopicPress={handleTopicPress}
+        onVideoEnd={autoAdvance ? handleVideoEnd : undefined}
         itemHeight={itemHeight}
       />
     ),
     [
       currentIndex,
+      isMuted,
+      autoAdvance,
       handleLike,
       handleComment,
       handleBookmark,
       handleShare,
       handleCreatorPress,
       handleTopicPress,
+      handleVideoEnd,
       itemHeight,
     ]
   );
@@ -146,14 +333,56 @@ export const FeedScreen: React.FC = () => {
     [itemHeight]
   );
 
+  // Render footer (loading indicator for infinite scroll)
+  const renderFooter = useCallback(() => {
+    if (!feedState.hasMore) return null;
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }, [feedState.hasMore]);
+
+  // Show loading state on initial load
+  if (feedState.loading && feedState.videos.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading videos...</Text>
+      </View>
+    );
+  }
+
+  // Show error state
+  if (feedState.error && feedState.videos.length === 0) {
+    return (
+      <View style={styles.errorContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <Text style={styles.errorText}>{feedState.error}</Text>
+        <Text style={styles.retryText} onPress={() => fetchFeed(true)}>
+          Tap to retry
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
+      {/* Options Button */}
+      <FeedOptionsButton
+        isMuted={isMuted}
+        autoAdvance={autoAdvance}
+        onToggleMute={handleToggleMute}
+        onToggleAutoAdvance={handleToggleAutoAdvance}
+      />
+
       {/* Video Feed */}
       <FlatList
         ref={flatListRef}
-        data={videos}
+        data={feedState.videos}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
@@ -171,6 +400,17 @@ export const FeedScreen: React.FC = () => {
         initialNumToRender={2}
         bounces={false}
         overScrollMode="never"
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        refreshControl={
+          <RefreshControl
+            refreshing={feedState.refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       />
     </View>
   );
@@ -180,6 +420,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingFooter: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
 
