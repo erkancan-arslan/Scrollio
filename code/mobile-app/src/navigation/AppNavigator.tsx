@@ -5,15 +5,14 @@ import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
 import { MainTabNavigator } from './MainTabNavigator';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
-import { TicTacToeScreen } from '../features/playground/games/tictactoe/TicTacToeScreen';
-import { FourInARowScreen } from '../features/playground/games/fourinarow/FourInARowScreen';
-import { RockPaperScissorsScreen } from '../features/playground/games/rockpaperscissors/RockPaperScissorsScreen';
-import { WordGuessScreen } from '../features/playground/games/wordguess/WordGuessScreen';
-import { MemoryMatchScreen } from '../features/playground/games/memorymatch/MemoryMatchScreen';
-import { NumberGuessScreen } from '../features/playground/games/numberguess/NumberGuessScreen';
-import { BattleshipScreen } from '../features/playground/games/battleship/BattleshipScreen';
-import { TinyGeoGuessScreen } from '../features/playground/games/tinygeoguess/TinyGeoGuessScreen';
-import { TurkishWordleScreen } from '../features/playground/games/turkishwordle/TurkishWordleScreen';
+import { LogicCategoryScreen } from '../features/playground/screens/LogicCategoryScreen';
+import { VisualCategoryScreen } from '../features/playground/screens/VisualCategoryScreen';
+import { DuelCategoryScreen } from '../features/playground/screens/DuelCategoryScreen';
+import { TimelineMasterScreen } from '../features/playground/games/timelinemaster/TimelineMasterScreen';
+import { MathSnakeScreen } from '../features/playground/games/mathsnake/MathSnakeScreen';
+import { ZoomFocusScreen } from '../features/playground/games/zoomfocus/ZoomFocusScreen';
+import { PerfectEyeScreen } from '../features/playground/games/perfecteye/PerfectEyeScreen';
+import { InfiniteFlowScreen } from '../features/playground/screens/InfiniteFlowScreen';
 
 export type RootStackParamList = {
     SignIn: undefined;
@@ -21,15 +20,14 @@ export type RootStackParamList = {
     MainTabs: undefined;
     Home: undefined; // Keep for backwards compatibility
     Playground: undefined;
-    TicTacToe: undefined;
-    FourInARow: undefined;
-    RockPaperScissors: undefined;
-    WordGuess: undefined;
-    MemoryMatch: undefined;
-    NumberGuess: undefined;
-    Battleship: undefined;
-    TinyGeoGuess: undefined;
-    TurkishWordle: undefined;
+    LogicCategory: undefined;
+    VisualCategory: undefined;
+    DuelCategory: undefined;
+    InfiniteFlow: undefined;
+    TimelineMaster: undefined;
+    MathSnake: undefined;
+    ZoomFocus: undefined;
+    PerfectEye: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,25 +35,25 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export const AppNavigator = () => {
     return (
         <NavigationContainer>
-            <Stack.Navigator 
+            <Stack.Navigator
                 initialRouteName="SignIn"
                 screenOptions={{
                     headerShown: false,
                 }}
             >
                 {/* Auth Screens */}
-                <Stack.Screen 
-                    name="SignIn" 
-                    component={SignInScreen} 
+                <Stack.Screen
+                    name="SignIn"
+                    component={SignInScreen}
                 />
-                <Stack.Screen 
-                    name="SignUp" 
-                    component={SignUpScreen} 
+                <Stack.Screen
+                    name="SignUp"
+                    component={SignUpScreen}
                 />
 
                 {/* Main App with Bottom Tabs */}
-                <Stack.Screen 
-                    name="MainTabs" 
+                <Stack.Screen
+                    name="MainTabs"
                     component={MainTabNavigator}
                     options={{
                         headerShown: false,
@@ -64,25 +62,28 @@ export const AppNavigator = () => {
                 />
 
                 {/* Additional Screens (accessible from anywhere) */}
-                <Stack.Screen 
-                    name="Playground" 
-                    component={PlaygroundScreen} 
-                    options={{ 
-                        headerShown: true,
-                        title: 'Playground' 
-                    }} 
+                <Stack.Screen
+                    name="LogicCategory"
+                    component={LogicCategoryScreen}
+                    options={{ headerShown: false }}
                 />
-                
+                <Stack.Screen
+                    name="VisualCategory"
+                    component={VisualCategoryScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="DuelCategory"
+                    component={DuelCategoryScreen}
+                    options={{ headerShown: false }}
+                />
+
                 {/* Game Screens */}
-                <Stack.Screen name="TicTacToe" component={TicTacToeScreen} options={{ headerShown: true, title: 'Tic-Tac-Toe' }} />
-                <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ headerShown: true, title: '4-in-a-row' }} />
-                <Stack.Screen name="RockPaperScissors" component={RockPaperScissorsScreen} options={{ headerShown: true, title: 'Rock Paper Scissors' }} />
-                <Stack.Screen name="WordGuess" component={WordGuessScreen} options={{ headerShown: true, title: 'Word Guess' }} />
-                <Stack.Screen name="MemoryMatch" component={MemoryMatchScreen} options={{ headerShown: true, title: 'Memory Match' }} />
-                <Stack.Screen name="NumberGuess" component={NumberGuessScreen} options={{ headerShown: true, title: 'Number Guess' }} />
-                <Stack.Screen name="Battleship" component={BattleshipScreen} options={{ headerShown: true, title: 'Battleship' }} />
-                <Stack.Screen name="TinyGeoGuess" component={TinyGeoGuessScreen} options={{ headerShown: true, title: 'Tiny GeoGuess' }} />
-                <Stack.Screen name="TurkishWordle" component={TurkishWordleScreen} options={{ headerShown: true, title: 'Türkçe Wordle' }} />
+                <Stack.Screen name="InfiniteFlow" component={InfiniteFlowScreen} options={{ headerShown: false, title: 'Infinite Flow' }} />
+                <Stack.Screen name="TimelineMaster" component={TimelineMasterScreen} options={{ headerShown: true, title: 'Timeline Master' }} />
+                <Stack.Screen name="MathSnake" component={MathSnakeScreen} options={{ headerShown: true, title: 'Math Snake' }} />
+                <Stack.Screen name="ZoomFocus" component={ZoomFocusScreen} options={{ headerShown: true, title: 'Zoom & Focus' }} />
+                <Stack.Screen name="PerfectEye" component={PerfectEyeScreen} options={{ headerShown: true, title: 'Perfect Eye' }} />
             </Stack.Navigator>
         </NavigationContainer>
     );

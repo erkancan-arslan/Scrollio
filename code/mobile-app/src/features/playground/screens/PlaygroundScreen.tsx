@@ -1,135 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { colors, spacing, typography } from '../../../theme';
-import { GameMode } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 
 type PlaygroundScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'Playground'>;
 };
 
-type GameItem = {
-    id: string;
-    name: string;
-    description: string;
-    route: keyof RootStackParamList;
-    supportedModes: GameMode[];
-};
-
-const GAMES: GameItem[] = [
+const CATEGORIES = [
     {
-        id: '1',
-        name: 'Tic-Tac-Toe',
-        description: 'Classic 3x3 strategy game',
-        route: 'TicTacToe',
-        supportedModes: ['multiplayer'],
+        id: 'infinite',
+        name: 'Infinite Flow',
+        description: 'Tinder-style rapid fire knowledge.',
+        icon: 'infinite-outline',
+        color: '#FF6B6B',
+        route: 'InfiniteFlow',
     },
     {
-        id: '2',
-        name: '4-in-a-row',
-        description: 'Connect 4 pieces to win',
-        route: 'FourInARow',
-        supportedModes: ['multiplayer'],
+        id: 'logic',
+        name: 'Logic & Mind',
+        description: 'Deep thinking puzzles.',
+        icon: 'bulb-outline',
+        color: '#4ECDC4',
+        route: 'LogicCategory',
     },
     {
-        id: '3',
-        name: 'Rock-Paper-Scissors',
-        description: 'Classic hand game',
-        route: 'RockPaperScissors',
-        supportedModes: ['singleplayer', 'multiplayer'],
+        id: 'visual',
+        name: 'Visual Intelligence',
+        description: 'Test your observation skills.',
+        icon: 'eye-outline',
+        color: '#FFE66D', //'#45B7D1',
+        route: 'VisualCategory',
     },
     {
-        id: '4',
-        name: 'Word Guess (TR)',
-        description: 'Guess the Turkish word',
-        route: 'WordGuess',
-        supportedModes: ['singleplayer'],
-    },
-    {
-        id: '5',
-        name: 'Memory Match',
-        description: 'Find matching pairs',
-        route: 'MemoryMatch',
-        supportedModes: ['singleplayer'],
-    },
-    {
-        id: '6',
-        name: 'Number Duel',
-        description: 'Guess the secret number',
-        route: 'NumberGuess',
-        supportedModes: ['singleplayer', 'multiplayer'],
-    },
-    {
-        id: '7',
-        name: 'Battleship',
-        description: 'Sink opponent ships',
-        route: 'Battleship',
-        supportedModes: ['multiplayer'],
-    },
-    {
-        id: 'tiny-geoguess',
-        name: 'Tiny GeoGuess',
-        description: 'Guess the city from the image!',
-        route: 'TinyGeoGuess',
-        supportedModes: ['singleplayer'],
-    },
-    {
-        id: 'turkish-wordle',
-        name: 'Türkçe Wordle',
-        description: '5 harfli Türkçe kelimeyi tahmin et!',
-        route: 'TurkishWordle',
-        supportedModes: ['singleplayer'],
+        id: 'challenges',
+        name: 'Duel Arena',
+        description: 'Challenge friends for coins.',
+        icon: 'flash-outline',
+        color: '#FF8C42',
+        route: 'DuelCategory',
     },
 ];
 
 export const PlaygroundScreen: React.FC<PlaygroundScreenProps> = ({ navigation }) => {
-    const [selectedMode, setSelectedMode] = useState<GameMode>('singleplayer');
-
-    const filteredGames = GAMES.filter(game => game.supportedModes.includes(selectedMode));
-
-    const renderGameItem = ({ item }: { item: GameItem }) => (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate(item.route as any)}
-        >
-            <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <View style={styles.tagsContainer}>
-                    {item.supportedModes.map(mode => (
-                        <View key={mode} style={[styles.tag, mode === 'singleplayer' ? styles.tagSingle : styles.tagMulti]}>
-                            <Text style={styles.tagText}>{mode === 'singleplayer' ? '1P' : '2P'}</Text>
-                        </View>
-                    ))}
-                </View>
-            </View>
-            <Text style={styles.cardDescription}>{item.description}</Text>
-        </TouchableOpacity>
-    );
-
     return (
         <View style={styles.container}>
-            <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, selectedMode === 'singleplayer' && styles.activeTab]}
-                    onPress={() => setSelectedMode('singleplayer')}
-                >
-                    <Text style={[styles.tabText, selectedMode === 'singleplayer' && styles.activeTabText]}>Single Player</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, selectedMode === 'multiplayer' && styles.activeTab]}
-                    onPress={() => setSelectedMode('multiplayer')}
-                >
-                    <Text style={[styles.tabText, selectedMode === 'multiplayer' && styles.activeTabText]}>Multiplayer</Text>
-                </TouchableOpacity>
+            <View style={styles.header}>
+                <Text style={styles.title}>Playground</Text>
+                <Text style={styles.subtitle}>Train your brain, earn rewards.</Text>
             </View>
 
-            <FlatList
-                data={filteredGames}
-                renderItem={renderGameItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-            />
+            <ScrollView contentContainerStyle={styles.grid}>
+                {CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.card, { borderColor: cat.color }]}
+                        onPress={() => navigation.navigate(cat.route as any)}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: cat.color }]}>
+                            <Ionicons name={cat.icon as any} size={32} color="white" />
+                        </View>
+                        <View style={styles.cardContent}>
+                            <Text style={styles.cardTitle}>{cat.name}</Text>
+                            <Text style={styles.cardDesc}>{cat.description}</Text>
+                        </View>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
         </View>
     );
 };
@@ -138,74 +77,59 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+        paddingTop: spacing.xl,
     },
-    tabsContainer: {
-        flexDirection: 'row',
-        padding: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+    header: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.lg,
     },
-    tab: {
-        flex: 1,
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-        borderRadius: spacing.sm,
-    },
-    activeTab: {
-        backgroundColor: colors.primary,
-    },
-    tabText: {
-        fontSize: typography.fontSize.md,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.text.secondary,
-    },
-    activeTabText: {
-        color: colors.background,
-    },
-    listContent: {
-        padding: spacing.md,
-    },
-    card: {
-        backgroundColor: colors.backgroundSecondary,
-        padding: spacing.lg,
-        borderRadius: spacing.sm,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.xs,
-    },
-    cardTitle: {
-        fontSize: typography.fontSize.lg,
-        fontWeight: typography.fontWeight.bold,
+    title: {
+        fontSize: 32,
+        fontWeight: 'bold',
         color: colors.text.primary,
     },
-    tagsContainer: {
+    subtitle: {
+        fontSize: 16,
+        color: colors.text.secondary,
+        marginTop: spacing.xs,
+    },
+    grid: {
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+    card: {
         flexDirection: 'row',
-        gap: spacing.xs,
+        backgroundColor: colors.backgroundSecondary,
+        borderRadius: spacing.md,
+        padding: spacing.md,
+        alignItems: 'center',
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        marginBottom: spacing.md
     },
-    tag: {
-        paddingHorizontal: spacing.xs,
-        paddingVertical: 2,
-        borderRadius: 4,
+    iconContainer: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.md,
     },
-    tagSingle: {
-        backgroundColor: '#4A90E2',
+    cardContent: {
+        flex: 1,
     },
-    tagMulti: {
-        backgroundColor: '#50E3C2',
-    },
-    tagText: {
-        fontSize: 10,
+    cardTitle: {
+        fontSize: 18,
         fontWeight: 'bold',
-        color: 'white',
+        color: colors.text.primary,
+        marginBottom: 4,
     },
-    cardDescription: {
-        fontSize: typography.fontSize.md,
+    cardDesc: {
+        fontSize: 14,
         color: colors.text.secondary,
     },
 });

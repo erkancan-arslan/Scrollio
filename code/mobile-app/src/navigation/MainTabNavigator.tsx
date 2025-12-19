@@ -10,12 +10,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { FeedScreen } from '../features/feed';
 import { ProfileScreen } from '../features/profile';
+import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 
 // Scrollio brand orange color
 const SCROLLIO_ORANGE = '#FF8C42';
 
 export type MainTabParamList = {
   Feed: undefined;
+  Playground: undefined;
   Profile: undefined;
 };
 
@@ -48,10 +50,26 @@ export const MainTabNavigator: React.FC = () => {
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused, color }) => (
             <View style={styles.iconContainer}>
-              <Ionicons 
-                name={focused ? 'home' : 'home-outline'} 
-                size={24} 
-                color={color} 
+              <Ionicons
+                name={focused ? 'home' : 'home-outline'}
+                size={24}
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Playground"
+        component={PlaygroundScreen}
+        options={{
+          tabBarLabel: 'Playground',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? 'game-controller' : 'game-controller-outline'}
+                size={24}
+                color={color}
               />
             </View>
           ),
@@ -64,10 +82,10 @@ export const MainTabNavigator: React.FC = () => {
           tabBarLabel: 'Profile',
           tabBarIcon: ({ focused, color }) => (
             <View style={styles.iconContainer}>
-              <Ionicons 
-                name={focused ? 'person' : 'person-outline'} 
-                size={24} 
-                color={color} 
+              <Ionicons
+                name={focused ? 'person' : 'person-outline'}
+                size={24}
+                color={color}
               />
             </View>
           ),
