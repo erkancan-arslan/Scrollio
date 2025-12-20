@@ -8,8 +8,8 @@ import { secureStorage } from '../storage/secureStorage';
 // API Configuration
 const API_CONFIG = {
   // Update this to your backend URL
-  BASE_URL: __DEV__ 
-    ? 'http://localhost:3000/api/v1'  // Development
+  BASE_URL: __DEV__
+    ? 'http://192.168.1.123:3000/api/v1'  // Development (LAN IP)
     : 'https://api.scrollio.app/api/v1', // Production
   TIMEOUT: 30000,
 };
@@ -48,11 +48,11 @@ class ApiClient {
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
     const { accessToken } = await secureStorage.getSession();
-    
+
     if (accessToken) {
       return { Authorization: `Bearer ${accessToken}` };
     }
-    
+
     return {};
   }
 

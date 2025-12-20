@@ -1,9 +1,9 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
-import { MainTabNavigator } from './MainTabNavigator';
+import { MainTabNavigator, MainTabParamList } from './MainTabNavigator';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { LogicCategoryScreen } from '../features/playground/screens/LogicCategoryScreen';
 import { VisualCategoryScreen } from '../features/playground/screens/VisualCategoryScreen';
@@ -17,7 +17,7 @@ import { InfiniteFlowScreen } from '../features/playground/screens/InfiniteFlowS
 export type RootStackParamList = {
     SignIn: undefined;
     SignUp: undefined;
-    MainTabs: undefined;
+    MainTabs: NavigatorScreenParams<MainTabParamList>;
     Home: undefined; // Keep for backwards compatibility
     Playground: undefined;
     LogicCategory: undefined;

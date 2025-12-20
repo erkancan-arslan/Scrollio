@@ -1,10 +1,14 @@
 import React, { useEffect, useCallback, useLayoutEffect } from 'react';
 import { BackHandler, TouchableOpacity, Text, StyleSheet, Platform, View } from 'react-native';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation, CommonActions, CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAppDispatch } from '../../../store/hooks';
 import { resetCurrentSession } from '../store/playgroundSlice';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../../../theme';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { MainTabParamList } from '../../../navigation/MainTabNavigator';
 
 /**
  * Hook to handle safe exit from games.
@@ -19,8 +23,14 @@ interface GameExitOptions {
     exitRoute?: string;
 }
 
+// Define combined navigation type
+type GameExitNavigationProp = CompositeNavigationProp<
+    NativeStackNavigationProp<RootStackParamList>,
+    BottomTabNavigationProp<MainTabParamList>
+>;
+
 export const useGameExit = (options: GameExitOptions | (() => void) = {}) => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<GameExitNavigationProp>();
     const dispatch = useAppDispatch();
 
     // Handle both old signature (callback only) and new signature (object)

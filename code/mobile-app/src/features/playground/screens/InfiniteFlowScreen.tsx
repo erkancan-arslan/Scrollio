@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { View, StyleSheet, Text, TouchableOpacity, StatusBar, SafeAreaView } from 'react-native';
 import { SwipeableCardStack } from '../components/SwipeableCardStack';
@@ -7,6 +7,8 @@ import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { startGame, incrementScore, endGame, resetStreak } from '../store/playgroundSlice';
 import { useGameExit } from '../hooks/useGameExit';
 import { Ionicons } from '@expo/vector-icons';
+import { leaderboardService } from '../services/leaderboardService';
+import { Leaderboard } from '../components/Leaderboard';
 
 // Hardcoded Mock Data (unchanged logic)
 // In real app, this would be dynamic.
@@ -21,39 +23,22 @@ const MOCK_DATA = [
 export const InfiniteFlowScreen = () => {
     const dispatch = useAppDispatch();
     const { activeSession } = useAppSelector(state => state.playground);
+    const scoreSubmittedRef = useRef(false);
 
     const handleExit = useGameExit();
 
     useEffect(() => {
-        // Hide default header? It should vary by navigation setup.
-        // Assuming we rely on screen options or component mount.
-        // dispatch(startGame({ gameType: 'infinite_flow', lives: 3 })); // 3 LIVES LOGIC
         dispatch(startGame({ gameType: 'infinite_flow' }));
-        // Note: Slice "startGame" might not take lives in payload if it resets to default.
-        // Let's check slice. If slice doesn't take lives, we manage it or update slice.
+        scoreSubmittedRef.current = false;
     }, [dispatch]);
 
-    // 3 Lives Logic: We need to check if 'lives' is supported in Redux or local state.
-    // Looking at the slice (I will view it next), but for now:
-    // If Redux doesn't support 'lives' param in startGame, we might need a local 'lives' state 
-    // OR update the reducer. 
-    // Assuming for now we handle "Game Over" only when lives == 0.
-
-    // Actually, let's wait to write the lives logic until I verify the slice. 
-    // But I CAN add the headerShown options.
-
-    // WAIT, better to do logic inside the existing file structure.
-
-    // Let's fix the header first.  
-    /* 
-       The user said "remove the upper bar...". 
-       To force hide header in standard React Navigation:
-    */
-    React.useLayoutEffect(() => {
-        // If navigation prop is available (which it should be via parent or hook if I used useNavigation)
-        // But here I'm using useGameExit which uses useNavigation.
-        // I should just grab navigation here.
-    }, []);
+    useEffect(() => {
+        if (activeSession?.isGameOver && activeSession.score > 0 && !scoreSubmittedRef.current) {
+            scoreSubmittedRef.current = true;
+            leaderboardService.submitScore('infinite_flow', activeSession.score)
+                .catch(err => console.error('Score submission failed', err));
+        }
+    }, [activeSession?.isGameOver, activeSession?.score]);
 
     const handleSwipe = (item: any, direction: 'left' | 'right') => {
         const isTrue = direction === 'right'; // Right = True, Left = False
@@ -90,9 +75,17 @@ export const InfiniteFlowScreen = () => {
                         </View>
                     </View>
 
+                    {/* Leaderboard Section */}
+                    <View style={{ flex: 1, width: '100%', marginBottom: spacing.md }}>
+                        <Leaderboard gameId="infinite_flow" />
+                    </View>
+
                     <TouchableOpacity
                         style={styles.primaryBtn}
-                        onPress={() => dispatch(startGame({ gameType: 'infinite_flow' }))}
+                        onPress={() => {
+                            scoreSubmittedRef.current = false;
+                            dispatch(startGame({ gameType: 'infinite_flow' }));
+                        }}
                     >
                         <Text style={styles.btnText}>Play Again</Text>
                     </TouchableOpacity>
