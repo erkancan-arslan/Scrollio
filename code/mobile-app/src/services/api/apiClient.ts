@@ -9,7 +9,7 @@ import { secureStorage } from '../storage/secureStorage';
 const API_CONFIG = {
   // Update this to your backend URL
   BASE_URL: __DEV__
-    ? 'http://192.168.1.123:3000/api/v1'  // Development (LAN IP)
+    ? 'http://localhost:3000/api/v1'  // Development (LAN IP)
     : 'https://api.scrollio.app/api/v1', // Production
   TIMEOUT: 30000,
 };

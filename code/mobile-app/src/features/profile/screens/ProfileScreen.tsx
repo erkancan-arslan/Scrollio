@@ -1,93 +1,262 @@
 /**
- * ProfileScreen - User profile placeholder
- * TODO: Implement full profile functionality
+ * ProfileScreen - User profile with stats and video collections
+ * Displays user information, statistics, and tabs for bookmarks/likes/watched videos
  */
 
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { authService } from '../../../services';
+import { AppDispatch, RootState } from '../../../store/store';
+import {
+  fetchMyProfile,
+  fetchBookmarkedVideos,
+  setActiveTab,
+  clearProfile,
+} from '../store/profileSlice';
+import { ProfileTab } from '../types';
+import { Video } from '../../feed/types';
+import {
+  ProfileHeader,
+  ProfileStats,
+  ProfileTabs,
+  VideoGrid,
+} from '../components';
 
 export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const dispatch = useDispatch<AppDispatch>();
 
+  // Redux state
+  const {
+    profile,
+    profileLoading,
+    profileError,
+    activeTab,
+    bookmarkedVideos,
+    bookmarksLoading,
+    bookmarksError,
+    hasMoreBookmarks,
+    bookmarksCursor,
+  } = useSelector((state: RootState) => state.profile);
+
+  // Load profile on mount
+  useEffect(() => {
+    dispatch(fetchMyProfile());
+    dispatch(fetchBookmarkedVideos({ limit: 20 }));
+  }, [dispatch]);
+
+  // Handle tab change
+  const handleTabChange = useCallback((tab: ProfileTab) => {
+    dispatch(setActiveTab(tab));
+
+    // Load data for the selected tab
+    if (tab === 'bookmarks' && bookmarkedVideos.length === 0) {
+      dispatch(fetchBookmarkedVideos({ limit: 20 }));
+    }
+    // TODO: Add handlers for likes and watched tabs when implemented
+  }, [dispatch, bookmarkedVideos.length]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    dispatch(fetchMyProfile());
+    if (activeTab === 'bookmarks') {
+      dispatch(fetchBookmarkedVideos({ limit: 20 }));
+    }
+    // TODO: Add refresh for other tabs
+  }, [dispatch, activeTab]);
+
+  // Handle load more
+  const handleLoadMore = useCallback(() => {
+    if (activeTab === 'bookmarks' && hasMoreBookmarks && !bookmarksLoading && bookmarksCursor) {
+      dispatch(fetchBookmarkedVideos({
+        limit: 20,
+        cursor: bookmarksCursor,
+        loadMore: true,
+      }));
+    }
+    // TODO: Add load more for other tabs
+  }, [dispatch, activeTab, hasMoreBookmarks, bookmarksLoading, bookmarksCursor]);
+
+  // Handle video press
+  const handleVideoPress = useCallback((video: Video) => {
+    // TODO: Navigate to video player or full screen video view
+    console.log('Video pressed:', video.id);
+  }, []);
+
+  // Handle sign out
   const handleSignOut = async () => {
-    await authService.signOut();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'SignIn' }],
-    });
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await authService.signOut();
+            dispatch(clearProfile());
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'SignIn' }],
+            });
+          },
+        },
+      ]
+    );
   };
+
+  // Get videos for current tab
+  const getCurrentTabVideos = (): Video[] => {
+    switch (activeTab) {
+      case 'bookmarks':
+        return bookmarkedVideos;
+      case 'likes':
+        return []; // TODO: Implement liked videos
+      case 'watched':
+        return []; // TODO: Implement watched videos
+      default:
+        return [];
+    }
+  };
+
+  // Get loading state for current tab
+  const getCurrentTabLoading = (): boolean => {
+    switch (activeTab) {
+      case 'bookmarks':
+        return bookmarksLoading;
+      case 'likes':
+        return false; // TODO: Implement
+      case 'watched':
+        return false; // TODO: Implement
+      default:
+        return false;
+    }
+  };
+
+  // Get error for current tab
+  const getCurrentTabError = (): string | null => {
+    switch (activeTab) {
+      case 'bookmarks':
+        return bookmarksError;
+      case 'likes':
+        return null; // TODO: Implement
+      case 'watched':
+        return null; // TODO: Implement
+      default:
+        return null;
+    }
+  };
+
+  // Get empty message for current tab
+  const getEmptyMessage = (): string => {
+    switch (activeTab) {
+      case 'bookmarks':
+        return 'No bookmarked videos yet.\nBookmark videos to watch them later!';
+      case 'likes':
+        return 'No liked videos yet.\nLike videos you enjoy!';
+      case 'watched':
+        return 'No watch history yet.\nStart watching to see your history!';
+      default:
+        return 'No videos yet';
+    }
+  };
+
+  if (profileError && !profile) {
+    return (
+      <View style={[styles.errorContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => dispatch(fetchMyProfile())}
+        >
+          <Ionicons name="refresh" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (profileLoading && !profile) {
+    return (
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+        {/* Loading skeleton or spinner */}
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Header with Sign Out button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </View>
-
-      {/* Profile Content */}
-      <View style={styles.content}>
-        {/* Avatar Placeholder */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </View>
-          <Text style={styles.username}>@username</Text>
-        </View>
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Videos</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Likes</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>1</Text>
-            <Text style={styles.statLabel}>Level</Text>
-          </View>
-        </View>
-
-        {/* XP Progress */}
-        <View style={styles.xpContainer}>
-          <View style={styles.xpHeader}>
-            <Text style={styles.xpLabel}>Experience Points</Text>
-            <Text style={styles.xpValue}>0 / 100 XP</Text>
-          </View>
-          <View style={styles.xpBar}>
-            <View style={[styles.xpProgress, { width: '0%' }]} />
-          </View>
-        </View>
-
-        {/* Coming Soon Message */}
-        <View style={styles.comingSoonContainer}>
-          <Text style={styles.comingSoonIcon}>🚧</Text>
-          <Text style={styles.comingSoonTitle}>Profile Coming Soon!</Text>
-          <Text style={styles.comingSoonText}>
-            Your learning stats, achievements, and settings will appear here.
-          </Text>
-        </View>
-
-        {/* Sign Out Button */}
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <View style={styles.headerSpacer} />
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={handleSignOut}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
         </TouchableOpacity>
       </View>
+
+      {/* Scrollable Content */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={profileLoading || bookmarksLoading}
+            onRefresh={handleRefresh}
+            tintColor="#FF8C42"
+          />
+        }
+      >
+        {/* Profile Header */}
+        <ProfileHeader profile={profile} />
+
+        {/* Profile Stats */}
+        <ProfileStats profile={profile} />
+
+        {/* Tabs */}
+        <ProfileTabs
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          bookmarkCount={bookmarkedVideos.length}
+          likeCount={0} // TODO: Implement
+          watchedCount={0} // TODO: Implement
+        />
+
+        {/* Video Grid without header */}
+        <VideoGrid
+          videos={getCurrentTabVideos()}
+          loading={getCurrentTabLoading()}
+          error={getCurrentTabError()}
+          onVideoPress={handleVideoPress}
+          onLoadMore={handleLoadMore}
+          hasMore={activeTab === 'bookmarks' ? hasMoreBookmarks : false}
+          emptyMessage={getEmptyMessage()}
+        />
+      </ScrollView>
     </View>
   );
 };
@@ -98,154 +267,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F3ED',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#E8E8E8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    fontSize: 48,
-  },
-  username: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E5E5E5',
-  },
-  xpContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  xpHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  xpLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  xpValue: {
-    fontSize: 14,
-    color: '#FF8C42',
-    fontWeight: '600',
-  },
-  xpBar: {
-    height: 8,
-    backgroundColor: '#E8E8E8',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  xpProgress: {
-    height: '100%',
-    backgroundColor: '#FF8C42',
-    borderRadius: 4,
-  },
-  comingSoonContainer: {
-    alignItems: 'center',
-    padding: 32,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
   },
-  comingSoonIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  comingSoonTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  comingSoonText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 20,
+  headerSpacer: {
+    width: 24,
   },
   signOutButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
+    padding: 4,
   },
-  signOutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF3B30',
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 50, // Add padding at bottom for scrolling
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F3ED',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F3ED',
+    padding: 40,
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
-

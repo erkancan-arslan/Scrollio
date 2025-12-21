@@ -4,7 +4,10 @@
       "Bash(npm start)",
       "Bash(pkill:*)",
       "Bash(npx expo start --port 8082)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(tail:*)"
     ],
     "deny": [],
     "ask": []

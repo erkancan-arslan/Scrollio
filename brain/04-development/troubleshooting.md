@@ -243,9 +243,75 @@ async function testBackendConnection() {
     .from('videos')
     .select('*')
     .limit(1);
-    
+
   console.log('Backend connection:', { data, error });
 }
+```
+
+**Real-World Case (2024-12-22):**
+```
+Issue: "Invalid API key" error when calling /profile/me endpoint
+Root Cause: Corrupted SUPABASE_SERVICE_ROLE_KEY in backend/.env
+- Key had extra characters appended at the end
+- Auth endpoints worked fine (use SUPABASE_ANON_KEY)
+- Profile endpoints failed (use SUPABASE_SERVICE_ROLE_KEY via getAdminClient())
+
+Solution:
+1. Opened Supabase dashboard → Settings → API
+2. Copied fresh SERVICE_ROLE_KEY
+3. Replaced entire line in backend/.env
+4. Restarted backend server
+5. Profile endpoint worked immediately
+
+Lesson: If auth works but profile/admin endpoints fail, check SERVICE_ROLE_KEY
+```
+
+### 3. Profile Not Found (PGRST116)
+
+**Symptoms:**
+- Error: "Cannot coerce the result to a single JSON object"
+- Code: "PGRST116"
+- Error detail: "The result contains 0 rows"
+- Happens when calling `/profile/me` endpoint
+
+**Root Cause:**
+- No profile row exists in `profiles` table for the user
+- Usually happens with users created before `handle_new_user()` trigger was set up
+- Or trigger failed silently during user creation
+
+**Solutions:**
+
+```sql
+-- 1. Check if profile exists for user
+SELECT * FROM profiles WHERE id = 'user-uuid-here';
+
+-- 2. Manually create profile for existing user
+INSERT INTO profiles (id, created_at, updated_at)
+VALUES ('user-uuid-here', NOW(), NOW());
+
+-- 3. Verify trigger exists and is enabled
+SELECT tgname, tgenabled
+FROM pg_trigger
+WHERE tgname = 'on_auth_user_created';
+
+-- 4. Test trigger by creating new user
+-- New signups should auto-create profile row
+```
+
+**Real-World Case (2024-12-22):**
+```
+Issue: User profile not found after sign-in
+Root Cause: Old user account didn't have profile row (created before trigger)
+
+Solution:
+1. User created fresh account with new email
+2. handle_new_user() trigger ran automatically
+3. Profile row created successfully in profiles table
+4. Profile loaded without errors
+
+Recommendation:
+- For production, run migration to create profiles for all existing users
+- Ensure trigger is active before first production deployment
 ```
 
 ---
