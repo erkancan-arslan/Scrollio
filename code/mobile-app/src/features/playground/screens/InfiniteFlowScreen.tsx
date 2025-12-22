@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { View, StyleSheet, Text, TouchableOpacity, StatusBar, SafeAreaView } from 'react-native';
 import { SwipeableCardStack } from '../components/SwipeableCardStack';
@@ -10,20 +10,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { leaderboardService } from '../services/leaderboardService';
 import { Leaderboard } from '../components/Leaderboard';
 
-// Hardcoded Mock Data (unchanged logic)
-// In real app, this would be dynamic.
-const MOCK_DATA = [
-    { id: 1, type: 'true_false', question: 'Octopuses have 3 hearts.', answer: true, hint: 'Nature is weird.' },
-    { id: 2, type: 'true_false', question: 'The Great Wall of China is visible from space.', answer: false, hint: 'Common myth.' },
-    { id: 3, type: 'true_false', question: 'Bananas are berries.', answer: true, hint: 'Botanically speaking.' },
-    { id: 4, type: 'true_false', question: 'Goldfish have a 3-second memory.', answer: false, hint: 'They can remember for months.' },
-    { id: 5, type: 'true_false', question: 'Lightning never strikes the same place twice.', answer: false, hint: 'Empire State Building gets hit ~25 times/year.' },
-];
+import { INFINITE_FLOW_QUESTIONS_ENGLISH, INFINITE_FLOW_QUESTIONS_TURKISH } from '../data/infiniteFlowQuestions';
+
+const shuffleArray = (array: any[]) => {
+    const newArr = [...array];
+    for (let i = newArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+};
 
 export const InfiniteFlowScreen = () => {
     const dispatch = useAppDispatch();
     const { activeSession } = useAppSelector(state => state.playground);
     const scoreSubmittedRef = useRef(false);
+    const [timer, setTimer] = useState(10);
+    const [gameRunId, setGameRunId] = useState(0);
+    const [language, setLanguage] = useState<'en' | 'tr'>('en');
+
+    const shuffledQuestions = useMemo(() => {
+        const sourceData = language === 'tr' ? INFINITE_FLOW_QUESTIONS_TURKISH : INFINITE_FLOW_QUESTIONS_ENGLISH;
+        return shuffleArray(sourceData);
+    }, [gameRunId, language]);
 
     const handleExit = useGameExit();
 
@@ -40,7 +49,24 @@ export const InfiniteFlowScreen = () => {
         }
     }, [activeSession?.isGameOver, activeSession?.score]);
 
+    useEffect(() => {
+        if (!activeSession || activeSession.isGameOver) return;
+
+        const interval = setInterval(() => {
+            setTimer((prev) => {
+                if (prev <= 1) {
+                    dispatch(resetStreak());
+                    return 10;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [activeSession, dispatch]);
+
     const handleSwipe = (item: any, direction: 'left' | 'right') => {
+        setTimer(10);
         const isTrue = direction === 'right'; // Right = True, Left = False
         const correct = item.answer === isTrue;
 
@@ -59,7 +85,7 @@ export const InfiniteFlowScreen = () => {
 
     if (activeSession.isGameOver) {
         return (
-            <View style={styles.container}>
+            <SafeAreaView style={styles.container}>
                 <StatusBar barStyle="light-content" />
                 <View style={styles.resultContainer}>
                     <Text style={styles.gameOverTitle}>RUN OVER</Text>
@@ -84,6 +110,7 @@ export const InfiniteFlowScreen = () => {
                         style={styles.primaryBtn}
                         onPress={() => {
                             scoreSubmittedRef.current = false;
+                            setGameRunId(prev => prev + 1);
                             dispatch(startGame({ gameType: 'infinite_flow' }));
                         }}
                     >
@@ -97,7 +124,7 @@ export const InfiniteFlowScreen = () => {
                         <Text style={styles.secondaryBtnText}>Back to Playground</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </SafeAreaView>
         );
     }
 
@@ -116,21 +143,28 @@ export const InfiniteFlowScreen = () => {
                 </View>
 
                 <View style={styles.statsMini}>
-                    <View style={styles.coinBadge}>
-                        <Ionicons name="heart" size={14} color={colors.error} />
-                        <Text style={styles.streakMiniText}>{activeSession.lives}</Text>
-                    </View>
-                    <View style={[styles.coinBadge, { marginLeft: 8 }]}>
+                    <View style={[styles.coinBadge, { marginLeft: 0 }]}>
                         <Ionicons name="flame" size={14} color={colors.primary} />
                         <Text style={styles.streakMiniText}>{activeSession.streak}</Text>
                     </View>
+                    <View style={[styles.coinBadge, { marginLeft: 8, backgroundColor: timer <= 3 ? colors.error : '#333' }]}>
+                        <Ionicons name="timer-outline" size={14} color="white" />
+                        <Text style={styles.streakMiniText}>{timer}s</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.coinBadge, { marginLeft: 8, backgroundColor: '#444' }]}
+                        onPress={() => setLanguage(prev => prev === 'en' ? 'tr' : 'en')}
+                    >
+                        <Ionicons name="language" size={14} color="white" />
+                        <Text style={styles.streakMiniText}>{language.toUpperCase()}</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
             {/* B. Card Stack */}
             <View style={styles.stackArea}>
                 <SwipeableCardStack
-                    data={MOCK_DATA}
+                    data={shuffledQuestions}
                     onSwipeLeft={(item) => handleSwipe(item, 'left')}
                     onSwipeRight={(item) => handleSwipe(item, 'right')}
                     onFinished={() => dispatch(endGame())}
@@ -215,8 +249,9 @@ const styles = StyleSheet.create({
     },
     statsMini: {
         flexDirection: 'row',
-        width: 40,
-        justifyContent: 'flex-end'
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 8,
     },
     coinBadge: {
         flexDirection: 'row',
