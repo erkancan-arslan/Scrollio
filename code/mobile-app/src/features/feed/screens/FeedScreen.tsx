@@ -16,6 +16,7 @@ import {
   Text,
 } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import { FeedVideoItem, FeedOptionsButton } from '../components';
 import { Video, FeedState } from '../types';
 import { mockVideos } from '../data/mockVideos';
@@ -25,6 +26,7 @@ import { colors } from '../../../theme';
 export const FeedScreen: React.FC = () => {
   const { height: windowHeight } = Dimensions.get('window');
   const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
   
   // Feed state
   const [feedState, setFeedState] = useState<FeedState>({
@@ -296,7 +298,7 @@ export const FeedScreen: React.FC = () => {
     ({ item, index }: { item: Video; index: number }) => (
       <FeedVideoItem
         video={item}
-        isActive={index === currentIndex}
+        isActive={index === currentIndex && isFocused}
         isMuted={isMuted}
         onLike={handleLike}
         onComment={handleComment}
@@ -310,6 +312,7 @@ export const FeedScreen: React.FC = () => {
     ),
     [
       currentIndex,
+      isFocused,
       isMuted,
       autoAdvance,
       handleLike,

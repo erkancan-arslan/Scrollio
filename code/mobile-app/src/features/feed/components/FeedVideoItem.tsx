@@ -10,6 +10,7 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video } from '../types';
 import { VideoActions } from './VideoActions';
 import { VideoInfo } from './VideoInfo';
+
+const UI_HIDE_DELAY = 4000; // Hide UI after 4 seconds
 
 interface FeedVideoItemProps {
   video: Video;
@@ -49,9 +52,59 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
+  const [showUI, setShowUI] = useState(true);
+  
+  // Animation value for UI fade
+  const uiOpacity = useRef(new Animated.Value(1)).current;
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Calculate bottom offset for content to not overlap with any UI
   const bottomOffset = useMemo(() => 16 + insets.bottom, [insets.bottom]);
+
+  // Clear hide timer
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  // Start hide timer
+  const startHideTimer = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      setShowUI(false);
+      Animated.timing(uiOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }, UI_HIDE_DELAY);
+  }, [clearHideTimer, uiOpacity]);
+
+  // Show UI with animation
+  const revealUI = useCallback(() => {
+    setShowUI(true);
+    Animated.timing(uiOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+    startHideTimer();
+  }, [uiOpacity, startHideTimer]);
+
+  // Start timer when video becomes active
+  useEffect(() => {
+    if (isActive) {
+      startHideTimer();
+    } else {
+      clearHideTimer();
+      // Show UI when video is not active
+      setShowUI(true);
+      uiOpacity.setValue(1);
+    }
+    return () => clearHideTimer();
+  }, [isActive, startHideTimer, clearHideTimer, uiOpacity]);
 
   // Create video player with expo-video
   const player = useVideoPlayer(video.videoUrl, (player) => {
@@ -96,21 +149,40 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     setIsLoading(false);
   }, []);
 
-  const handlePress = useCallback(() => {
-    if (player.playing) {
-      player.pause();
-      setShowPauseIcon(true);
-      setTimeout(() => setShowPauseIcon(false), 800);
-    } else {
-      player.play();
-    }
-  }, [player]);
-
   const handleDoubleTap = useCallback(() => {
     if (!video.isLiked) {
       onLike(video.id);
     }
-  }, [video.id, video.isLiked, onLike]);
+    // Show UI briefly when liking
+    revealUI();
+  }, [video.id, video.isLiked, onLike, revealUI]);
+
+  // Single tap behavior
+  const handleSingleTap = useCallback(() => {
+    if (showUI) {
+      // UI is visible - pause/play the video
+      if (player.playing) {
+        player.pause();
+        setShowPauseIcon(true);
+        setTimeout(() => setShowPauseIcon(false), 800);
+        // Hide UI when pausing
+        clearHideTimer();
+        setShowUI(false);
+        Animated.timing(uiOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        // Video is paused, resume playing
+        player.play();
+        startHideTimer();
+      }
+    } else {
+      // UI is hidden - show UI and start timer
+      revealUI();
+    }
+  }, [showUI, player, clearHideTimer, uiOpacity, revealUI, startHideTimer]);
 
   // Double tap detection
   const lastTap = useRef<number>(0);
@@ -121,15 +193,15 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
       handleDoubleTap();
     } else {
-      // Single tap - toggle play/pause with delay to check for double tap
+      // Single tap - toggle UI with delay to check for double tap
       setTimeout(() => {
         if (Date.now() - lastTap.current >= DOUBLE_TAP_DELAY) {
-          handlePress();
+          handleSingleTap();
         }
       }, DOUBLE_TAP_DELAY);
     }
     lastTap.current = now;
-  }, [handleDoubleTap, handlePress]);
+  }, [handleDoubleTap, handleSingleTap]);
 
   return (
     <View style={[styles.container, { width, height: itemHeight }]}>
@@ -163,24 +235,32 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
             </View>
           )}
 
-          {/* Gradient Overlay for better text visibility */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
-            locations={[0, 0.5, 1]}
-            style={styles.gradientOverlay}
-          />
+          {/* Gradient Overlay for better text visibility - animated with UI */}
+          <Animated.View style={{ opacity: uiOpacity }}>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
+              locations={[0, 0.5, 1]}
+              style={styles.gradientOverlay}
+            />
+          </Animated.View>
 
-          {/* Video Info (Bottom Left) */}
-          <View style={[styles.infoContainer, { bottom: bottomOffset }]}>
+          {/* Video Info (Bottom Left) - animated */}
+          <Animated.View 
+            style={[styles.infoContainer, { bottom: bottomOffset, opacity: uiOpacity }]}
+            pointerEvents={showUI ? 'auto' : 'none'}
+          >
             <VideoInfo
               video={video}
               onCreatorPress={() => onCreatorPress(video.creator.id)}
               onTopicPress={() => onTopicPress(video.topic)}
             />
-          </View>
+          </Animated.View>
 
-          {/* Action Buttons (Right Side) */}
-          <View style={[styles.actionsContainer, { bottom: bottomOffset }]}>
+          {/* Action Buttons (Right Side) - animated */}
+          <Animated.View 
+            style={[styles.actionsContainer, { bottom: bottomOffset, opacity: uiOpacity }]}
+            pointerEvents={showUI ? 'auto' : 'none'}
+          >
             <VideoActions
               creator={video.creator}
               stats={video.stats}
@@ -192,7 +272,7 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
               onShare={() => onShare(video.id)}
               onCreatorPress={() => onCreatorPress(video.creator.id)}
             />
-          </View>
+          </Animated.View>
         </View>
       </TouchableWithoutFeedback>
     </View>
