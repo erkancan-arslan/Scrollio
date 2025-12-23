@@ -21,6 +21,10 @@ import { VideoInfo } from './VideoInfo';
 
 const UI_HIDE_DELAY = 4000; // Hide UI after 4 seconds
 
+// Global cache to track which videos have already loaded their first frame
+// This persists across component remounts
+const loadedVideosCache = new Set<string>();
+
 interface FeedVideoItemProps {
   video: Video;
   isActive: boolean;
@@ -33,6 +37,7 @@ interface FeedVideoItemProps {
   onTopicPress: (topic: string) => void;
   onVideoEnd?: () => void;
   itemHeight: number;
+  nextVideoUrl?: string; // URL of the next video to preload
 }
 
 export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
@@ -47,16 +52,20 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   onTopicPress,
   onVideoEnd,
   itemHeight,
+  nextVideoUrl,
 }) => {
   const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
-  const [isLoading, setIsLoading] = useState(true);
+  // Check cache to see if this video has already loaded - skip loading indicator if so
+  const [isLoading, setIsLoading] = useState(() => !loadedVideosCache.has(video.videoUrl));
+  const [isBuffering, setIsBuffering] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
   const [showUI, setShowUI] = useState(true);
   
   // Animation value for UI fade
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasPlayingRef = useRef(false);
   
   // Calculate bottom offset for content to not overlap with any UI
   const bottomOffset = useMemo(() => 16 + insets.bottom, [insets.bottom]);
@@ -110,7 +119,49 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   const player = useVideoPlayer(video.videoUrl, (player) => {
     player.loop = !onVideoEnd; // Only loop if no onVideoEnd handler (auto-advance disabled)
     player.muted = isMuted;
+    // IMPORTANT: Start paused - only play when isActive
+    player.pause();
   });
+
+  // Debug: Log video URL and player errors
+  useEffect(() => {
+    console.log('Video URL:', video.videoUrl);
+    
+    const errorSubscription = player.addListener('statusChange', (status) => {
+      console.log('Player status:', status.status);
+      if (status.status === 'error') {
+        console.error('Video playback error:', status.error);
+      }
+    });
+
+    return () => errorSubscription.remove();
+  }, [player, video.videoUrl]);
+
+  // Preload next video when this one is active
+  // Only create preload player when we have a URL to preload
+  const shouldPreload = isActive && nextVideoUrl && !loadedVideosCache.has(nextVideoUrl);
+  const preloadUrl = shouldPreload ? nextVideoUrl : video.videoUrl; // Use current video as fallback (already loaded)
+  
+  const preloadPlayer = useVideoPlayer(preloadUrl, (preloader) => {
+    preloader.muted = true;
+    preloader.pause(); // Ensure preloader doesn't auto-play
+  });
+
+  // When preload completes, add to cache
+  useEffect(() => {
+    if (shouldPreload && nextVideoUrl && preloadPlayer) {
+      try {
+        const subscription = preloadPlayer.addListener('statusChange', (status) => {
+          if (status.status === 'readyToPlay') {
+            loadedVideosCache.add(nextVideoUrl);
+          }
+        });
+        return () => subscription.remove();
+      } catch {
+        // Ignore errors if player is not ready
+      }
+    }
+  }, [shouldPreload, nextVideoUrl, preloadPlayer]);
 
   // Update muted state when prop changes
   useEffect(() => {
@@ -135,6 +186,34 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     };
   }, [player, onVideoEnd]);
 
+  // Listen for buffering state changes
+  useEffect(() => {
+    const statusSubscription = player.addListener('statusChange', (status) => {
+      // When status is 'loading' after initial load, it means buffering
+      if (status.status === 'loading' && !isLoading) {
+        setIsBuffering(true);
+      } else if (status.status === 'readyToPlay') {
+        setIsBuffering(false);
+      }
+    });
+
+    // Also track playback state to detect stalls
+    const playingSubscription = player.addListener('playingChange', (isPlaying) => {
+      if (isActive && wasPlayingRef.current && !isPlaying.isPlaying && !player.currentTime) {
+        // Was playing but suddenly stopped - likely buffering
+        setIsBuffering(true);
+      } else if (isPlaying.isPlaying) {
+        setIsBuffering(false);
+      }
+      wasPlayingRef.current = isPlaying.isPlaying;
+    });
+
+    return () => {
+      statusSubscription.remove();
+      playingSubscription.remove();
+    };
+  }, [player, isActive, isLoading]);
+
   // Play/pause based on whether video is active in viewport
   useEffect(() => {
     if (isActive) {
@@ -144,10 +223,11 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     }
   }, [isActive, player]);
 
-  // Handle first frame render to hide loading
+  // Handle first frame render to hide loading and cache the loaded video
   const handleFirstFrameRender = useCallback(() => {
+    loadedVideosCache.add(video.videoUrl);
     setIsLoading(false);
-  }, []);
+  }, [video.videoUrl]);
 
   const handleDoubleTap = useCallback(() => {
     if (!video.isLiked) {
@@ -216,10 +296,17 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
             onFirstFrameRender={handleFirstFrameRender}
           />
 
-          {/* Loading Indicator */}
+          {/* Initial Loading Indicator */}
           {isLoading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
+
+          {/* Buffering Indicator (smaller, for mid-playback stalls) */}
+          {!isLoading && isBuffering && (
+            <View style={styles.bufferingOverlay}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
             </View>
           )}
 
@@ -294,6 +381,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  bufferingOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -15,
+    marginTop: -15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,
