@@ -37,7 +37,6 @@ interface FeedVideoItemProps {
   onTopicPress: (topic: string) => void;
   onVideoEnd?: () => void;
   itemHeight: number;
-  nextVideoUrl?: string; // URL of the next video to preload
 }
 
 export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
@@ -52,7 +51,6 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   onTopicPress,
   onVideoEnd,
   itemHeight,
-  nextVideoUrl,
 }) => {
   const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
@@ -137,31 +135,8 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     return () => errorSubscription.remove();
   }, [player, video.videoUrl]);
 
-  // Preload next video when this one is active
-  // Only create preload player when we have a URL to preload
-  const shouldPreload = isActive && nextVideoUrl && !loadedVideosCache.has(nextVideoUrl);
-  const preloadUrl = shouldPreload ? nextVideoUrl : video.videoUrl; // Use current video as fallback (already loaded)
-  
-  const preloadPlayer = useVideoPlayer(preloadUrl, (preloader) => {
-    preloader.muted = true;
-    preloader.pause(); // Ensure preloader doesn't auto-play
-  });
-
-  // When preload completes, add to cache
-  useEffect(() => {
-    if (shouldPreload && nextVideoUrl && preloadPlayer) {
-      try {
-        const subscription = preloadPlayer.addListener('statusChange', (status) => {
-          if (status.status === 'readyToPlay') {
-            loadedVideosCache.add(nextVideoUrl);
-          }
-        });
-        return () => subscription.remove();
-      } catch {
-        // Ignore errors if player is not ready
-      }
-    }
-  }, [shouldPreload, nextVideoUrl, preloadPlayer]);
+  // Note: Preloading removed to reduce memory usage and prevent crashes
+  // HLS streaming is already fast enough without preloading
 
   // Update muted state when prop changes
   useEffect(() => {

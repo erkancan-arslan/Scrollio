@@ -295,27 +295,21 @@ export const FeedScreen: React.FC = () => {
 
   // Render each video item
   const renderItem = useCallback(
-    ({ item, index }: { item: Video; index: number }) => {
-      // Get the next video URL for preloading
-      const nextVideoUrl = feedState.videos[index + 1]?.videoUrl;
-      
-      return (
-        <FeedVideoItem
-          video={item}
-          isActive={index === currentIndex && isFocused}
-          isMuted={isMuted}
-          onLike={handleLike}
-          onComment={handleComment}
-          onBookmark={handleBookmark}
-          onShare={handleShare}
-          onCreatorPress={handleCreatorPress}
-          onTopicPress={handleTopicPress}
-          onVideoEnd={autoAdvance ? handleVideoEnd : undefined}
-          itemHeight={itemHeight}
-          nextVideoUrl={nextVideoUrl}
-        />
-      );
-    },
+    ({ item, index }: { item: Video; index: number }) => (
+      <FeedVideoItem
+        video={item}
+        isActive={index === currentIndex && isFocused}
+        isMuted={isMuted}
+        onLike={handleLike}
+        onComment={handleComment}
+        onBookmark={handleBookmark}
+        onShare={handleShare}
+        onCreatorPress={handleCreatorPress}
+        onTopicPress={handleTopicPress}
+        onVideoEnd={autoAdvance ? handleVideoEnd : undefined}
+        itemHeight={itemHeight}
+      />
+    ),
     [
       currentIndex,
       isFocused,
@@ -329,7 +323,6 @@ export const FeedScreen: React.FC = () => {
       handleTopicPress,
       handleVideoEnd,
       itemHeight,
-      feedState.videos,
     ]
   );
 
@@ -404,10 +397,10 @@ export const FeedScreen: React.FC = () => {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={getItemLayout}
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        initialNumToRender={2}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={1}
         bounces={false}
         overScrollMode="never"
         onEndReached={handleEndReached}
