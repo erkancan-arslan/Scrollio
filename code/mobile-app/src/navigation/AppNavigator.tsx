@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
 import { MainTabNavigator, MainTabParamList } from './MainTabNavigator';
+import { ChatScreen } from '../features/chat';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { LogicCategoryScreen } from '../features/playground/screens/LogicCategoryScreen';
 import { VisualCategoryScreen } from '../features/playground/screens/VisualCategoryScreen';
@@ -19,6 +20,12 @@ export type RootStackParamList = {
     SignUp: undefined;
     MainTabs: NavigatorScreenParams<MainTabParamList>;
     Home: undefined; // Keep for backwards compatibility
+    Chat: {
+        conversationId: string;
+        otherUserId: string;
+        otherUserName: string;
+        otherUserAvatar?: string;
+    };
     Playground: undefined;
     LogicCategory: undefined;
     VisualCategory: undefined;
@@ -62,6 +69,15 @@ export const AppNavigator = () => {
                 />
 
                 {/* Additional Screens (accessible from anywhere) */}
+                <Stack.Screen
+                    name="Chat"
+                    component={ChatScreen}
+                    options={{
+                        headerShown: true,
+                        headerTitle: 'Chat',
+                        headerBackTitle: 'Back',
+                    }}
+                />
                 <Stack.Screen
                     name="LogicCategory"
                     component={LogicCategoryScreen}

@@ -33,12 +33,13 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Invalid or expired token');
       }
 
-      // Attach user to request
+      // Attach user context to request for downstream handlers
       request.user = {
         id: data.user.id,
         email: data.user.email,
         displayName: data.user.user_metadata?.display_name,
       };
+      request.supabaseAccessToken = token;
 
       return true;
     } catch (error) {
@@ -49,4 +50,3 @@ export class AuthGuard implements CanActivate {
     }
   }
 }
-

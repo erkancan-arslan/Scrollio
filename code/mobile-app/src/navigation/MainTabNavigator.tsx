@@ -11,12 +11,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { FeedScreen } from '../features/feed';
 import { ProfileScreen } from '../features/profile';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
+import { SearchScreen } from '../features/search';
+import { FriendsScreen } from '../features/friends';
+import { ChatListScreen } from '../features/chat';
 
 // Scrollio brand orange color
 const SCROLLIO_ORANGE = '#FF8C42';
 
 export type MainTabParamList = {
   Feed: undefined;
+  Search: undefined;
+  Friends: undefined;
+  Messages: undefined;
   Playground: undefined;
   Profile: undefined;
 };
@@ -52,6 +58,54 @@ export const MainTabNavigator: React.FC = () => {
             <View style={styles.iconContainer}>
               <Ionicons
                 name={focused ? 'home' : 'home-outline'}
+                size={24}
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarLabel: 'Search',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? 'search' : 'search-outline'}
+                size={24}
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Friends"
+        component={FriendsScreen}
+        options={{
+          tabBarLabel: 'Friends',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? 'people' : 'people-outline'}
+                size={24}
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Messages"
+        component={ChatListScreen}
+        options={{
+          tabBarLabel: 'Messages',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
                 size={24}
                 color={color}
               />

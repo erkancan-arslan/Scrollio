@@ -52,19 +52,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ profile }) => {
           <Text style={styles.bioText}>{profile.bio}</Text>
         </View>
       )}
-
-      {/* Followers/Following */}
-      <View style={styles.socialStats}>
-        <View style={styles.socialStatItem}>
-          <Text style={styles.socialStatNumber}>{profile.followerCount}</Text>
-          <Text style={styles.socialStatLabel}>Followers</Text>
-        </View>
-        <View style={styles.socialDivider} />
-        <View style={styles.socialStatItem}>
-          <Text style={styles.socialStatNumber}>{profile.followingCount}</Text>
-          <Text style={styles.socialStatLabel}>Following</Text>
-        </View>
-      </View>
     </View>
   );
 };
@@ -153,30 +140,5 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  socialStats: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 16,
-  },
-  socialStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  socialStatNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  socialStatLabel: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  socialDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E5E5E5',
   },
 });
