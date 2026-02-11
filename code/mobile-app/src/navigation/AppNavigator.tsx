@@ -14,10 +14,12 @@ import { MathSnakeScreen } from '../features/playground/games/mathsnake/MathSnak
 import { ZoomFocusScreen } from '../features/playground/games/zoomfocus/ZoomFocusScreen';
 import { PerfectEyeScreen } from '../features/playground/games/perfecteye/PerfectEyeScreen';
 import { InfiniteFlowScreen } from '../features/playground/screens/InfiniteFlowScreen';
+import { KidsNavigator } from './KidsNavigator';
 
 export type RootStackParamList = {
     SignIn: undefined;
     SignUp: undefined;
+    Kids: undefined; // Scrollio Kids (7–12) — separate auth flow
     MainTabs: NavigatorScreenParams<MainTabParamList>;
     Home: undefined; // Keep for backwards compatibility
     Chat: {
@@ -56,6 +58,11 @@ export const AppNavigator = () => {
                 <Stack.Screen
                     name="SignUp"
                     component={SignUpScreen}
+                />
+                <Stack.Screen
+                    name="Kids"
+                    component={KidsNavigator}
+                    options={{ headerShown: false, gestureEnabled: false }}
                 />
 
                 {/* Main App with Bottom Tabs */}

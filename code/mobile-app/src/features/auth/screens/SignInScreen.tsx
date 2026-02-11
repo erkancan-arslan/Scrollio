@@ -21,9 +21,12 @@ type SignInScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
 };
 
+const testEmail = __DEV__ ? (process.env.EXPO_PUBLIC_TEST_EMAIL ?? '') : '';
+const testPassword = __DEV__ ? (process.env.EXPO_PUBLIC_TEST_PASSWORD ?? '') : '';
+
 export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState(testEmail);
+    const [password, setPassword] = useState(testPassword);
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -196,6 +199,14 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
                                     <Text style={styles.footerLink}>Sign Up</Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {/* Scrollio Kids entry */}
+                            <TouchableOpacity
+                                style={styles.kidsLink}
+                                onPress={() => navigation.navigate('Kids')}
+                            >
+                                <Text style={styles.kidsLinkText}>Scrollio Kids (7–12) için tıkla</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
@@ -415,5 +426,14 @@ const styles = StyleSheet.create({
         fontSize: typography.fontSize.sm,
         color: ACCENT_COLOR,
         fontWeight: '600',
+    },
+    kidsLink: {
+        marginTop: spacing.lg,
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+    },
+    kidsLinkText: {
+        fontSize: typography.fontSize.sm,
+        color: '#888',
     },
 });

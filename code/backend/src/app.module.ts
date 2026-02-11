@@ -9,6 +9,7 @@ import { FriendsModule } from './friends/friends.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessagesModule } from './messages/messages.module';
 import { FcmModule } from './fcm/fcm.module';
+import { KidsModule } from './kids/kids.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -26,6 +27,7 @@ import { HealthController } from './health/health.controller';
     ConversationsModule,
     MessagesModule,
     FcmModule,
+    KidsModule,
   ],
   controllers: [HealthController],
   providers: [],

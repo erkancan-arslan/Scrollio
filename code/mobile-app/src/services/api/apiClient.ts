@@ -6,11 +6,21 @@
 import { secureStorage } from '../storage/secureStorage';
 
 // API Configuration
+// Web (browser): always use localhost so "Failed to fetch" doesn't happen.
+// Expo Go (phone): use EXPO_PUBLIC_API_BASE_URL (LAN IP) from .env
+const getBaseUrl = () => {
+  if (!__DEV__) return 'https://api.scrollio.app/api/v1';
+  const isWeb = typeof window !== 'undefined' && window.location?.hostname;
+  if (isWeb && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000/api/v1';
+  }
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  return 'http://localhost:3000/api/v1';
+};
+
 const API_CONFIG = {
-  // Update this to your backend URL
-  BASE_URL: __DEV__
-    ? 'http://localhost:3000/api/v1'  // Development (LAN IP)
-    : 'https://api.scrollio.app/api/v1', // Production
+  BASE_URL: getBaseUrl(),
   TIMEOUT: 30000,
 };
 

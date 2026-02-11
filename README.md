@@ -64,6 +64,11 @@ scrollio-v1/
 
 **Full setup instructions:** [brain/00-core/QUICK_START.md](brain/00-core/QUICK_START.md)
 
+**Test credentials (development):**
+| Email | Password |
+|-------|----------|
+| `test@scrollio.co` | `Deneme123.` (nokta dahil) |
+
 ---
 
 ### For AI Agents

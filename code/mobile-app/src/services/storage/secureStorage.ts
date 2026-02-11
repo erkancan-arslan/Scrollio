@@ -1,11 +1,13 @@
 /**
  * Secure Storage Service
  * Uses Keychain (iOS) / Keystore (Android) for secure token storage
- * 
+ * Falls back to localStorage on web (not encrypted, but functional for dev)
+ *
  * NEVER store auth tokens in AsyncStorage - it's not encrypted!
- * This service uses expo-secure-store for encrypted storage.
+ * This service uses expo-secure-store for encrypted storage on native.
  */
 
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 // Storage keys
@@ -18,9 +20,12 @@ const STORAGE_KEYS = {
 
 type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
 
+const isWeb = Platform.OS === 'web';
+
 /**
  * Secure Storage Service
- * Provides encrypted storage for sensitive data using device Keychain/Keystore
+ * Provides encrypted storage on native (Keychain/Keystore)
+ * and localStorage fallback on web for development
  */
 export const secureStorage = {
   /**
@@ -28,9 +33,13 @@ export const secureStorage = {
    */
   async setItem(key: StorageKey, value: string): Promise<void> {
     try {
-      await SecureStore.setItemAsync(key, value, {
-        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      });
+      if (isWeb) {
+        localStorage.setItem(key, value);
+      } else {
+        await SecureStore.setItemAsync(key, value, {
+          keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        });
+      }
     } catch (error) {
       console.error(`SecureStorage.setItem error for ${key}:`, error);
       throw new Error(`Failed to store ${key}`);
@@ -42,6 +51,9 @@ export const secureStorage = {
    */
   async getItem(key: StorageKey): Promise<string | null> {
     try {
+      if (isWeb) {
+        return localStorage.getItem(key);
+      }
       return await SecureStore.getItemAsync(key);
     } catch (error) {
       console.error(`SecureStorage.getItem error for ${key}:`, error);
@@ -54,7 +66,11 @@ export const secureStorage = {
    */
   async deleteItem(key: StorageKey): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(key);
+      if (isWeb) {
+        localStorage.removeItem(key);
+      } else {
+        await SecureStore.deleteItemAsync(key);
+      }
     } catch (error) {
       console.error(`SecureStorage.deleteItem error for ${key}:`, error);
     }
