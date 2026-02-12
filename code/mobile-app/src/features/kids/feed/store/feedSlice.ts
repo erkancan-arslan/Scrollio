@@ -120,6 +120,14 @@ const feedSlice = createSlice({
       const item = state.items.find((i) => i.contentId === action.payload || i.id === action.payload);
       if (item) {
         item.isBookmarked = !item.isBookmarked;
+        item.content.bookmarkCount += item.isBookmarked ? 1 : -1;
+      }
+    },
+    toggleLikeLocal(state, action: PayloadAction<string>) {
+      const item = state.items.find((i) => i.contentId === action.payload || i.id === action.payload);
+      if (item) {
+        item.isLiked = !item.isLiked;
+        item.content.likeCount += item.isLiked ? 1 : -1;
       }
     },
   },
@@ -153,13 +161,14 @@ const feedSlice = createSlice({
             ageGroupMax: 12,
             difficultyLevel: (item.difficulty ?? 'easy') as 'easy' | 'medium' | 'hard',
             tags: (item.topic_tags ?? []) as string[],
-            viewCount: 0,
-            likeCount: 0,
-            bookmarkCount: 0,
+            viewCount: ((item.view_count as number) ?? 0),
+            likeCount: ((item.like_count as number) ?? 0),
+            bookmarkCount: ((item.bookmark_count as number) ?? 0),
             isPublished: true,
             createdAt: (item.created_at ?? '') as string,
             updatedAt: (item.updated_at ?? '') as string,
           },
+          isLiked: (item.isLiked ?? false) as boolean,
           isBookmarked: (item.isBookmarked ?? false) as boolean,
           hasQuiz: (item.hasQuiz ?? false) as boolean,
           quizCompleted: false,
@@ -214,6 +223,7 @@ export const {
   dismissQuiz,
   resetFeed,
   toggleBookmarkLocal,
+  toggleLikeLocal,
 } = feedSlice.actions;
 
 export default feedSlice.reducer;

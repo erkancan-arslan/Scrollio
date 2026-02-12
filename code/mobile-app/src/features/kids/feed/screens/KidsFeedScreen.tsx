@@ -1,18 +1,29 @@
 /**
- * KidsFeedScreen — Kids content feed with swipeable video cards
+ * KidsFeedScreen - TikTok-style vertical video feed for Kids
+ * Mirrors the main FeedScreen with:
+ * - FlatList-based paging with snap-to-item
+ * - Tab bar height calculation for accurate item sizing
+ * - isFocused check for play/pause on tab switch
+ * - Mute / auto-advance options via KidsFeedOptionsButton
+ * - Like, bookmark, share actions with optimistic updates
+ * - Quiz overlay triggered every 5 videos
+ * - Watch time tracking
  */
 
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
-  Text,
-  FlatList,
   StyleSheet,
-  Dimensions,
-  RefreshControl,
+  FlatList,
+  StatusBar,
   ViewToken,
+  Dimensions,
   ActivityIndicator,
+  RefreshControl,
+  Text,
 } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import {
   fetchFeedThunk,
@@ -20,22 +31,24 @@ import {
   setCurrentIndex,
   fetchQuizThunk,
   dismissQuiz,
+  toggleBookmarkLocal,
+  toggleLikeLocal,
 } from '../store/feedSlice';
 import { kidsColors } from '../../shared/constants/colors';
-import { kidsTypography } from '../../shared/constants/typography';
 import { EmptyState } from '../../shared/components/EmptyState';
 import { ErrorScreen } from '../../shared/components/ErrorScreen';
-import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
-import { VideoCard } from '../components/VideoPlayer';
+import { KidsVideoItem } from '../components/KidsVideoItem';
+import { KidsFeedOptionsButton } from '../components/KidsFeedOptionsButton';
 import { QuizOverlay } from '../components/QuizOverlay';
-import { BookmarkButton } from '../components/BookmarkButton';
+import { kidsApi } from '../../shared/utils/api';
 import type { KidsFeedItem } from '../types/feed.types';
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_HEIGHT = SCREEN_HEIGHT;
-
 export const KidsFeedScreen: React.FC = () => {
+  const { height: windowHeight } = Dimensions.get('window');
+  const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
   const dispatch = useAppDispatch();
+
   const {
     items,
     currentIndex,
@@ -51,8 +64,22 @@ export const KidsFeedScreen: React.FC = () => {
 
   const flatListRef = useRef<FlatList>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const isLoadingMore = useRef(false);
+
+  // Playback options state
+  const [isMuted, setIsMuted] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
+
+  // Watch time tracking
   const watchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchSecondsRef = useRef(0);
+
+  // Calculate the exact height for each video item
+  // Subtract tab bar height so content doesn't overflow behind it
+  const itemHeight = useMemo(() => {
+    const calculated = windowHeight - tabBarHeight;
+    return calculated > 0 ? calculated : windowHeight;
+  }, [windowHeight, tabBarHeight]);
 
   // Initial fetch
   useEffect(() => {
@@ -66,7 +93,7 @@ export const KidsFeedScreen: React.FC = () => {
     }
     watchSecondsRef.current = 0;
 
-    if (items.length > 0 && currentIndex < items.length) {
+    if (items.length > 0 && currentIndex < items.length && isFocused) {
       watchTimerRef.current = setInterval(() => {
         watchSecondsRef.current += 5;
         const item = items[currentIndex];
@@ -84,7 +111,7 @@ export const KidsFeedScreen: React.FC = () => {
     return () => {
       if (watchTimerRef.current) clearInterval(watchTimerRef.current);
     };
-  }, [currentIndex, items, dispatch]);
+  }, [currentIndex, items, dispatch, isFocused]);
 
   // Trigger quiz every 5 videos
   useEffect(() => {
@@ -96,18 +123,101 @@ export const KidsFeedScreen: React.FC = () => {
     }
   }, [videosWatchedSinceQuiz, currentIndex, items, dispatch]);
 
+  // Handle pull to refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await dispatch(fetchFeedThunk({ page: 1, limit: 10 }));
     setRefreshing(false);
   }, [dispatch]);
 
+  // Handle load more when reaching end
   const handleEndReached = useCallback(() => {
-    if (!isLoading && hasMore) {
-      dispatch(fetchFeedThunk({ page: page + 1, limit: 10 }));
+    if (!isLoadingMore.current && hasMore && !isLoading) {
+      isLoadingMore.current = true;
+      dispatch(fetchFeedThunk({ page: page + 1, limit: 10 })).finally(() => {
+        isLoadingMore.current = false;
+      });
     }
-  }, [dispatch, isLoading, hasMore, page]);
+  }, [dispatch, hasMore, isLoading, page]);
 
+  // Handle like action with optimistic update
+  // TEMPORARY: Uses main feed like endpoints while kids DB is empty
+  const handleLike = useCallback(
+    async (contentId: string) => {
+      const item = items.find((i) => i.contentId === contentId || i.id === contentId);
+      const wasLiked = item?.isLiked ?? false;
+
+      // Optimistic update
+      dispatch(toggleLikeLocal(contentId));
+
+      // API call – main feed uses separate POST/DELETE endpoints
+      const res = wasLiked
+        ? await kidsApi.delete(`/feed/videos/${contentId}/like`)
+        : await kidsApi.post(`/feed/videos/${contentId}/like`);
+      if (res.error) {
+        // Revert on failure
+        dispatch(toggleLikeLocal(contentId));
+      }
+    },
+    [dispatch, items],
+  );
+
+  // Handle bookmark action with optimistic update
+  // TEMPORARY: Uses main feed bookmark endpoints while kids DB is empty
+  const handleBookmark = useCallback(
+    async (contentId: string) => {
+      const item = items.find((i) => i.contentId === contentId || i.id === contentId);
+      const wasBookmarked = item?.isBookmarked ?? false;
+
+      // Optimistic update
+      dispatch(toggleBookmarkLocal(contentId));
+
+      // API call – main feed uses separate POST/DELETE endpoints
+      const res = wasBookmarked
+        ? await kidsApi.delete(`/feed/videos/${contentId}/bookmark`)
+        : await kidsApi.post(`/feed/videos/${contentId}/bookmark`);
+      if (res.error) {
+        // Revert on failure
+        dispatch(toggleBookmarkLocal(contentId));
+      }
+    },
+    [dispatch, items],
+  );
+
+  // Handle share action (placeholder)
+  const handleShare = useCallback((contentId: string) => {
+    console.log('Share kids video:', contentId);
+    // TODO: Open share sheet
+  }, []);
+
+  // Handle topic press
+  const handleTopicPress = useCallback((topic: string) => {
+    console.log('Navigate to kids topic:', topic);
+    // TODO: Navigate to topic-filtered feed
+  }, []);
+
+  // Handle mute toggle
+  const handleToggleMute = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
+
+  // Handle auto-advance toggle
+  const handleToggleAutoAdvance = useCallback(() => {
+    setAutoAdvance((prev) => !prev);
+  }, []);
+
+  // Handle video end (auto-advance to next video)
+  const handleVideoEnd = useCallback(() => {
+    if (autoAdvance && currentIndex < items.length - 1) {
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true,
+      });
+    }
+  }, [autoAdvance, currentIndex, items.length]);
+
+  // Track viewable items for auto-play
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -117,81 +227,140 @@ export const KidsFeedScreen: React.FC = () => {
     [dispatch],
   );
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
 
+  // Render each video item
   const renderItem = useCallback(
     ({ item, index }: { item: KidsFeedItem; index: number }) => (
-      <VideoCard
+      <KidsVideoItem
         item={item}
-        isActive={index === currentIndex}
-        height={ITEM_HEIGHT}
+        isActive={index === currentIndex && isFocused}
+        isMuted={isMuted}
+        onLike={handleLike}
+        onBookmark={handleBookmark}
+        onShare={handleShare}
+        onTopicPress={handleTopicPress}
+        onVideoEnd={autoAdvance ? handleVideoEnd : undefined}
+        itemHeight={itemHeight}
       />
     ),
-    [currentIndex],
+    [
+      currentIndex,
+      isFocused,
+      isMuted,
+      autoAdvance,
+      handleLike,
+      handleBookmark,
+      handleShare,
+      handleTopicPress,
+      handleVideoEnd,
+      itemHeight,
+    ],
   );
 
+  // Get item layout for optimized scrolling
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
-      length: ITEM_HEIGHT,
-      offset: ITEM_HEIGHT * index,
+      length: itemHeight,
+      offset: itemHeight * index,
       index,
     }),
-    [],
+    [itemHeight],
   );
 
-  if (isLoading && items.length === 0) {
-    return <LoadingSpinner message="Loading videos..." />;
-  }
-
-  if (error && items.length === 0) {
+  // Render footer (loading indicator for infinite scroll)
+  const renderFooter = useCallback(() => {
+    if (!hasMore) return null;
     return (
-      <ErrorScreen
-        message={error}
-        onRetry={() => dispatch(fetchFeedThunk({ page: 1, limit: 10 }))}
-      />
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={kidsColors.primary} />
+      </View>
+    );
+  }, [hasMore]);
+
+  // Show loading state on initial load
+  if (isLoading && items.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <ActivityIndicator size="large" color={kidsColors.primary} />
+        <Text style={styles.loadingText}>Loading videos...</Text>
+      </View>
     );
   }
 
+  // Show error state
+  if (error && items.length === 0) {
+    return (
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <ErrorScreen
+          message={error}
+          onRetry={() => dispatch(fetchFeedThunk({ page: 1, limit: 10 }))}
+        />
+      </>
+    );
+  }
+
+  // Show empty state
   if (!isLoading && items.length === 0) {
     return (
-      <EmptyState
-        title="No Videos Yet"
-        message="Select some topics in your profile to see personalized content!"
-        icon="📺"
-      />
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <EmptyState
+          title="No Videos Yet"
+          message="Select some topics in your profile to see personalized content!"
+          icon="📺"
+        />
+      </>
     );
   }
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      {/* Options Button */}
+      <KidsFeedOptionsButton
+        isMuted={isMuted}
+        autoAdvance={autoAdvance}
+        onToggleMute={handleToggleMute}
+        onToggleAutoAdvance={handleToggleAutoAdvance}
+      />
+
+      {/* Video Feed */}
       <FlatList
         ref={flatListRef}
         data={items}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
-        snapToInterval={ITEM_HEIGHT}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={itemHeight}
         snapToAlignment="start"
         decelerationRate="fast"
-        showsVerticalScrollIndicator={false}
-        getItemLayout={getItemLayout}
+        disableIntervalMomentum={true}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={1}
+        bounces={false}
+        overScrollMode="never"
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
             tintColor={kidsColors.primary}
+            colors={[kidsColors.primary]}
           />
-        }
-        ListFooterComponent={
-          isLoading && items.length > 0 ? (
-            <View style={styles.footer}>
-              <ActivityIndicator color={kidsColors.primary} />
-            </View>
-          ) : null
         }
       />
 
@@ -210,11 +379,21 @@ export const KidsFeedScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
   },
-  footer: {
-    height: 60,
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  loadingFooter: {
+    paddingVertical: 20,
     alignItems: 'center',
   },
 });

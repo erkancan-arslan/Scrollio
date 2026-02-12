@@ -28,6 +28,7 @@ export interface KidsFeedItem {
   id: string;
   contentId: string;
   content: KidsContent;
+  isLiked: boolean;
   isBookmarked: boolean;
   hasQuiz: boolean;
   quizCompleted: boolean;
