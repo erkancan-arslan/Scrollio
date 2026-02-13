@@ -9,6 +9,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Provider } from 'react-redux';
 import { store } from './src/store/store';
+import { initializeGameRegistry } from './src/features/playground/registryInit';
+
+// Initialize game registry before app renders
+initializeGameRegistry();
 
 export default function App() {
   return (

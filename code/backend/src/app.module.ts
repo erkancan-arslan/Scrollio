@@ -10,6 +10,7 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { MessagesModule } from './messages/messages.module';
 import { FcmModule } from './fcm/fcm.module';
 import { KidsModule } from './kids/kids.module';
+import { DuelModule } from './duel/duel.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -28,8 +29,9 @@ import { HealthController } from './health/health.controller';
     MessagesModule,
     FcmModule,
     KidsModule,
+    DuelModule,
   ],
   controllers: [HealthController],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }

@@ -17,7 +17,7 @@ import {
 export class FriendsService {
   private readonly logger = new Logger(FriendsService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService) { }
 
   /**
    * Get list of accepted friends
@@ -84,7 +84,7 @@ export class FriendsService {
         throw new BadRequestException('Cannot send friend request to yourself');
       }
 
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getAdminClient();
 
       // Check if friendship already exists
       const { data: existing } = await supabase
@@ -140,7 +140,7 @@ export class FriendsService {
     status: 'accepted' | 'rejected',
   ) {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getAdminClient();
 
       // Verify the user is the recipient of the request
       const { data: friendship, error: fetchError } = await supabase
@@ -186,7 +186,7 @@ export class FriendsService {
    */
   async removeFriend(userId: string, friendshipId: string) {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getAdminClient();
 
       // Verify the user is part of this friendship
       const { data: friendship, error: fetchError } = await supabase

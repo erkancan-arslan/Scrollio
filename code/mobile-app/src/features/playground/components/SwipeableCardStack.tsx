@@ -37,6 +37,17 @@ export const SwipeableCardStack: React.FC<SwipeableCardStackProps> = ({
         currentIndexRef.current = currentIndex;
     }, [currentIndex]);
 
+    // Refs for handlers to avoid stale closures in PanResponder
+    const onSwipeRightRef = useRef(onSwipeRight);
+    const onSwipeLeftRef = useRef(onSwipeLeft);
+    const onFinishedRef = useRef(onFinished);
+
+    useEffect(() => {
+        onSwipeRightRef.current = onSwipeRight;
+        onSwipeLeftRef.current = onSwipeLeft;
+        onFinishedRef.current = onFinished;
+    }, [onSwipeRight, onSwipeLeft, onFinished]);
+
     // Reset Position when index changes (New card takes Top Slot)
     useEffect(() => {
         position.setValue({ x: 0, y: 0 });
@@ -66,6 +77,7 @@ export const SwipeableCardStack: React.FC<SwipeableCardStackProps> = ({
             position.setValue({ x: gesture.dx, y: gesture.dy });
         },
         onPanResponderRelease: (_, gesture) => {
+            console.log('[SwipeableStack] Release:', gesture.dx);
             if (gesture.dx > SWIPE_THRESHOLD) {
                 forceSwipe('right');
             } else if (gesture.dx < -SWIPE_THRESHOLD) {
@@ -77,12 +89,16 @@ export const SwipeableCardStack: React.FC<SwipeableCardStackProps> = ({
     }), []);
 
     const forceSwipe = (direction: 'right' | 'left') => {
+        console.log('[SwipeableStack] forceSwipe:', direction);
         const x = direction === 'right' ? width * 1.5 : -width * 1.5;
         Animated.timing(position, {
             toValue: { x, y: 0 },
             duration: 250,
             useNativeDriver: true
-        }).start(() => onSwipeComplete(direction));
+        }).start(() => {
+            console.log('[SwipeableStack] Animation finished');
+            onSwipeComplete(direction);
+        });
     };
 
     const resetPosition = () => {
@@ -96,16 +112,17 @@ export const SwipeableCardStack: React.FC<SwipeableCardStackProps> = ({
     const onSwipeComplete = (direction: 'right' | 'left') => {
         const index = currentIndexRef.current;
         const item = data[index];
+        console.log('[SwipeableStack] onSwipeComplete:', direction, 'Index:', index, 'Item:', !!item);
 
         if (item) {
-            direction === 'right' ? onSwipeRight(item) : onSwipeLeft(item);
+            direction === 'right' ? onSwipeRightRef.current(item) : onSwipeLeftRef.current(item);
         }
 
         // Functional State Update
         setCurrentIndex(prev => {
             const next = prev + 1;
             if (next >= data.length) {
-                setTimeout(() => onFinished?.(), 0);
+                setTimeout(() => onFinishedRef.current?.(), 0);
             }
             return next;
         });

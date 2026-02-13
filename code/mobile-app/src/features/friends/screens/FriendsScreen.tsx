@@ -1,9 +1,10 @@
 /**
  * Friends Screen
- * Shows friends list, pending requests, and sent requests
+ * Shows friends list, pending requests (friend + duel), and sent requests.
+ * Duel requests show countdown and accept/refuse buttons with realtime updates.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   Alert,
   Image,
   RefreshControl,
+  SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +27,8 @@ import {
   PendingRequest,
 } from '../../../services/friends';
 import { chatService } from '../../../services/chat';
+import { duelService } from '../../playground/services/duelService';
+import { supabase } from '../../../services/supabase/client';
 import { colors } from '../../../theme/colors';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 
@@ -32,22 +36,137 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type TabType = 'friends' | 'requests';
 
+// =====================================================
+// Duel Request Item (from DB row)
+// =====================================================
+interface DuelRequestItem {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  match_id: string | null;
+  // Sender profile data (resolved by backend)
+  sender_profile?: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+  } | null;
+}
+
 export const FriendsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [duelRequests, setDuelRequests] = useState<DuelRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const userIdRef = useRef<string | null>(null);
+  const [, forceUpdate] = useState(0); // For countdown re-renders
 
+  // Get current user ID and then load all data
   useEffect(() => {
-    loadData();
+    const init = async () => {
+      console.log('[FriendsScreen] init() starting...');
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[FriendsScreen] user:', user?.id || 'null');
+      if (user) {
+        setCurrentUserId(user.id);
+        userIdRef.current = user.id;
+        await loadDataWithUserId(user.id);
+      } else {
+        console.log('[FriendsScreen] No user found, skipping load');
+        setIsLoading(false);
+      }
+    };
+    init();
   }, []);
 
-  const loadData = async () => {
+  // =====================================================
+  // Duel Request Realtime Subscription
+  // =====================================================
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    duelService.subscribeToDuelRequestsViaDB(
+      currentUserId,
+      // On INSERT — new incoming duel request
+      (record: DuelRequestItem) => {
+        console.log('[FriendsScreen] RT INSERT:', JSON.stringify(record));
+        if (record.status === 'pending' && record.to_user_id === currentUserId) {
+          // Fetch profile for the sender
+          loadDuelRequests();
+        }
+      },
+      // On UPDATE — status change (accepted/rejected/expired/canceled)
+      (record: DuelRequestItem) => {
+        console.log('[FriendsScreen] RT UPDATE:', JSON.stringify(record));
+        if (record.status === 'accepted' && record.match_id) {
+          // Someone accepted — navigate to duel game
+          handleDuelAccepted(record);
+        } else if (record.status !== 'pending') {
+          // Remove from list (rejected/expired/canceled)
+          setDuelRequests((prev) => prev.filter((r) => r.id !== record.id));
+        }
+      },
+    );
+
+    return () => {
+      duelService.unsubscribeFromDuelRequests();
+    };
+  }, [currentUserId]);
+
+  // =====================================================
+  // Countdown timer for duel requests
+  // =====================================================
+  useEffect(() => {
+    if (duelRequests.length === 0) {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      return;
+    }
+
+    countdownIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      // Remove expired requests from local state
+      setDuelRequests((prev) => {
+        const filtered = prev.filter((r) => new Date(r.expires_at).getTime() > now);
+        if (filtered.length !== prev.length) return filtered;
+        return prev;
+      });
+      // Force re-render for countdown display
+      forceUpdate((v) => v + 1);
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [duelRequests.length]);
+
+  // =====================================================
+  // Data Loading
+  // =====================================================
+  const loadDataWithUserId = async (userId: string) => {
     setIsLoading(true);
-    await Promise.all([loadFriends(), loadPendingRequests()]);
+    await Promise.all([loadFriends(), loadPendingRequests(), loadDuelRequests(userId)]);
+    setIsLoading(false);
+  };
+
+  const loadData = async () => {
+    const uid = userIdRef.current;
+    if (!uid) return;
+    setIsLoading(true);
+    await Promise.all([loadFriends(), loadPendingRequests(), loadDuelRequests(uid)]);
     setIsLoading(false);
   };
 
@@ -65,12 +184,105 @@ export const FriendsScreen: React.FC = () => {
     }
   };
 
+  const loadDuelRequests = async (userId?: string) => {
+    const uid = userId || userIdRef.current;
+    console.log('[FriendsScreen] loadDuelRequests uid:', uid);
+    if (!uid) return;
+    try {
+      const result = await duelService.getPendingDuelRequests();
+      console.log('[FriendsScreen] getPendingDuelRequests result:', JSON.stringify(result));
+      // Filter to only show incoming requests (to_user_id = me)
+      const incoming = (result.requests || []).filter(
+        (r: DuelRequestItem) => r.to_user_id === uid && r.status === 'pending',
+      );
+      console.log('[FriendsScreen] filtered incoming duel requests:', incoming.length);
+      setDuelRequests(incoming);
+    } catch (err) {
+      console.error('[FriendsScreen] loadDuelRequests error:', err);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadData();
     setIsRefreshing(false);
   };
 
+  // =====================================================
+  // Duel Request Handlers
+  // =====================================================
+  const handleDuelAccepted = (record: DuelRequestItem) => {
+    if (!record.match_id || !currentUserId) return;
+
+    // Remove from list
+    setDuelRequests((prev) => prev.filter((r) => r.id !== record.id));
+
+    // Navigate to DuelGame
+    const isPlayerA = record.from_user_id !== currentUserId; // Receiver becomes B
+    const opponentName = record.sender_profile?.display_name || 'Opponent';
+    const opponentAvatar = record.sender_profile?.avatar_url || null;
+
+    navigation.navigate('DuelGame', {
+      matchId: record.match_id,
+      opponentName,
+      opponentAvatar,
+      role: isPlayerA ? 'A' : 'B',
+      seed: 0, // Will be fetched from match state
+      questionSetId: '',
+      bankVersion: '',
+      playerAId: record.from_user_id,
+      playerBId: record.to_user_id,
+    });
+  };
+
+  const handleAcceptDuel = async (request: DuelRequestItem) => {
+    setActionInProgress(request.id);
+    try {
+      const result = await duelService.respondDuelRequest(request.id, 'accept');
+      setActionInProgress(null);
+
+      // Remove from local list
+      setDuelRequests((prev) => prev.filter((r) => r.id !== request.id));
+
+      if (result.matchId) {
+        // Navigate to DuelGame
+        const opponentName = request.sender_profile?.display_name || 'Opponent';
+        const opponentAvatar = request.sender_profile?.avatar_url || null;
+
+        navigation.navigate('DuelGame', {
+          matchId: result.matchId,
+          opponentName,
+          opponentAvatar,
+          role: 'B', // Acceptor is always player B
+          seed: 0,
+          questionSetId: '',
+          bankVersion: '',
+          playerAId: request.from_user_id,
+          playerBId: request.to_user_id,
+        });
+      }
+    } catch (err: any) {
+      setActionInProgress(null);
+      Alert.alert('Error', err.message || 'Failed to accept duel request');
+    }
+  };
+
+  const handleRefuseDuel = async (request: DuelRequestItem) => {
+    setActionInProgress(request.id);
+    try {
+      await duelService.respondDuelRequest(request.id, 'reject');
+      setActionInProgress(null);
+      // Remove from local list immediately
+      setDuelRequests((prev) => prev.filter((r) => r.id !== request.id));
+    } catch (err: any) {
+      setActionInProgress(null);
+      Alert.alert('Error', err.message || 'Failed to refuse duel request');
+    }
+  };
+
+  // =====================================================
+  // Friend Request Handlers
+  // =====================================================
   const handleAcceptRequest = async (friendshipId: string) => {
     setActionInProgress(friendshipId);
     const response = await friendsService.acceptFriendRequest(friendshipId);
@@ -78,7 +290,6 @@ export const FriendsScreen: React.FC = () => {
 
     if (response.success) {
       Alert.alert('Success', 'Friend request accepted!');
-      // Reload data to update lists
       await loadData();
     } else {
       Alert.alert('Error', response.error || 'Failed to accept request');
@@ -100,7 +311,6 @@ export const FriendsScreen: React.FC = () => {
             setActionInProgress(null);
 
             if (response.success) {
-              // Remove from pending requests
               setPendingRequests((prev) =>
                 prev.filter((req) => req.friendship_id !== friendshipId)
               );
@@ -128,7 +338,6 @@ export const FriendsScreen: React.FC = () => {
             setActionInProgress(null);
 
             if (response.success) {
-              // Remove from friends list
               setFriends((prev) =>
                 prev.filter((friend) => friend.friendship_id !== friendshipId)
               );
@@ -158,6 +367,24 @@ export const FriendsScreen: React.FC = () => {
     }
   };
 
+  const handleChallengeToDuel = async (friend: FriendProfile) => {
+    setActionInProgress(friend.friendship_id);
+    try {
+      const result = await duelService.createDuelRequest(friend.id);
+      setActionInProgress(null);
+      navigation.navigate('DuelLobby', {
+        requestId: result.requestId,
+        opponentName: friend.display_name || 'Opponent',
+      });
+    } catch (err: any) {
+      setActionInProgress(null);
+      Alert.alert('Error', err.message || 'Failed to send duel challenge');
+    }
+  };
+
+  // =====================================================
+  // Render Items
+  // =====================================================
   const renderFriendItem = ({ item }: { item: FriendProfile }) => {
     const isActionInProgress = actionInProgress === item.friendship_id;
 
@@ -189,6 +416,13 @@ export const FriendsScreen: React.FC = () => {
           </View>
         </View>
         <View style={styles.friendActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.duelButton, isActionInProgress && styles.buttonDisabled]}
+            onPress={() => handleChallengeToDuel(item)}
+            disabled={isActionInProgress}
+          >
+            <Ionicons name="flash" size={18} color="#FFF" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.messageButton, isActionInProgress && styles.buttonDisabled]}
             onPress={() => handleStartChat(item)}
@@ -264,6 +498,102 @@ export const FriendsScreen: React.FC = () => {
     );
   };
 
+  // =====================================================
+  // Duel Request Card
+  // =====================================================
+  const renderDuelRequestItem = (request: DuelRequestItem) => {
+    const isInProgress = actionInProgress === request.id;
+    const expiresAt = new Date(request.expires_at).getTime();
+    const remainingSec = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+    const senderName = request.sender_profile?.display_name || 'Someone';
+    const senderAvatar = request.sender_profile?.avatar_url;
+
+    return (
+      <View key={request.id} style={[styles.listItem, styles.duelRequestCard]}>
+        <View style={styles.itemContent}>
+          {senderAvatar ? (
+            <Image source={{ uri: senderAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="flash" size={24} color="#FFD700" />
+            </View>
+          )}
+          <View style={styles.itemDetails}>
+            <Text style={styles.itemName}>{senderName}</Text>
+            <Text style={styles.duelRequestLabel}>⚔️ Duel Challenge</Text>
+            <Text style={[styles.countdownText, remainingSec <= 5 && styles.countdownUrgent]}>
+              Expires in {remainingSec}s
+            </Text>
+          </View>
+        </View>
+        <View style={styles.requestActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.duelAcceptButton, isInProgress && styles.buttonDisabled]}
+            onPress={() => handleAcceptDuel(request)}
+            disabled={isInProgress}
+          >
+            {isInProgress ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Ionicons name="checkmark-circle" size={22} color="#FFF" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.duelRefuseButton, isInProgress && styles.buttonDisabled]}
+            onPress={() => handleRefuseDuel(request)}
+            disabled={isInProgress}
+          >
+            <Ionicons name="close-circle" size={22} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // =====================================================
+  // Requests Tab Content
+  // =====================================================
+  const renderRequestsTab = () => {
+    const hasDuelRequests = duelRequests.length > 0;
+    const hasFriendRequests = pendingRequests.length > 0;
+
+    if (!hasDuelRequests && !hasFriendRequests) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="mail-open-outline" size={64} color={colors.text.secondary} />
+          <Text style={styles.emptyTitle}>No Pending Requests</Text>
+          <Text style={styles.emptyText}>
+            You don't have any friend or duel requests at the moment
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Duel Requests Section */}
+        {hasDuelRequests && (
+          <View>
+            <Text style={styles.sectionHeader}>⚔️ Duel Challenges</Text>
+            {duelRequests.map(renderDuelRequestItem)}
+          </View>
+        )}
+
+        {/* Friend Requests Section */}
+        {hasFriendRequests && (
+          <View>
+            <Text style={styles.sectionHeader}>👋 Friend Requests</Text>
+            {pendingRequests.map((item) => (
+              <View key={item.friendship_id}>
+                {renderRequestItem({ item })}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderEmptyState = () => {
     if (activeTab === 'friends') {
       return (
@@ -275,18 +605,11 @@ export const FriendsScreen: React.FC = () => {
           </Text>
         </View>
       );
-    } else {
-      return (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="mail-open-outline" size={64} color={colors.text.secondary} />
-          <Text style={styles.emptyTitle}>No Pending Requests</Text>
-          <Text style={styles.emptyText}>
-            You don't have any friend requests at the moment
-          </Text>
-        </View>
-      );
     }
+    return null;
   };
+
+  const totalRequestCount = pendingRequests.length + duelRequests.length;
 
   if (isLoading) {
     return (
@@ -327,36 +650,49 @@ export const FriendsScreen: React.FC = () => {
           <Text
             style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}
           >
-            Requests ({pendingRequests.length})
+            Requests ({totalRequestCount})
           </Text>
-          {pendingRequests.length > 0 && (
+          {totalRequestCount > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingRequests.length}</Text>
+              <Text style={styles.badgeText}>{totalRequestCount}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      <FlatList
-        data={activeTab === 'friends' ? friends : pendingRequests}
-        renderItem={
-          activeTab === 'friends' ? renderFriendItem : renderRequestItem
-        }
-        keyExtractor={(item) =>
-          'friendship_id' in item ? item.friendship_id : item.id
-        }
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      {activeTab === 'friends' ? (
+        <FlatList
+          data={friends}
+          renderItem={renderFriendItem}
+          keyExtractor={(item) => item.friendship_id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={[{ key: 'requests' }]}
+          renderItem={() => renderRequestsTab()}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -364,12 +700,12 @@ export const FriendsScreen: React.FC = () => {
 // Helper function to get time ago
 const getTimeAgo = (date: Date): string => {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  
+
   if (seconds < 60) return 'Just now';
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  
+
   return date.toLocaleDateString();
 };
 
@@ -434,6 +770,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     paddingHorizontal: 6,
   },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 12,
+    marginTop: 4,
+  },
   listContent: {
     padding: 16,
     flexGrow: 1,
@@ -448,6 +791,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  duelRequestCard: {
+    borderColor: '#FFD70060',
+    borderWidth: 1.5,
   },
   itemContent: {
     flexDirection: 'row',
@@ -494,6 +841,20 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     marginTop: 2,
   },
+  duelRequestLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFD700',
+    marginBottom: 2,
+  },
+  countdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  countdownUrgent: {
+    color: colors.error,
+  },
   requestActions: {
     flexDirection: 'row',
     gap: 8,
@@ -520,6 +881,15 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     backgroundColor: colors.text.tertiary,
+  },
+  duelButton: {
+    backgroundColor: '#FFD700',
+  },
+  duelAcceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  duelRefuseButton: {
+    backgroundColor: '#F44336',
   },
   buttonDisabled: {
     opacity: 0.6,

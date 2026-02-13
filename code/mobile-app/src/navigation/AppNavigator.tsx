@@ -1,20 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
 import { MainTabNavigator, MainTabParamList } from './MainTabNavigator';
 import { ChatScreen } from '../features/chat';
-import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
-import { LogicCategoryScreen } from '../features/playground/screens/LogicCategoryScreen';
-import { VisualCategoryScreen } from '../features/playground/screens/VisualCategoryScreen';
-import { DuelCategoryScreen } from '../features/playground/screens/DuelCategoryScreen';
-import { TimelineMasterScreen } from '../features/playground/games/timelinemaster/TimelineMasterScreen';
-import { MathSnakeScreen } from '../features/playground/games/mathsnake/MathSnakeScreen';
-import { ZoomFocusScreen } from '../features/playground/games/zoomfocus/ZoomFocusScreen';
-import { PerfectEyeScreen } from '../features/playground/games/perfecteye/PerfectEyeScreen';
-import { InfiniteFlowScreen } from '../features/playground/screens/InfiniteFlowScreen';
 import { KidsNavigator } from './KidsNavigator';
+import { PlaygroundGameShell } from '../features/playground/platform/PlaygroundGameShell';
+import { GameId } from '../features/playground/platform/types';
+import { DuelLobbyScreen } from '../features/playground/screens/DuelLobbyScreen';
+import { DuelGameScreen } from '../features/playground/screens/DuelGameScreen';
+import { DuelRequestModal } from '../features/playground/components/DuelRequestModal';
 
 export type RootStackParamList = {
     SignIn: undefined;
@@ -29,14 +25,29 @@ export type RootStackParamList = {
         otherUserAvatar?: string;
     };
     Playground: undefined;
-    LogicCategory: undefined;
-    VisualCategory: undefined;
-    DuelCategory: undefined;
-    InfiniteFlow: undefined;
-    TimelineMaster: undefined;
-    MathSnake: undefined;
-    ZoomFocus: undefined;
-    PerfectEye: undefined;
+
+    // Generic Game Shell Route
+    GameShell: {
+        gameId: GameId;
+        config?: any;
+    };
+
+    // Duel Routes
+    DuelLobby: {
+        requestId: string;
+        opponentName: string;
+    };
+    DuelGame: {
+        matchId: string;
+        opponentName: string;
+        opponentAvatar: string | null;
+        role: 'A' | 'B';
+        seed: number;
+        questionSetId: string;
+        bankVersion: string;
+        playerAId: string;
+        playerBId: string;
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -85,29 +96,29 @@ export const AppNavigator = () => {
                         headerBackTitle: 'Back',
                     }}
                 />
+
+                {/* Game Screens */}
                 <Stack.Screen
-                    name="LogicCategory"
-                    component={LogicCategoryScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="VisualCategory"
-                    component={VisualCategoryScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="DuelCategory"
-                    component={DuelCategoryScreen}
+                    name="GameShell"
+                    component={PlaygroundGameShell}
                     options={{ headerShown: false }}
                 />
 
-                {/* Game Screens */}
-                <Stack.Screen name="InfiniteFlow" component={InfiniteFlowScreen} options={{ headerShown: false, title: 'Infinite Flow' }} />
-                <Stack.Screen name="TimelineMaster" component={TimelineMasterScreen} options={{ headerShown: true, title: 'Timeline Master' }} />
-                <Stack.Screen name="MathSnake" component={MathSnakeScreen} options={{ headerShown: true, title: 'Math Snake' }} />
-                <Stack.Screen name="ZoomFocus" component={ZoomFocusScreen} options={{ headerShown: true, title: 'Zoom & Focus' }} />
-                <Stack.Screen name="PerfectEye" component={PerfectEyeScreen} options={{ headerShown: true, title: 'Perfect Eye' }} />
+                {/* Duel Screens */}
+                <Stack.Screen
+                    name="DuelLobby"
+                    component={DuelLobbyScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="DuelGame"
+                    component={DuelGameScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
             </Stack.Navigator>
+
+            {/* Global overlay for incoming duel requests */}
+            <DuelRequestModal />
         </NavigationContainer>
     );
 };
