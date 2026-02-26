@@ -36,7 +36,8 @@ export class UpdateProfileDto {
     notifications?: boolean;
     darkMode?: boolean;
     autoPlay?: boolean;
-    contentDifficulty?: 'beginner' | 'intermediate' | 'advanced';
+    /** Per-topic difficulty. Key = topic id, value = beginner | intermediate | advanced */
+    topicDifficulties?: Record<string, 'beginner' | 'intermediate' | 'advanced'>;
     preferredTopics?: string[];
   };
 }
@@ -61,7 +62,7 @@ export class ProfileDto {
     notifications: boolean;
     darkMode: boolean;
     autoPlay: boolean;
-    contentDifficulty: string;
+    topicDifficulties: Record<string, 'beginner' | 'intermediate' | 'advanced'>;
     preferredTopics: string[];
   };
   isCreator: boolean;

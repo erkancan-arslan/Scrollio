@@ -12,11 +12,14 @@ export enum AgeGroup {
   ADULT_45 = '45+',
 }
 
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
 export interface ProfilePreferences {
   notifications: boolean;
   darkMode: boolean;
   autoPlay: boolean;
-  contentDifficulty: 'beginner' | 'intermediate' | 'advanced';
+  /** Per-topic difficulty level. Key = topic id, value = difficulty. */
+  topicDifficulties: Record<string, DifficultyLevel>;
   preferredTopics: string[];
 }
 

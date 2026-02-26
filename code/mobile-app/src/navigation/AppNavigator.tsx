@@ -3,6 +3,9 @@ import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/na
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
+import { OnboardingUsernameScreen } from '../features/auth/screens/OnboardingUsernameScreen';
+import { OnboardingInterestsScreen } from '../features/auth/screens/OnboardingInterestsScreen';
+import { OnboardingDifficultyScreen } from '../features/auth/screens/OnboardingDifficultyScreen';
 import { MainTabNavigator, MainTabParamList } from './MainTabNavigator';
 import { ChatScreen } from '../features/chat';
 import { KidsNavigator } from './KidsNavigator';
@@ -15,6 +18,9 @@ import { DuelRequestModal } from '../features/playground/components/DuelRequestM
 export type RootStackParamList = {
     SignIn: undefined;
     SignUp: undefined;
+    OnboardingUsername: undefined;
+    OnboardingInterests: undefined;
+    OnboardingDifficulty: { topics: string[] };
     Kids: undefined; // Scrollio Kids (7–12) — separate auth flow
     MainTabs: NavigatorScreenParams<MainTabParamList>;
     Home: undefined; // Keep for backwards compatibility
@@ -70,6 +76,24 @@ export const AppNavigator = () => {
                     name="SignUp"
                     component={SignUpScreen}
                 />
+
+                {/* Onboarding Screens (new users only) */}
+                <Stack.Screen
+                    name="OnboardingUsername"
+                    component={OnboardingUsernameScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                    name="OnboardingInterests"
+                    component={OnboardingInterestsScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                    name="OnboardingDifficulty"
+                    component={OnboardingDifficultyScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
+
                 <Stack.Screen
                     name="Kids"
                     component={KidsNavigator}

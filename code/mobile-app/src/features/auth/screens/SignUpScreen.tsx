@@ -62,10 +62,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            // Navigate to main app (Feed) on successful sign up
+            // New users go through onboarding before the main app
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'MainTabs' }],
+                routes: [{ name: 'OnboardingUsername' }],
             });
         } else {
             setError(result.error || 'Sign up failed. Please try again.');

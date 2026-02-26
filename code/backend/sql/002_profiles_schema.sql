@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     "notifications": true,
     "darkMode": false,
     "autoPlay": true,
-    "contentDifficulty": "beginner",
+    "topicDifficulties": {},
     "preferredTopics": []
   }'::jsonb,
   

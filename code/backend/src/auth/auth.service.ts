@@ -61,18 +61,8 @@ export class AuthService {
       throw new BadRequestException('Failed to create user account');
     }
 
-    // Create profile in profiles table
-    const adminClient = this.supabaseService.getAdminClient();
-    const { error: profileError } = await adminClient.from('profiles').insert({
-      id: data.user.id,
-      display_name: displayName || email.split('@')[0],
-    });
-
-    if (profileError) {
-      this.logger.warn(`Profile creation warning: ${profileError.message}`);
-      // Don't fail the signup if profile creation fails
-      // Profile can be created later via trigger or manual update
-    }
+    // Profile row is created automatically by the handle_new_user() trigger
+    // on auth.users — no manual insert needed here.
 
     return this.formatAuthResponse(data.user, data.session);
   }

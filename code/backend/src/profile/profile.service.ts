@@ -166,7 +166,19 @@ export class ProfileService {
     if (updateData.avatarUrl !== undefined) dbData.avatar_url = updateData.avatarUrl;
     if (updateData.bio !== undefined) dbData.bio = updateData.bio;
     if (updateData.ageGroup !== undefined) dbData.age_group = updateData.ageGroup;
-    if (updateData.preferences !== undefined) dbData.preferences = updateData.preferences;
+
+    // Merge preferences with existing values so a partial update (e.g. only
+    // setting preferredTopics) never wipes out the other preference fields.
+    if (updateData.preferences !== undefined) {
+      const { data: current } = await supabase
+        .from('profiles')
+        .select('preferences')
+        .eq('id', userId)
+        .single();
+
+      const existingPrefs = current?.preferences ?? {};
+      dbData.preferences = { ...existingPrefs, ...updateData.preferences };
+    }
 
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -415,7 +427,7 @@ export class ProfileService {
         notifications: true,
         darkMode: false,
         autoPlay: true,
-        contentDifficulty: 'beginner',
+        topicDifficulties: {},
         preferredTopics: [],
       },
       isCreator: profile.is_creator || false,

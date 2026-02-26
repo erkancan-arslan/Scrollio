@@ -25,6 +25,43 @@ export class FeedService {
   }
 
   /**
+   * Resolve a stored video URL into a playable one.
+   *
+   * - Supabase Storage URLs (private bucket) → short-lived signed URL (1 hour)
+   * - Everything else (BunnyCDN, external CDN, public URLs) → returned as-is
+   */
+  private async resolveVideoUrl(storedUrl: string): Promise<string> {
+    if (!storedUrl) return storedUrl;
+
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL') || '';
+
+    // Not a Supabase storage URL — pass through unchanged
+    if (!supabaseUrl || !storedUrl.includes(supabaseUrl)) {
+      return storedUrl;
+    }
+
+    // Parse:  .../storage/v1/object/(public|private)/bucket-name/file-path
+    const match = storedUrl.match(
+      /\/storage\/v1\/object\/(?:public|private)\/([^/?#]+)\/(.+?)(?:\?.*)?$/,
+    );
+    if (!match) return storedUrl;
+
+    const [, bucket, filePath] = match;
+
+    const supabase = this.supabaseService.getAdminClient();
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 3600); // valid for 1 hour
+
+    if (error || !data?.signedUrl) {
+      this.logger.warn(`Could not sign URL for ${storedUrl}: ${error?.message}`);
+      return storedUrl; // fall back to original
+    }
+
+    return data.signedUrl;
+  }
+
+  /**
    * Get personalized feed for a user
    */
   async getFeed(userId: string | null, query: FeedQueryDto): Promise<FeedResponseDto> {
@@ -107,9 +144,15 @@ export class FeedService {
       }
     }
 
+    // Resolve signed URLs for all videos in one batch
+    const resolvedUrls = await Promise.all(
+      videosToReturn.map((v) => this.resolveVideoUrl(v.video_url)),
+    );
+    const urlMap = new Map(videosToReturn.map((v, i) => [v.id, resolvedUrls[i]]));
+
     // Transform to DTOs
     const videosDtos: VideoDto[] = videosToReturn.map((video) =>
-      this.transformVideoToDto(video, userLikes, userBookmarks),
+      this.transformVideoToDto(video, userLikes, userBookmarks, urlMap.get(video.id)),
     );
 
     return {
@@ -184,9 +227,15 @@ export class FeedService {
     // All returned videos are bookmarked
     const userBookmarks = new Set(bookmarksToReturn.map((b) => b.video_id));
 
-    const videosDtos: VideoDto[] = bookmarksToReturn
-      .filter((b) => b.video)
-      .map((b) => this.transformVideoToDto(b.video, userLikes, userBookmarks));
+    const validBookmarks = bookmarksToReturn.filter((b) => b.video);
+
+    const resolvedUrls = await Promise.all(
+      validBookmarks.map((b) => this.resolveVideoUrl(b.video.video_url)),
+    );
+    const urlMap = new Map(validBookmarks.map((b, i) => [b.video_id, resolvedUrls[i]]));
+
+    const videosDtos: VideoDto[] = validBookmarks
+      .map((b) => this.transformVideoToDto(b.video, userLikes, userBookmarks, urlMap.get(b.video_id)));
 
     return {
       videos: videosDtos,
@@ -460,7 +509,8 @@ export class FeedService {
       }
     }
 
-    return this.transformVideoToDto(video, userLikes, userBookmarks);
+    const resolvedUrl = await this.resolveVideoUrl(video.video_url);
+    return this.transformVideoToDto(video, userLikes, userBookmarks, resolvedUrl);
   }
 
   /**
@@ -470,12 +520,13 @@ export class FeedService {
     video: any,
     userLikes: Set<string>,
     userBookmarks: Set<string>,
+    resolvedVideoUrl?: string,
   ): VideoDto {
     return {
       id: video.id,
       title: video.title,
       description: video.description,
-      videoUrl: video.video_url,
+      videoUrl: resolvedVideoUrl ?? video.video_url,
       thumbnailUrl: video.thumbnail_url,
       duration: video.duration,
       creator: video.creator
