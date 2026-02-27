@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { AppLandingScreen } from '../features/auth/screens/AppLandingScreen';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
 import { OnboardingUsernameScreen } from '../features/auth/screens/OnboardingUsernameScreen';
@@ -16,6 +17,7 @@ import { DuelGameScreen } from '../features/playground/screens/DuelGameScreen';
 import { DuelRequestModal } from '../features/playground/components/DuelRequestModal';
 
 export type RootStackParamList = {
+    AppLanding: undefined;
     SignIn: undefined;
     SignUp: undefined;
     OnboardingUsername: undefined;
@@ -62,11 +64,17 @@ export const AppNavigator = () => {
     return (
         <NavigationContainer>
             <Stack.Navigator
-                initialRouteName="SignIn"
+                initialRouteName="AppLanding"
                 screenOptions={{
                     headerShown: false,
                 }}
             >
+                {/* Landing — choose Core vs Kids */}
+                <Stack.Screen
+                    name="AppLanding"
+                    component={AppLandingScreen}
+                />
+
                 {/* Auth Screens */}
                 <Stack.Screen
                     name="SignIn"

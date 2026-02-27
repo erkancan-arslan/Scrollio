@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { verifyPinThunk, fetchChildrenThunk } from '../store/authSlice';
@@ -73,7 +74,7 @@ export const KidsPinEntryScreen: React.FC = () => {
   if (isPinVerified) return null;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {cooldown > 0 ? (
         <View style={styles.cooldownContainer}>
           <Text style={styles.cooldownEmoji}>⏳</Text>
@@ -91,7 +92,7 @@ export const KidsPinEntryScreen: React.FC = () => {
           isLoading={isLoading}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

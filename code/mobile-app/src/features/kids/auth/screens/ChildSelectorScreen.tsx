@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
-import { switchChildThunk, fetchChildrenThunk } from '../store/authSlice';
+import { switchChildThunk, fetchChildrenThunk, setCharacterSelectChildId } from '../store/authSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
@@ -36,9 +37,15 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
   const handleSelect = async (child: ChildProfile) => {
     try {
       await dispatch(switchChildThunk(child.id)).unwrap();
-      nav.dispatch(
-        CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),
-      );
+      if (child.selectedCharacterId) {
+        nav.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }));
+      } else {
+        const id = child?.id;
+        if (id) {
+          dispatch(setCharacterSelectChildId(id));
+          nav.navigate('KidsCharacterSelect', { childId: id });
+        }
+      }
     } catch {
       // Error handled by Redux
     }
@@ -86,7 +93,7 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Text style={styles.title}>Who&apos;s learning today?</Text>
       <Text style={styles.subtitle}>Select a profile to get started</Text>
 
@@ -99,7 +106,7 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.grid}
         ListFooterComponent={renderAddCard}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

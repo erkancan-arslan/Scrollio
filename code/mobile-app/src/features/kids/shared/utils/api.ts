@@ -26,20 +26,23 @@ const getBaseUrl = (): string => {
   if (typeof __DEV__ !== 'undefined' && !__DEV__) {
     return 'https://api.scrollio.app/api/v1';
   }
+  // Prefer env so local backend port (e.g. 3001) is used on web too
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envUrl) return envUrl.replace(/\/$/, '');
   const isWeb =
     typeof window !== 'undefined' && typeof window.location?.hostname === 'string';
   if (
     isWeb &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ) {
-    return 'http://localhost:3000/api/v1';
+    return 'http://localhost:3001/api/v1';
   }
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return 'http://localhost:3000/api/v1';
+  return 'http://localhost:3001/api/v1';
 };
 
 const TIMEOUT_MS = 30_000;
+/** Longer timeout for AI generation (e.g. generate-mentor). Exported for callers that need it. */
+export const TIMEOUT_MS_LONG = 120_000;
 
 // ── Response type (mirrors Core ApiResponse) ─────────────────────────
 export interface KidsApiResponse<T> {
@@ -50,12 +53,18 @@ export interface KidsApiResponse<T> {
 
 // ── Internals ────────────────────────────────────────────────────────
 
+export interface RequestOptions {
+  timeoutMs?: number;
+}
+
 async function request<T>(
   endpoint: string,
   init: RequestInit = {},
   includeAuth = true,
+  options: RequestOptions = {},
 ): Promise<KidsApiResponse<T>> {
   const url = `${getBaseUrl()}${endpoint}`;
+  const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -78,7 +87,7 @@ async function request<T>(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(url, {
       ...init,
@@ -120,11 +129,17 @@ export const kidsApi = {
     return request<T>(endpoint, { method: 'GET' }, includeAuth);
   },
 
-  post<T>(endpoint: string, body?: unknown, includeAuth = true): Promise<KidsApiResponse<T>> {
+  post<T>(
+    endpoint: string,
+    body?: unknown,
+    includeAuth = true,
+    options: RequestOptions = {},
+  ): Promise<KidsApiResponse<T>> {
     return request<T>(
       endpoint,
       { method: 'POST', body: body ? JSON.stringify(body) : undefined },
       includeAuth,
+      options,
     );
   },
 

@@ -12,10 +12,11 @@ import {
     Pressable,
     Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { spacing, typography } from '../../../theme';
-import { authService } from '../../../services';
+import { authService, apiClient } from '../../../services';
 
 type SignInScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
@@ -46,10 +47,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            // Navigate to main app (Feed) on successful sign in
+            // If user has parent/school role, send them to Kids flow
+            const meRes = await apiClient.get<{ primaryRole?: string }>('/kids/auth/me').catch(() => ({ data: null }));
+            const role = meRes?.data?.primaryRole;
+            const isParentOrSchool = role === 'parent' || role === 'school';
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'MainTabs' }],
+                routes: [{ name: isParentOrSchool ? 'Kids' : 'MainTabs' }],
             });
         } else {
             setError(result.error || 'Sign in failed. Please try again.');
@@ -65,7 +69,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Decorative circles */}
             <View style={styles.decorCircleTopRight} />
             <View style={styles.decorCircleLeft} />
@@ -79,6 +83,17 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    {/* Back to landing */}
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.navigate('AppLanding')}
+                        accessibilityLabel="Go back"
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <Text style={styles.backArrow}>{'<'}</Text>
+                        <Text style={styles.backText}>Back</Text>
+                    </TouchableOpacity>
+
                     {/* Logo */}
                     <View style={styles.logoContainer}>
                         <Image
@@ -200,19 +215,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Scrollio Kids entry */}
-                            <TouchableOpacity
-                                style={styles.kidsLink}
-                                onPress={() => navigation.navigate('Kids')}
-                            >
-                                <Text style={styles.kidsLinkText}>Scrollio Kids (7–12) için tıkla</Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
 
                 </ScrollView>
             </KeyboardAvoidingView>
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -250,6 +258,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.lg,
         paddingTop: 60,
         paddingBottom: spacing.xl,
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginBottom: spacing.sm,
+        padding: spacing.sm,
+        minHeight: 44,
+    },
+    backArrow: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: ACCENT_COLOR,
+        marginRight: 4,
+    },
+    backText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: ACCENT_COLOR,
     },
     logoContainer: {
         alignItems: 'center',
@@ -426,14 +453,5 @@ const styles = StyleSheet.create({
         fontSize: typography.fontSize.sm,
         color: ACCENT_COLOR,
         fontWeight: '600',
-    },
-    kidsLink: {
-        marginTop: spacing.lg,
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-    },
-    kidsLinkText: {
-        fontSize: typography.fontSize.sm,
-        color: '#888',
     },
 });

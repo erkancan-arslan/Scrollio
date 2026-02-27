@@ -1,4 +1,5 @@
 export { CreateChildProfileDto } from './create-child-profile.dto';
+export { UpdateChildProfileDto } from './update-child-profile.dto';
 export { SwitchChildProfileDto } from './switch-child-profile.dto';
 export { SetPinDto } from './set-pin.dto';
 export { VerifyPinDto } from './verify-pin.dto';

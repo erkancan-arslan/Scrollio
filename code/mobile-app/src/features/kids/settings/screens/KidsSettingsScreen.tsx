@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAppSelector } from '../../../../store/hooks';
 import { useActiveChild } from '../../shared/hooks/useActiveChild';
@@ -29,6 +30,7 @@ interface SettingsData {
 }
 
 export const KidsSettingsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<{ navigate: (s: string) => void }>();
   const { childProfile } = useActiveChild();
   const [settings, setSettings] = useState<SettingsData | null>(null);
@@ -72,8 +74,9 @@ export const KidsSettingsScreen: React.FC = () => {
     return <LoadingSpinner message="Loading settings..." />;
   }
 
+  const contentPaddingBottom = 80 + insets.bottom;
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: contentPaddingBottom }]}>
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatarPlaceholder}>
@@ -113,7 +116,7 @@ export const KidsSettingsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: kidsColors.background },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16 },
   header: { alignItems: 'center', marginBottom: 24, paddingTop: 8 },
   avatarPlaceholder: {
     width: 80,

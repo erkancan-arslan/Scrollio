@@ -233,6 +233,7 @@ export class KidsChildAuthService {
         display_name: dto.displayName,
         date_of_birth: dto.dateOfBirth ?? null,
         avatar_config: dto.avatarConfig ?? {},
+        selected_character_id: dto.selectedCharacterId ?? null,
         is_active: true,
       })
       .select()
@@ -292,6 +293,7 @@ export class KidsChildAuthService {
     if (dto.displayName !== undefined) updateData.display_name = dto.displayName;
     if (dto.dateOfBirth !== undefined) updateData.date_of_birth = dto.dateOfBirth;
     if (dto.avatarConfig !== undefined) updateData.avatar_config = dto.avatarConfig;
+    if (dto.selectedCharacterId !== undefined) updateData.selected_character_id = dto.selectedCharacterId;
 
     const { data, error } = await admin
       .from('kids_child_profiles')
@@ -301,7 +303,8 @@ export class KidsChildAuthService {
       .single();
 
     if (error) {
-      throw new BadRequestException('Failed to update child profile');
+      this.logger.warn(`updateChild Supabase error: ${error.message}`);
+      throw new BadRequestException(error.message || 'Failed to update child profile');
     }
 
     return data;
@@ -393,7 +396,16 @@ export class KidsChildAuthService {
       .eq('parent_id', userId)
       .maybeSingle();
 
-    if (error || !child) {
+    if (error) {
+      this.logger.warn(
+        `validateChildOwnership Supabase error: userId=${userId} childId=${childId} error=${error.message}`,
+      );
+      throw new ForbiddenException('Child profile not found or access denied');
+    }
+    if (!child) {
+      this.logger.warn(
+        `validateChildOwnership no row: userId=${userId} childId=${childId} (row missing or parent_id mismatch)`,
+      );
       throw new ForbiddenException('Child profile not found or access denied');
     }
 

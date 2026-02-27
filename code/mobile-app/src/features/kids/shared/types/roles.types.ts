@@ -14,4 +14,5 @@ export interface ChildProfile {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  selectedCharacterId?: string | null;
 }

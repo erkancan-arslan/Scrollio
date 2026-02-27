@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { registerThunk } from '../store/authSlice';
@@ -85,14 +86,26 @@ export const KidsRegisterScreen: React.FC<Props> = ({ navigation }) => {
   const displayError = localError || error;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
+    <SafeAreaView style={styles.safeRoot} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Back to login */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.backArrow}>{'<'}</Text>
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <View style={styles.header}>
           <Text style={styles.logoEmoji}>🚀</Text>
           <Text style={styles.title}>Create Account</Text>
@@ -193,14 +206,19 @@ export const KidsRegisterScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.linkText}>Log In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeRoot: { flex: 1, backgroundColor: kidsColors.background },
   container: { flex: 1, backgroundColor: kidsColors.background },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 48 },
+  backButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 8, padding: 8, minHeight: 44 },
+  backArrow: { fontSize: 20, fontWeight: '700', color: kidsColors.primary, marginRight: 4 },
+  backText: { fontSize: 16, fontWeight: '600', color: kidsColors.primary },
   header: { alignItems: 'center', marginBottom: 24 },
   logoEmoji: { fontSize: 56, marginBottom: 8 },
   title: { ...kidsTypography.heading1, color: kidsColors.primary },

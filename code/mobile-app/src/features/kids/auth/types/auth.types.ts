@@ -28,6 +28,8 @@ export interface AuthState {
   session: AuthSession | null;
   userRole: UserRole;
   activeChildProfileId: string | null;
+  /** Set right before navigating to CharacterSelect; used as fallback when route params are missing */
+  characterSelectChildId: string | null;
   childProfiles: ChildProfile[];
   isPinSet: boolean;
   isPinVerified: boolean;

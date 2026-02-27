@@ -20,6 +20,7 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import {
   CreateChildProfileDto,
+  UpdateChildProfileDto,
   SwitchChildProfileDto,
   SetPinDto,
   VerifyPinDto,
@@ -118,7 +119,7 @@ export class KidsChildAuthController {
   async updateChild(
     @Req() req: AuthenticatedRequest,
     @Param('childId') childId: string,
-    @Body() dto: CreateChildProfileDto,
+    @Body() dto: UpdateChildProfileDto,
   ) {
     return this.kidsChildAuthService.updateChild(req.user!.id, childId, dto);
   }

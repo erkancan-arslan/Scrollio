@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { setPinThunk } from '../store/authSlice';
@@ -46,7 +47,7 @@ export const KidsSetPinScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {step === 'enter' ? (
         <PinPad
           key="enter"
@@ -66,7 +67,7 @@ export const KidsSetPinScreen: React.FC = () => {
           isLoading={isLoading}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

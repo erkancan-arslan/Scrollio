@@ -22,8 +22,16 @@ export const createChild = async (data: {
 /** PATCH /api/v1/kids/auth/children/:childId */
 export const updateChild = async (
   childId: string,
-  data: Partial<{ displayName: string; dateOfBirth: string; avatarConfig: Record<string, unknown> }>,
+  data: Partial<{
+    displayName: string;
+    dateOfBirth: string;
+    avatarConfig: Record<string, unknown>;
+    selectedCharacterId: string;
+  }>,
 ): Promise<KidsApiResponse<ChildProfile>> => {
+  if (childId == null || childId === '' || String(childId) === 'undefined') {
+    return { data: null, error: 'Invalid child ID', status: 400 };
+  }
   return kidsApi.patch<ChildProfile>(`/kids/auth/children/${childId}`, data);
 };
 
