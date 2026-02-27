@@ -230,7 +230,7 @@ export class FeedService {
     const validBookmarks = bookmarksToReturn.filter((b) => b.video);
 
     const resolvedUrls = await Promise.all(
-      validBookmarks.map((b) => this.resolveVideoUrl(b.video.video_url)),
+      validBookmarks.map((b) => this.resolveVideoUrl(b.video[0].video_url)),
     );
     const urlMap = new Map(validBookmarks.map((b, i) => [b.video_id, resolvedUrls[i]]));
 
