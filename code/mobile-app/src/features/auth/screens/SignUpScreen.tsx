@@ -11,6 +11,7 @@ import {
     Image,
     Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { spacing, typography } from '../../../theme';
@@ -87,7 +88,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
     const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Decorative circles */}
             <View style={styles.decorCircleTopRight} />
             <View style={styles.decorCircleLeft} />
@@ -275,7 +276,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
                 </ScrollView>
             </KeyboardAvoidingView>
-        </View>
+        </SafeAreaView>
     );
 };
 

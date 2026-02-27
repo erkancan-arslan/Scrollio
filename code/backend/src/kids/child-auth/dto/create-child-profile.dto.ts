@@ -17,4 +17,10 @@ export class CreateChildProfileDto {
   @IsOptional()
   @IsObject()
   avatarConfig?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Selected monster character id (e.g. monster_1..monster_6)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  selectedCharacterId?: string;
 }

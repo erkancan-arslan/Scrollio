@@ -15,6 +15,7 @@ const initialState: AuthState = {
   session: null,
   userRole: UserRole.USER,
   activeChildProfileId: null,
+  characterSelectChildId: null,
   childProfiles: [],
   isPinSet: false,
   isPinVerified: false,
@@ -145,6 +146,20 @@ export const switchChildThunk = createAsyncThunk(
   },
 );
 
+export const updateChildThunk = createAsyncThunk(
+  'kidsAuth/updateChild',
+  async (
+    params: { childId: string; data: { selectedCharacterId: string } },
+    { rejectWithValue },
+  ) => {
+    const res = await childProfileApi.updateChild(params.childId, params.data);
+    if (res.error || !res.data) {
+      return rejectWithValue(res.error || 'Failed to update child');
+    }
+    return res.data;
+  },
+);
+
 export const upgradeRoleThunk = createAsyncThunk(
   'kidsAuth/upgradeRole',
   async (targetRole: string, { rejectWithValue }) => {
@@ -182,6 +197,9 @@ const authSlice = createSlice({
     },
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
+    },
+    setCharacterSelectChildId: (state, action: PayloadAction<string | null>) => {
+      state.characterSelectChildId = action.payload;
     },
     resetAuth: () => initialState,
   },
@@ -300,6 +318,10 @@ const authSlice = createSlice({
       .addCase(fetchChildrenThunk.fulfilled, (state, action) => {
         state.isLoading = false;
         // Map snake_case from DB to camelCase
+        const ids = new Set(action.payload.map((c) => (c as { id?: string }).id ?? ''));
+        if (state.activeChildProfileId && !ids.has(state.activeChildProfileId)) {
+          state.activeChildProfileId = null;
+        }
         state.childProfiles = action.payload.map((c) => {
           const raw = c as unknown as Record<string, unknown>;
           return {
@@ -311,6 +333,7 @@ const authSlice = createSlice({
             isActive: ((raw.is_active ?? raw.isActive) ?? true) as boolean,
             createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
             updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
+            selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
           };
         });
       })
@@ -337,6 +360,7 @@ const authSlice = createSlice({
           isActive: true,
           createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
           updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
+          selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
         };
         state.childProfiles.push(newChild);
       })
@@ -351,6 +375,28 @@ const authSlice = createSlice({
         state.activeChildProfileId = action.payload.childId;
       })
       .addCase(switchChildThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    // ── Update Child ──
+    builder
+      .addCase(updateChildThunk.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateChildThunk.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.characterSelectChildId = null;
+        const raw = action.payload as unknown as Record<string, unknown>;
+        const updatedId = (raw.id ?? '') as string;
+        const selectedCharacterId = (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined;
+        const idx = state.childProfiles.findIndex((p) => p.id === updatedId);
+        if (idx !== -1) {
+          state.childProfiles[idx] = { ...state.childProfiles[idx], selectedCharacterId };
+        }
+      })
+      .addCase(updateChildThunk.rejected, (state, action) => {
+        state.isLoading = false;
         state.error = action.payload as string;
       });
 
@@ -379,6 +425,7 @@ export const {
   setPinVerified,
   setLoading,
   setError,
+  setCharacterSelectChildId,
   resetAuth,
 } = authSlice.actions;
 

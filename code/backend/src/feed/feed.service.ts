@@ -227,15 +227,18 @@ export class FeedService {
     // All returned videos are bookmarked
     const userBookmarks = new Set(bookmarksToReturn.map((b) => b.video_id));
 
-    const validBookmarks = bookmarksToReturn.filter((b) => b.video);
+    const getVideo = (b: (typeof bookmarksToReturn)[0]) =>
+      Array.isArray(b.video) ? b.video[0] : b.video;
+
+    const validBookmarks = bookmarksToReturn.filter((b) => getVideo(b));
 
     const resolvedUrls = await Promise.all(
-      validBookmarks.map((b) => this.resolveVideoUrl(b.video[0].video_url)),
+      validBookmarks.map((b) => this.resolveVideoUrl(getVideo(b)!.video_url)),
     );
     const urlMap = new Map(validBookmarks.map((b, i) => [b.video_id, resolvedUrls[i]]));
 
     const videosDtos: VideoDto[] = validBookmarks
-      .map((b) => this.transformVideoToDto(b.video, userLikes, userBookmarks, urlMap.get(b.video_id)));
+      .map((b) => this.transformVideoToDto(getVideo(b)!, userLikes, userBookmarks, urlMap.get(b.video_id)));
 
     return {
       videos: videosDtos,
@@ -531,19 +534,19 @@ export class FeedService {
       duration: video.duration,
       creator: video.creator
         ? {
-            id: video.creator.id,
-            username: video.creator.username,
-            displayName: video.creator.display_name,
-            avatarUrl: video.creator.avatar_url,
-            isVerified: video.creator.is_verified,
-          }
+          id: video.creator.id,
+          username: video.creator.username,
+          displayName: video.creator.display_name,
+          avatarUrl: video.creator.avatar_url,
+          isVerified: video.creator.is_verified,
+        }
         : {
-            id: 'unknown',
-            username: 'unknown',
-            displayName: 'Unknown Creator',
-            avatarUrl: null,
-            isVerified: false,
-          },
+          id: 'unknown',
+          username: 'unknown',
+          displayName: 'Unknown Creator',
+          avatarUrl: null,
+          isVerified: false,
+        },
       stats: {
         views: video.view_count || 0,
         likes: video.like_count || 0,

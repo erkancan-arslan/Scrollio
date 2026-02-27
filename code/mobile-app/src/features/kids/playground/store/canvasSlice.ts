@@ -11,6 +11,7 @@ interface CanvasState {
   undonePaths: CanvasPath[];
   selectedColor: string;
   brushSize: number;
+  isEraser: boolean;
 }
 
 const initialState: CanvasState = {
@@ -18,6 +19,7 @@ const initialState: CanvasState = {
   undonePaths: [],
   selectedColor: '#000',
   brushSize: 5,
+  isEraser: false,
 };
 
 const canvasSlice = createSlice({
@@ -53,11 +55,15 @@ const canvasSlice = createSlice({
     setBrushSize(state, action: PayloadAction<number>) {
       state.brushSize = action.payload;
     },
+    setEraser(state, action: PayloadAction<boolean>) {
+      state.isEraser = action.payload;
+    },
     resetCanvas(state) {
       state.paths = [];
       state.undonePaths = [];
       state.selectedColor = '#000';
       state.brushSize = 5;
+      state.isEraser = false;
     },
   },
 });
@@ -70,6 +76,7 @@ export const {
   clearPaths,
   setSelectedColor,
   setBrushSize,
+  setEraser,
   resetCanvas,
 } = canvasSlice.actions;
 

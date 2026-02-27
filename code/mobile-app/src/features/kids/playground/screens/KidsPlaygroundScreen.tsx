@@ -2,7 +2,7 @@
  * KidsPlaygroundScreen — Creative playground with drawing, daily missions, and progress
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,20 +11,30 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Image,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import {
   fetchProgressThunk,
   fetchMissionsThunk,
-  completeMissionThunk,
-  fetchRewardsThunk,
 } from '../store/progressionSlice';
-import { clearPaths, setSelectedColor, setBrushSize } from '../store/canvasSlice';
-import { uploadDrawing } from '../services/drawingApi';
+import {
+  clearPaths,
+  setSelectedColor,
+  setBrushSize,
+  setEraser,
+} from '../store/canvasSlice';
+import { uploadDrawing, generateMentor, type GenerateMentorResponse } from '../services/drawingApi';
+import { exportCanvasToPng, type ViewShotRef } from '../utils/exportCanvas';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { KidsThemedButton } from '../../shared/components/KidsThemedButton';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
+import { DrawingCanvas } from '../components/DrawingCanvas';
+import { UndoRedoControls } from '../components/UndoRedoControls';
 
 const COLORS = [
   '#000000', '#FF6B35', '#4ECDC4', '#FFD93D', '#FF6B9D',
@@ -32,15 +42,28 @@ const COLORS = [
 ];
 
 const BRUSH_SIZES = [3, 5, 8, 12, 18];
+const MAX_CANVAS_WIDTH = 400;
+const CANVAS_ASPECT = 300 / 400; // height/width
+
+type DrawPhase = 'draw' | 'generating' | 'mentorReady';
 
 export const KidsPlaygroundScreen: React.FC = () => {
+  const { width: windowWidth } = useWindowDimensions();
+  const canvasWidth = Math.min(MAX_CANVAS_WIDTH, Math.max(200, windowWidth - 32));
+  const canvasHeight = Math.round(canvasWidth * CANVAS_ASPECT);
+
   const dispatch = useAppDispatch();
-  const { level, xp, xpToNextLevel, progressPercentage, missions, completedMissionIds, isLoading } =
+  const { level, xp, xpToNextLevel, missions, completedMissionIds, isLoading } =
     useAppSelector((s) => s.kidsProgression);
-  const { selectedColor, brushSize, paths } = useAppSelector((s) => s.kidsCanvas);
+  const { selectedColor, brushSize, paths, isEraser } = useAppSelector((s) => s.kidsCanvas);
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'draw' | 'missions' | 'rewards'>('draw');
+  const [drawPhase, setDrawPhase] = useState<DrawPhase>('draw');
+  const [mentorResult, setMentorResult] = useState<GenerateMentorResponse | null>(null);
+  const [drawError, setDrawError] = useState<string | null>(null);
+  const canvasRef = useRef<View>(null);
+  const viewShotRef = useRef<ViewShotRef>(null);
 
   useEffect(() => {
     dispatch(fetchProgressThunk());
@@ -61,7 +84,6 @@ export const KidsPlaygroundScreen: React.FC = () => {
       Alert.alert('Empty Canvas', 'Draw something first!');
       return;
     }
-    // Convert paths to a simple JSON string as "drawing data"
     const drawingData = JSON.stringify(paths);
     const res = await uploadDrawing(drawingData, `Drawing ${Date.now()}`);
     if (res.error) {
@@ -73,12 +95,56 @@ export const KidsPlaygroundScreen: React.FC = () => {
     }
   };
 
+  const handleCreateMentor = useCallback(async () => {
+    if (paths.length === 0) {
+      Alert.alert('Empty Canvas', 'Draw something first!');
+      return;
+    }
+    setDrawError(null);
+    setDrawPhase('generating');
+    try {
+      const dataUrl = await exportCanvasToPng({
+        paths,
+        width: canvasWidth,
+        height: canvasHeight,
+        viewShotRef,
+      });
+      if (!dataUrl) {
+        setDrawError('Could not export drawing.');
+        setDrawPhase('draw');
+        return;
+      }
+      const res = await generateMentor(dataUrl);
+      if (res.error || !res.data) {
+        const message = res.status === 408
+          ? 'Request timeout. Check your connection and try again.'
+          : (res.error ?? 'Something went wrong. Try again.');
+        setDrawError(message);
+        setDrawPhase('draw');
+        return;
+      }
+      setMentorResult(res.data);
+      setDrawPhase('mentorReady');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Try again.';
+      setDrawError(msg);
+      setDrawPhase('draw');
+    }
+  }, [paths, canvasWidth, canvasHeight]);
+
+  const handleBackToDraw = useCallback(() => {
+    setDrawPhase('draw');
+    setMentorResult(null);
+    setDrawError(null);
+  }, []);
+
   const xpPercent = xpToNextLevel > 0 ? Math.round((xp / xpToNextLevel) * 100) : 0;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      scrollEnabled={activeTab !== 'draw'}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={kidsColors.primary} />
       }
@@ -116,71 +182,126 @@ export const KidsPlaygroundScreen: React.FC = () => {
       {/* Tab Content */}
       {activeTab === 'draw' && (
         <View style={styles.drawSection}>
-          {/* Simple Canvas Placeholder */}
-          <View style={styles.canvasArea}>
-            <View style={styles.canvasPlaceholder}>
-              {paths.length === 0 ? (
-                <Text style={styles.canvasHint}>Tap and draw here!</Text>
-              ) : (
-                <Text style={styles.canvasHint}>{paths.length} strokes drawn</Text>
-              )}
+          {drawPhase === 'generating' && (
+            <View style={styles.generatingBlock}>
+              <LoadingSpinner message="Creating your mentor in Pixar style…" />
             </View>
-          </View>
+          )}
 
-          {/* Color Palette */}
-          <View style={styles.paletteRow}>
-            {COLORS.map((color) => (
-              <TouchableOpacity
-                key={color}
-                style={[
-                  styles.colorDot,
-                  { backgroundColor: color },
-                  selectedColor === color && styles.colorDotSelected,
-                ]}
-                onPress={() => dispatch(setSelectedColor(color))}
-                accessibilityLabel={`Select color ${color}`}
+          {drawPhase === 'mentorReady' && mentorResult && (
+            <View style={styles.mentorReadyBlock}>
+              <Text style={styles.mentorTitle}>Your mentor is ready!</Text>
+              <Image
+                source={{ uri: mentorResult.characterImageUrl }}
+                style={[styles.mentorImage, { width: canvasWidth, height: canvasHeight }]}
+                resizeMode="contain"
+                accessibilityLabel="Generated Pixar-style character"
               />
-            ))}
-          </View>
+              <KidsThemedButton
+                title="Draw again"
+                variant="outline"
+                onPress={handleBackToDraw}
+                style={styles.mentorAction}
+              />
+            </View>
+          )}
 
-          {/* Brush Size */}
-          <View style={styles.brushRow}>
-            {BRUSH_SIZES.map((size) => (
-              <TouchableOpacity
-                key={size}
-                style={[styles.brushOption, brushSize === size && styles.brushSelected]}
-                onPress={() => dispatch(setBrushSize(size))}
-                accessibilityLabel={`Brush size ${size}`}
-              >
-                <View
-                  style={[
-                    styles.brushDot,
-                    {
-                      width: size * 2,
-                      height: size * 2,
-                      borderRadius: size,
-                      backgroundColor: selectedColor,
-                    },
-                  ]}
+          {drawPhase === 'draw' && (
+            <>
+              <View style={[styles.canvasArea, { minHeight: canvasHeight }]}>
+                {Platform.OS === 'web' ? (
+                  <DrawingCanvas
+                    width={canvasWidth}
+                    height={canvasHeight}
+                    canvasRef={canvasRef}
+                  />
+                ) : (
+                  <ViewShot
+                    ref={viewShotRef}
+                    options={{ format: 'png', result: 'data-uri', width: canvasWidth, height: canvasHeight }}
+                    style={{ width: canvasWidth, height: canvasHeight }}
+                    collapsable={false}
+                  >
+                    <DrawingCanvas
+                      width={canvasWidth}
+                      height={canvasHeight}
+                      canvasRef={canvasRef}
+                    />
+                  </ViewShot>
+                )}
+              </View>
+              {drawError ? (
+                <Text style={styles.drawErrorText}>{drawError}</Text>
+              ) : null}
+              <UndoRedoControls />
+              <View style={styles.paletteRow}>
+                {COLORS.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: color },
+                      selectedColor === color && !isEraser && styles.colorDotSelected,
+                    ]}
+                    onPress={() => {
+                      dispatch(setSelectedColor(color));
+                      dispatch(setEraser(false));
+                    }}
+                    accessibilityLabel={`Select color ${color}`}
+                  />
+                ))}
+              </View>
+              <View style={styles.brushRow}>
+                {BRUSH_SIZES.map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    style={[styles.brushOption, brushSize === size && styles.brushSelected]}
+                    onPress={() => dispatch(setBrushSize(size))}
+                    accessibilityLabel={`Brush size ${size}`}
+                  >
+                    <View
+                      style={[
+                        styles.brushDot,
+                        {
+                          width: size * 2,
+                          height: size * 2,
+                          borderRadius: size,
+                          backgroundColor: isEraser ? kidsColors.border : selectedColor,
+                        },
+                      ]}
+                    />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.eraserBtn, isEraser && styles.eraserBtnActive]}
+                  onPress={() => dispatch(setEraser(!isEraser))}
+                  accessibilityLabel="Eraser"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.eraserText}>Eraser</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.drawActions}>
+                <KidsThemedButton
+                  title="Clear"
+                  variant="outline"
+                  onPress={() => dispatch(clearPaths())}
+                  style={styles.actionBtn}
                 />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Actions */}
-          <View style={styles.drawActions}>
-            <KidsThemedButton
-              title="Clear"
-              variant="outline"
-              onPress={() => dispatch(clearPaths())}
-              style={styles.actionBtn}
-            />
-            <KidsThemedButton
-              title="Save Drawing"
-              onPress={handleSaveDrawing}
-              style={styles.actionBtn}
-            />
-          </View>
+                <KidsThemedButton
+                  title="Save Drawing"
+                  variant="outline"
+                  onPress={handleSaveDrawing}
+                  style={styles.actionBtn}
+                />
+                <KidsThemedButton
+                  title="Create my mentor"
+                  onPress={handleCreateMentor}
+                  style={styles.actionBtn}
+                />
+              </View>
+            </>
+          )}
         </View>
       )}
 
@@ -276,8 +397,17 @@ const styles = StyleSheet.create({
   brushOption: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
   brushSelected: { borderColor: kidsColors.primary },
   brushDot: { /* dynamic */ },
-  drawActions: { flexDirection: 'row', gap: 12, justifyContent: 'center' },
-  actionBtn: { flex: 1 },
+  eraserBtn: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFF', borderRadius: 12, borderWidth: 2, borderColor: kidsColors.border, justifyContent: 'center' },
+  eraserBtnActive: { borderColor: kidsColors.primary, backgroundColor: kidsColors.primary + '15' },
+  eraserText: { ...kidsTypography.bodySmall, color: kidsColors.text.primary, fontWeight: '600' },
+  generatingBlock: { minHeight: 280, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  mentorReadyBlock: { marginBottom: 16, alignItems: 'center' },
+  mentorTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 12 },
+  mentorImage: { borderRadius: 20, backgroundColor: kidsColors.border },
+  mentorAction: { marginTop: 16, minWidth: 160 },
+  drawErrorText: { ...kidsTypography.caption, color: kidsColors.error ?? '#B00020', marginBottom: 8, textAlign: 'center' },
+  drawActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  actionBtn: { minWidth: 100, flex: 1 },
   // Missions
   missionsSection: { paddingHorizontal: 16 },
   sectionTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 12 },

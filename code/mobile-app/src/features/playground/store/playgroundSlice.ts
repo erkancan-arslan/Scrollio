@@ -2,10 +2,11 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { BaseSession, GameId, GameResult } from '../platform/types';
 import { getGameDefinition, isGameRegistered } from '../platform/gameRegistry';
 import { InfiniteFlowState } from '../games/infinite_flow/types';
+import { ClassroomClientState } from '../games/bil-ve-fethet-classroom/types';
 import { DuelSession, DuelStateSnapshot, DuelRequest, DuelConnectionStatus } from '../games/infinite_flow/duelTypes';
 
 // Strict union for all supported games
-export type GameStateUnion = InfiniteFlowState;
+export type GameStateUnion = InfiniteFlowState | ClassroomClientState;
 
 export interface ActiveGameSession extends BaseSession {
     state: GameStateUnion;

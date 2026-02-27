@@ -26,6 +26,7 @@ import { KidsRegisterScreen } from '../features/kids/auth/screens/RegisterScreen
 import { KidsSetPinScreen } from '../features/kids/auth/screens/SetPinScreen';
 import { KidsPinEntryScreen } from '../features/kids/auth/screens/PinEntryScreen';
 import { KidsChildSelectorScreen } from '../features/kids/auth/screens/ChildSelectorScreen';
+import { KidsCharacterSelectScreen } from '../features/kids/auth/screens/CharacterSelectScreen';
 import { KidsCreateChildScreen } from '../features/kids/auth/screens/CreateChildScreen';
 import { KidsRoleBlockedScreen } from '../features/kids/auth/screens/RoleBlockedScreen';
 
@@ -53,6 +54,7 @@ export type KidsStackParamList = {
   // Child selection
   KidsChildSelector: undefined;
   KidsCreateChild: undefined;
+  KidsCharacterSelect: { childId: string };
 
   // Main app
   KidsMainTabs: NavigatorScreenParams<KidsMainTabParamList>;
@@ -138,6 +140,7 @@ export const KidsNavigator: React.FC = () => {
 
       {/* Child management */}
       <Stack.Screen name="KidsChildSelector" component={KidsChildSelectorScreen} />
+      <Stack.Screen name="KidsCharacterSelect" component={KidsCharacterSelectScreen} />
       <Stack.Screen
         name="KidsCreateChild"
         component={KidsCreateChildScreen}

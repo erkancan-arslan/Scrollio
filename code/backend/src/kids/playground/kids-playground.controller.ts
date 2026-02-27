@@ -5,7 +5,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentChild } from '../../auth/current-child.decorator';
-import { UploadDrawingDto, GetCharacterParamsDto, GetAnimationParamsDto } from './dto';
+import { UploadDrawingDto, GenerateMentorDto, GetCharacterParamsDto, GetAnimationParamsDto } from './dto';
 
 @ApiTags('kids-playground')
 @Controller('kids/playground')
@@ -21,6 +21,19 @@ export class KidsPlaygroundController {
     @Body() dto: UploadDrawingDto,
   ) {
     return this.kidsPlaygroundService.uploadDrawing(childId, dto);
+  }
+
+  @Post('generate-mentor')
+  @ApiOperation({ summary: 'Generate Pixar-style mentor from drawing (FAL image-to-image)' })
+  async generateMentor(
+    @CurrentChild() childId: string,
+    @Body() dto: GenerateMentorDto,
+  ) {
+    return this.kidsPlaygroundService.generateMentor(
+      childId,
+      dto.imageBase64,
+      dto.childName,
+    );
   }
 
   @Get('character/:id')

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { AppLandingScreen } from '../features/auth/screens/AppLandingScreen';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
 import { SignUpScreen } from '../features/auth/screens/SignUpScreen';
 import { OnboardingUsernameScreen } from '../features/auth/screens/OnboardingUsernameScreen';
@@ -14,8 +15,12 @@ import { GameId } from '../features/playground/platform/types';
 import { DuelLobbyScreen } from '../features/playground/screens/DuelLobbyScreen';
 import { DuelGameScreen } from '../features/playground/screens/DuelGameScreen';
 import { DuelRequestModal } from '../features/playground/components/DuelRequestModal';
+import { ClassroomLobbyScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomLobbyScreen';
+import { ClassroomGameScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomGameScreen';
+import { ClassroomMenuScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomMenuScreen';
 
 export type RootStackParamList = {
+    AppLanding: undefined;
     SignIn: undefined;
     SignUp: undefined;
     OnboardingUsername: undefined;
@@ -54,19 +59,40 @@ export type RootStackParamList = {
         playerAId: string;
         playerBId: string;
     };
+
+    ClassroomMenu: undefined;
+    ClassroomLobby: {
+        roomCode: string;
+        isHost: boolean;
+    };
+    ClassroomGame: {
+        matchId: string;
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/** Standalone wrapper for ClassroomMenuScreen to work as a navigation target */
+const ClassroomMenuWrapper: React.FC = () => {
+    const navigation = useNavigation();
+    return <ClassroomMenuScreen onExit={() => navigation.goBack()} />;
+};
 
 export const AppNavigator = () => {
     return (
         <NavigationContainer>
             <Stack.Navigator
-                initialRouteName="SignIn"
+                initialRouteName="AppLanding"
                 screenOptions={{
                     headerShown: false,
                 }}
             >
+                {/* Landing — choose Core vs Kids */}
+                <Stack.Screen
+                    name="AppLanding"
+                    component={AppLandingScreen}
+                />
+
                 {/* Auth Screens */}
                 <Stack.Screen
                     name="SignIn"
@@ -137,6 +163,23 @@ export const AppNavigator = () => {
                 <Stack.Screen
                     name="DuelGame"
                     component={DuelGameScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
+
+                {/* Classroom Game Screens */}
+                <Stack.Screen
+                    name="ClassroomMenu"
+                    component={ClassroomMenuWrapper}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="ClassroomLobby"
+                    component={ClassroomLobbyScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="ClassroomGame"
+                    component={ClassroomGameScreen}
                     options={{ headerShown: false, gestureEnabled: false }}
                 />
             </Stack.Navigator>
