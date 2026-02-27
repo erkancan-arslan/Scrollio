@@ -11,6 +11,7 @@ import { MessagesModule } from './messages/messages.module';
 import { FcmModule } from './fcm/fcm.module';
 import { KidsModule } from './kids/kids.module';
 import { DuelModule } from './duel/duel.module';
+import { ClassroomModule } from './classroom/classroom.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -30,6 +31,7 @@ import { HealthController } from './health/health.controller';
     FcmModule,
     KidsModule,
     DuelModule,
+    ClassroomModule,
   ],
   controllers: [HealthController],
   providers: [],

@@ -534,19 +534,19 @@ export class FeedService {
       duration: video.duration,
       creator: video.creator
         ? {
-            id: video.creator.id,
-            username: video.creator.username,
-            displayName: video.creator.display_name,
-            avatarUrl: video.creator.avatar_url,
-            isVerified: video.creator.is_verified,
-          }
+          id: video.creator.id,
+          username: video.creator.username,
+          displayName: video.creator.display_name,
+          avatarUrl: video.creator.avatar_url,
+          isVerified: video.creator.is_verified,
+        }
         : {
-            id: 'unknown',
-            username: 'unknown',
-            displayName: 'Unknown Creator',
-            avatarUrl: null,
-            isVerified: false,
-          },
+          id: 'unknown',
+          username: 'unknown',
+          displayName: 'Unknown Creator',
+          avatarUrl: null,
+          isVerified: false,
+        },
       stats: {
         views: video.view_count || 0,
         likes: video.like_count || 0,

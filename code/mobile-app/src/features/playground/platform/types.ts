@@ -6,7 +6,8 @@ import { ReactNode } from 'react';
  * Add new game IDs here as they are migrated.
  */
 export type GameId =
-    | 'infinite_flow';
+    | 'infinite_flow'
+    | 'bil_ve_fethet_classroom';
 
 
 export type GameMode = 'single' | 'hotseat' | 'multiplayer';
