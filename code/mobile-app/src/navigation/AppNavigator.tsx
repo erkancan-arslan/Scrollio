@@ -18,6 +18,7 @@ import { DuelRequestModal } from '../features/playground/components/DuelRequestM
 import { ClassroomLobbyScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomLobbyScreen';
 import { ClassroomGameScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomGameScreen';
 import { ClassroomMenuScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomMenuScreen';
+import { AdminNavigator } from './AdminNavigator';
 
 export type RootStackParamList = {
     AppLanding: undefined;
@@ -68,6 +69,7 @@ export type RootStackParamList = {
     ClassroomGame: {
         matchId: string;
     };
+    Admin: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -181,6 +183,13 @@ export const AppNavigator = () => {
                     name="ClassroomGame"
                     component={ClassroomGameScreen}
                     options={{ headerShown: false, gestureEnabled: false }}
+                />
+
+                {/* Admin Panel */}
+                <Stack.Screen
+                    name="Admin"
+                    component={AdminNavigator}
+                    options={{ headerShown: false }}
                 />
             </Stack.Navigator>
 

@@ -88,6 +88,14 @@ export const AppLandingScreen: React.FC<Props> = ({ navigation }) => {
                             </View>
                         </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.adminLink}
+                        onPress={() => navigation.navigate('Admin')}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <Text style={styles.adminLinkText}>Admin</Text>
+                    </TouchableOpacity>
                 </ScrollView>
             </View>
         </SafeAreaView>
@@ -235,5 +243,15 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+    },
+    adminLink: {
+        marginTop: spacing.xl,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+    },
+    adminLinkText: {
+        fontSize: 14,
+        color: '#666',
+        textDecorationLine: 'underline',
     },
 });

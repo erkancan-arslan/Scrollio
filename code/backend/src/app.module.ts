@@ -12,6 +12,7 @@ import { FcmModule } from './fcm/fcm.module';
 import { KidsModule } from './kids/kids.module';
 import { DuelModule } from './duel/duel.module';
 import { ClassroomModule } from './classroom/classroom.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -32,6 +33,7 @@ import { HealthController } from './health/health.controller';
     KidsModule,
     DuelModule,
     ClassroomModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [],
