@@ -51,6 +51,23 @@ class FeedService {
   }
 
   /**
+   * Get user's liked videos
+   */
+  async getLikedFeed(
+    params: { limit?: number; cursor?: string } = {}
+  ): Promise<ApiResponse<FeedResponse>> {
+    const queryParams = new URLSearchParams();
+
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/feed/likes${queryString ? `?${queryString}` : ''}`;
+
+    return apiClient.get<FeedResponse>(endpoint, true);
+  }
+
+  /**
    * Get all active topics
    */
   async getTopics(): Promise<ApiResponse<TopicsResponse>> {
@@ -90,6 +107,23 @@ class FeedService {
    */
   async unbookmarkVideo(videoId: string): Promise<ApiResponse<ActionResponse>> {
     return apiClient.delete<ActionResponse>(`/feed/videos/${videoId}/bookmark`, true);
+  }
+
+  /**
+   * Get user's watched videos (deduplicated history)
+   */
+  async getWatchedFeed(
+    params: { limit?: number; cursor?: string } = {}
+  ): Promise<ApiResponse<FeedResponse>> {
+    const queryParams = new URLSearchParams();
+
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/feed/watched${queryString ? `?${queryString}` : ''}`;
+
+    return apiClient.get<FeedResponse>(endpoint, true);
   }
 
   /**

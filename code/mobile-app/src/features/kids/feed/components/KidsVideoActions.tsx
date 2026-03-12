@@ -11,6 +11,7 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface KidsVideoActionsProps {
   likeCount: number;
@@ -47,20 +48,24 @@ export const KidsVideoActions: React.FC<KidsVideoActionsProps> = ({
     <View style={styles.container}>
       {/* Like Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onLike}>
-        <View style={[styles.iconContainer, isLiked && styles.iconContainerActive]}>
-          <Text style={[styles.icon, isLiked && styles.iconActive]}>
-            {isLiked ? '❤️' : '🤍'}
-          </Text>
+        <View style={[styles.iconContainer, isLiked && styles.iconContainerLiked]}>
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={26}
+            color={isLiked ? '#FF4D67' : '#FFFFFF'}
+          />
         </View>
         <Text style={styles.actionCount}>{formatCount(likeCount)}</Text>
       </TouchableOpacity>
 
       {/* Bookmark Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onBookmark}>
-        <View style={[styles.iconContainer, isBookmarked && styles.iconContainerActive]}>
-          <Text style={[styles.icon, isBookmarked && styles.iconActive]}>
-            {isBookmarked ? '🔖' : '📑'}
-          </Text>
+        <View style={[styles.iconContainer, isBookmarked && styles.iconContainerBookmarked]}>
+          <Ionicons
+            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+            size={24}
+            color={isBookmarked ? '#FFD700' : '#FFFFFF'}
+          />
         </View>
         <Text style={styles.actionCount}>{formatCount(bookmarkCount)}</Text>
       </TouchableOpacity>
@@ -68,7 +73,7 @@ export const KidsVideoActions: React.FC<KidsVideoActionsProps> = ({
       {/* Share Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onShare}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>↗️</Text>
+          <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
         </View>
         <Text style={styles.actionCount}>Share</Text>
       </TouchableOpacity>
@@ -76,7 +81,7 @@ export const KidsVideoActions: React.FC<KidsVideoActionsProps> = ({
       {/* Quiz Indicator */}
       {hasQuiz && (
         <View style={styles.quizIndicator}>
-          <Text style={styles.quizIcon}>📝</Text>
+          <Ionicons name="help-circle-outline" size={24} color="#FFFFFF" />
         </View>
       )}
     </View>
@@ -101,14 +106,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  iconContainerActive: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+  iconContainerLiked: {
+    backgroundColor: 'rgba(255, 77, 103, 0.2)',
   },
-  icon: {
-    fontSize: 26,
-  },
-  iconActive: {
-    transform: [{ scale: 1.1 }],
+  iconContainerBookmarked: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
   },
   actionCount: {
     color: '#FFFFFF',
@@ -126,8 +128,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
-  },
-  quizIcon: {
-    fontSize: 22,
   },
 });

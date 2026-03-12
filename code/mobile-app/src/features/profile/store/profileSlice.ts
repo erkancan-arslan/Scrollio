@@ -25,15 +25,19 @@ interface ProfileState {
   bookmarksCursor: string | null;
   hasMoreBookmarks: boolean;
 
-  // Liked videos (using feed data)
+  // Liked videos
   likedVideos: Video[];
   likesLoading: boolean;
   likesError: string | null;
+  likesCursor: string | null;
+  hasMoreLikes: boolean;
 
   // Watched videos history
   watchedVideos: Video[];
   watchedLoading: boolean;
   watchedError: string | null;
+  watchedCursor: string | null;
+  hasMoreWatched: boolean;
 }
 
 const initialState: ProfileState = {
@@ -52,10 +56,14 @@ const initialState: ProfileState = {
   likedVideos: [],
   likesLoading: false,
   likesError: null,
+  likesCursor: null,
+  hasMoreLikes: true,
 
   watchedVideos: [],
   watchedLoading: false,
   watchedError: null,
+  watchedCursor: null,
+  hasMoreWatched: true,
 };
 
 // Async thunks
@@ -88,6 +96,42 @@ export const fetchBookmarkedVideos = createAsyncThunk(
   }
 );
 
+export const fetchLikedVideos = createAsyncThunk(
+  'profile/fetchLikedVideos',
+  async (params: { limit?: number; cursor?: string; loadMore?: boolean }, { rejectWithValue }) => {
+    const response = await feedService.getLikedFeed({
+      limit: params.limit || 20,
+      cursor: params.cursor,
+    });
+    if (response.data) {
+      return {
+        videos: response.data.videos,
+        nextCursor: response.data.nextCursor,
+        loadMore: params.loadMore || false,
+      };
+    }
+    return rejectWithValue(response.error || 'Failed to fetch liked videos');
+  }
+);
+
+export const fetchWatchedVideos = createAsyncThunk(
+  'profile/fetchWatchedVideos',
+  async (params: { limit?: number; cursor?: string; loadMore?: boolean }, { rejectWithValue }) => {
+    const response = await feedService.getWatchedFeed({
+      limit: params.limit || 20,
+      cursor: params.cursor,
+    });
+    if (response.data) {
+      return {
+        videos: response.data.videos,
+        nextCursor: response.data.nextCursor,
+        loadMore: params.loadMore || false,
+      };
+    }
+    return rejectWithValue(response.error || 'Failed to fetch watch history');
+  }
+);
+
 export const updateProfile = createAsyncThunk(
   'profile/updateProfile',
   async (data: Parameters<typeof profileService.updateProfile>[0], { rejectWithValue }) => {
@@ -113,6 +157,10 @@ const profileSlice = createSlice({
       state.watchedVideos = [];
       state.bookmarksCursor = null;
       state.hasMoreBookmarks = true;
+      state.likesCursor = null;
+      state.hasMoreLikes = true;
+      state.watchedCursor = null;
+      state.hasMoreWatched = true;
     },
     addBookmark: (state, action: PayloadAction<Video>) => {
       // Add video to bookmarks if not already present
@@ -169,6 +217,48 @@ const profileSlice = createSlice({
       .addCase(fetchBookmarkedVideos.rejected, (state, action) => {
         state.bookmarksLoading = false;
         state.bookmarksError = action.payload as string;
+      });
+
+    // Fetch liked videos
+    builder
+      .addCase(fetchLikedVideos.pending, (state) => {
+        state.likesLoading = true;
+        state.likesError = null;
+      })
+      .addCase(fetchLikedVideos.fulfilled, (state, action) => {
+        state.likesLoading = false;
+        if (action.payload.loadMore) {
+          state.likedVideos = [...state.likedVideos, ...action.payload.videos];
+        } else {
+          state.likedVideos = action.payload.videos;
+        }
+        state.likesCursor = action.payload.nextCursor || null;
+        state.hasMoreLikes = !!action.payload.nextCursor;
+      })
+      .addCase(fetchLikedVideos.rejected, (state, action) => {
+        state.likesLoading = false;
+        state.likesError = action.payload as string;
+      });
+
+    // Fetch watched videos
+    builder
+      .addCase(fetchWatchedVideos.pending, (state) => {
+        state.watchedLoading = true;
+        state.watchedError = null;
+      })
+      .addCase(fetchWatchedVideos.fulfilled, (state, action) => {
+        state.watchedLoading = false;
+        if (action.payload.loadMore) {
+          state.watchedVideos = [...state.watchedVideos, ...action.payload.videos];
+        } else {
+          state.watchedVideos = action.payload.videos;
+        }
+        state.watchedCursor = action.payload.nextCursor || null;
+        state.hasMoreWatched = !!action.payload.nextCursor;
+      })
+      .addCase(fetchWatchedVideos.rejected, (state, action) => {
+        state.watchedLoading = false;
+        state.watchedError = action.payload as string;
       });
 
     // Update profile

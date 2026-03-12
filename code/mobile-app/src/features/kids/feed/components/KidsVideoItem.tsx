@@ -42,7 +42,7 @@ interface KidsVideoItemProps {
   itemHeight: number;
 }
 
-export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
+export const KidsVideoItem = React.memo<KidsVideoItemProps>(function KidsVideoItem({
   item,
   isActive,
   isMuted,
@@ -52,7 +52,7 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
   onTopicPress,
   onVideoEnd,
   itemHeight,
-}) => {
+}) {
   const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
   const videoUrl = item.content.videoUrl || '';
@@ -67,6 +67,8 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wasPlayingRef = useRef(false);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pauseIconTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Calculate bottom offset for content
   const bottomOffset = useMemo(() => 16 + insets.bottom, [insets.bottom]);
@@ -122,6 +124,21 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
     player.muted = isMuted;
     player.pause();
   });
+
+  // Release the native player on unmount to prevent memory leaks (expo-video v3 bug).
+  // Guard with try-catch: if the native object was already destroyed (e.g. by a
+  // re-render cycle), calling pause/release on the stale JS reference throws
+  // NativeSharedObjectNotFoundException.
+  useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+        player.release();
+      } catch {
+        // Native player already released — nothing to do
+      }
+    };
+  }, [player]);
 
   // Update muted state when prop changes
   useEffect(() => {
@@ -202,7 +219,7 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
       if (player.playing) {
         player.pause();
         setShowPauseIcon(true);
-        setTimeout(() => setShowPauseIcon(false), 800);
+        pauseIconTimerRef.current = setTimeout(() => setShowPauseIcon(false), 800);
         clearHideTimer();
         setShowUI(false);
         Animated.timing(uiOpacity, {
@@ -220,6 +237,14 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
     }
   }, [showUI, player, clearHideTimer, uiOpacity, revealUI, startHideTimer]);
 
+  // Cancel pending tap/pause-icon timers on unmount
+  useEffect(() => {
+    return () => {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+      if (pauseIconTimerRef.current) clearTimeout(pauseIconTimerRef.current);
+    };
+  }, []);
+
   // Double tap detection
   const lastTap = useRef<number>(0);
   const handleTap = useCallback(() => {
@@ -227,9 +252,10 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
       handleDoubleTap();
     } else {
-      setTimeout(() => {
+      tapTimerRef.current = setTimeout(() => {
         if (Date.now() - lastTap.current >= DOUBLE_TAP_DELAY) {
           handleSingleTap();
         }
@@ -332,7 +358,7 @@ export const KidsVideoItem: React.FC<KidsVideoItemProps> = ({
       </TouchableWithoutFeedback>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

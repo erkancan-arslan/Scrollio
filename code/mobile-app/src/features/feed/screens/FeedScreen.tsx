@@ -43,6 +43,10 @@ export const FeedScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const isLoadingMore = useRef(false);
 
+  // Watch tracking
+  const activeVideoStartTime = useRef<number | null>(null);
+  const activeVideoId = useRef<string | null>(null);
+
   // Playback options state
   const [isMuted, setIsMuted] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
@@ -110,6 +114,16 @@ export const FeedScreen: React.FC = () => {
   useEffect(() => {
     fetchFeed(true);
   }, []);
+
+  // Record view when navigating away from the feed tab
+  useEffect(() => {
+    if (!isFocused && activeVideoId.current && activeVideoStartTime.current !== null) {
+      recordVideoView(activeVideoId.current, activeVideoStartTime.current);
+      activeVideoStartTime.current = null;
+    } else if (isFocused && activeVideoId.current) {
+      activeVideoStartTime.current = Date.now();
+    }
+  }, [isFocused, recordVideoView]);
 
   // Handle pull to refresh
   const handleRefresh = useCallback(() => {
@@ -279,18 +293,42 @@ export const FeedScreen: React.FC = () => {
     }
   }, [autoAdvance, currentIndex, feedState.videos.length]);
 
-  // Track viewable items for auto-play
+  // Record view for a video that is leaving the viewport
+  const recordVideoView = useCallback((videoId: string, startTime: number) => {
+    const watchDuration = Math.round((Date.now() - startTime) / 1000);
+    // Fire-and-forget — do not block UI
+    feedService.recordView(videoId, watchDuration, false).catch(() => {});
+  }, []);
+
+  // Track viewable items for auto-play and watch time recording
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setCurrentIndex(viewableItems[0].index);
+        const newIndex = viewableItems[0].index;
+        const newVideoId = feedState.videos[newIndex]?.id ?? null;
+
+        // Record the view for the video that just left the viewport
+        if (
+          activeVideoId.current &&
+          activeVideoStartTime.current !== null &&
+          activeVideoId.current !== newVideoId
+        ) {
+          recordVideoView(activeVideoId.current, activeVideoStartTime.current);
+        }
+
+        // Start tracking the new active video
+        activeVideoId.current = newVideoId;
+        activeVideoStartTime.current = Date.now();
+
+        setCurrentIndex(newIndex);
       }
     },
-    []
+    [feedState.videos, recordVideoView]
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 100,
   }).current;
 
   // Render each video item

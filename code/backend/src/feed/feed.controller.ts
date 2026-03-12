@@ -17,7 +17,7 @@ import {
 import { FeedService } from './feed.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { SupabaseService } from '../supabase/supabase.service';
-import { FeedQueryDto, BookmarkedFeedQueryDto } from './dto/feed-query.dto';
+import { FeedQueryDto, BookmarkedFeedQueryDto, LikedFeedQueryDto, WatchedFeedQueryDto } from './dto/feed-query.dto';
 import { VideoIdParamDto, RecordViewDto } from './dto/video-action.dto';
 import {
   FeedResponseDto,
@@ -102,6 +102,34 @@ export class FeedController {
     @Query() query: BookmarkedFeedQueryDto,
   ): Promise<FeedResponseDto> {
     return this.feedService.getBookmarkedFeed(req.user!.id, query);
+  }
+
+  /**
+   * GET /feed/likes
+   * Get user's liked videos
+   * Authentication: Required
+   */
+  @Get('likes')
+  @UseGuards(AuthGuard)
+  async getLikedFeed(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: LikedFeedQueryDto,
+  ): Promise<FeedResponseDto> {
+    return this.feedService.getLikedFeed(req.user!.id, query);
+  }
+
+  /**
+   * GET /feed/watched
+   * Get user's watched videos (deduplicated history)
+   * Authentication: Required
+   */
+  @Get('watched')
+  @UseGuards(AuthGuard)
+  async getWatchedFeed(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: WatchedFeedQueryDto,
+  ): Promise<FeedResponseDto> {
+    return this.feedService.getWatchedFeed(req.user!.id, query);
   }
 
   /**

@@ -27,6 +27,21 @@ export const VideoCard: React.FC<VideoCardProps> = ({ item, isActive, height }) 
     p.muted = false;
   });
 
+  // Release the native player on unmount to prevent memory leaks (expo-video v3 bug).
+  // Guard with try-catch: if the native object was already destroyed (e.g. by a
+  // re-render cycle), calling pause/release on the stale JS reference throws
+  // NativeSharedObjectNotFoundException.
+  useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+        player.release();
+      } catch {
+        // Native player already released — nothing to do
+      }
+    };
+  }, [player]);
+
   useEffect(() => {
     if (isActive && videoSource) {
       player.play();

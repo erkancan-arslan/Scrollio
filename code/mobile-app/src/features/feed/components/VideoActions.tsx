@@ -1,6 +1,6 @@
 /**
  * VideoActions Component
- * Right-side action buttons (like, comment, bookmark) for feed videos
+ * Right-side action buttons (like, comment, bookmark, share) for feed videos
  */
 
 import React from 'react';
@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { VideoStats, VideoCreator } from '../types';
 import { formatCount } from '../data/mockVideos';
 
@@ -49,10 +50,12 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
 
       {/* Like Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onLike}>
-        <View style={[styles.iconContainer, isLiked && styles.iconContainerActive]}>
-          <Text style={[styles.icon, isLiked && styles.iconActive]}>
-            {isLiked ? '❤️' : '🤍'}
-          </Text>
+        <View style={[styles.iconContainer, isLiked && styles.iconContainerLiked]}>
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={26}
+            color={isLiked ? '#FF4D67' : '#FFFFFF'}
+          />
         </View>
         <Text style={styles.actionCount}>{formatCount(stats.likes)}</Text>
       </TouchableOpacity>
@@ -60,17 +63,19 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
       {/* Comment Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onComment}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>💬</Text>
+          <Ionicons name="chatbubble-outline" size={24} color="#FFFFFF" />
         </View>
         <Text style={styles.actionCount}>{formatCount(stats.comments)}</Text>
       </TouchableOpacity>
 
       {/* Bookmark Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onBookmark}>
-        <View style={[styles.iconContainer, isBookmarked && styles.iconContainerActive]}>
-          <Text style={[styles.icon, isBookmarked && styles.iconActive]}>
-            {isBookmarked ? '🔖' : '📑'}
-          </Text>
+        <View style={[styles.iconContainer, isBookmarked && styles.iconContainerBookmarked]}>
+          <Ionicons
+            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+            size={24}
+            color={isBookmarked ? '#FFD700' : '#FFFFFF'}
+          />
         </View>
         <Text style={styles.actionCount}>{formatCount(stats.bookmarks)}</Text>
       </TouchableOpacity>
@@ -78,7 +83,7 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
       {/* Share Button */}
       <TouchableOpacity style={styles.actionButton} onPress={onShare}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>↗️</Text>
+          <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
         </View>
         <Text style={styles.actionCount}>Share</Text>
       </TouchableOpacity>
@@ -132,14 +137,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  iconContainerActive: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+  iconContainerLiked: {
+    backgroundColor: 'rgba(255, 77, 103, 0.2)',
   },
-  icon: {
-    fontSize: 26,
-  },
-  iconActive: {
-    transform: [{ scale: 1.1 }],
+  iconContainerBookmarked: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
   },
   actionCount: {
     color: '#FFFFFF',
@@ -150,5 +152,3 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
 });
-
-

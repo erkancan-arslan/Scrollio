@@ -8,7 +8,7 @@ import {
   TopicsResponseDto,
   ActionResponseDto,
 } from './dto/feed-response.dto';
-import { FeedQueryDto, BookmarkedFeedQueryDto } from './dto/feed-query.dto';
+import { FeedQueryDto, BookmarkedFeedQueryDto, LikedFeedQueryDto, WatchedFeedQueryDto } from './dto/feed-query.dto';
 import { RecordViewDto } from './dto/video-action.dto';
 
 @Injectable()
@@ -244,6 +244,184 @@ export class FeedService {
       videos: videosDtos,
       nextCursor: hasMore && bookmarksToReturn.length > 0
         ? bookmarksToReturn[bookmarksToReturn.length - 1].video_id
+        : null,
+      hasMore,
+    };
+  }
+
+  /**
+   * Get a paginated list of videos the user has liked
+   */
+  async getLikedFeed(userId: string, query: LikedFeedQueryDto): Promise<FeedResponseDto> {
+    const supabase = this.supabaseService.getAdminClient();
+    const limit = query.limit || 10;
+
+    let dbQuery = supabase
+      .from('video_likes')
+      .select(`
+        video_id,
+        created_at,
+        video:videos(
+          *,
+          topic:topics(id, name, slug),
+          creator:creators(id, username, display_name, avatar_url, is_verified)
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit + 1);
+
+    if (query.cursor) {
+      const { data: cursorLike } = await supabase
+        .from('video_likes')
+        .select('created_at')
+        .eq('video_id', query.cursor)
+        .eq('user_id', userId)
+        .single();
+
+      if (cursorLike) {
+        dbQuery = dbQuery.lt('created_at', cursorLike.created_at);
+      }
+    }
+
+    const { data: likes, error } = await dbQuery;
+
+    if (error) {
+      this.logger.error('Error fetching liked feed:', error);
+      throw error;
+    }
+
+    const hasMore = likes && likes.length > limit;
+    const likesToReturn = hasMore ? likes.slice(0, limit) : likes || [];
+
+    // All returned videos are liked by the user
+    const userLikes = new Set(likesToReturn.map((l) => l.video_id));
+
+    // Check which of these the user has also bookmarked
+    let userBookmarks = new Set<string>();
+    if (likesToReturn.length > 0) {
+      const videoIds = likesToReturn.map((l) => l.video_id);
+      const { data: bookmarks } = await supabase
+        .from('video_bookmarks')
+        .select('video_id')
+        .eq('user_id', userId)
+        .in('video_id', videoIds);
+
+      if (bookmarks) {
+        userBookmarks = new Set(bookmarks.map((b) => b.video_id));
+      }
+    }
+
+    const getVideo = (l: (typeof likesToReturn)[0]) =>
+      Array.isArray(l.video) ? l.video[0] : l.video;
+
+    const validLikes = likesToReturn.filter((l) => getVideo(l));
+
+    const resolvedUrls = await Promise.all(
+      validLikes.map((l) => this.resolveVideoUrl(getVideo(l)!.video_url)),
+    );
+    const urlMap = new Map(validLikes.map((l, i) => [l.video_id, resolvedUrls[i]]));
+
+    const videosDtos: VideoDto[] = validLikes.map((l) =>
+      this.transformVideoToDto(getVideo(l)!, userLikes, userBookmarks, urlMap.get(l.video_id)),
+    );
+
+    return {
+      videos: videosDtos,
+      nextCursor:
+        hasMore && likesToReturn.length > 0
+          ? likesToReturn[likesToReturn.length - 1].video_id
+          : null,
+      hasMore,
+    };
+  }
+
+  /**
+   * Get a paginated list of unique videos the authenticated user has watched
+   */
+  async getWatchedFeed(userId: string, query: WatchedFeedQueryDto): Promise<FeedResponseDto> {
+    const supabase = this.supabaseService.getAdminClient();
+    const limit = query.limit || 10;
+
+    let dbQuery = supabase
+      .from('user_watched_videos')
+      .select(`
+        video_id,
+        watched_at,
+        video:videos(
+          *,
+          topic:topics(id, name, slug),
+          creator:creators(id, username, display_name, avatar_url, is_verified)
+        )
+      `)
+      .eq('user_id', userId)
+      .order('watched_at', { ascending: false })
+      .limit(limit + 1);
+
+    if (query.cursor) {
+      const { data: cursorRow } = await supabase
+        .from('user_watched_videos')
+        .select('watched_at')
+        .eq('user_id', userId)
+        .eq('video_id', query.cursor)
+        .single();
+
+      if (cursorRow) {
+        dbQuery = dbQuery.lt('watched_at', cursorRow.watched_at);
+      }
+    }
+
+    const { data: rows, error } = await dbQuery;
+
+    if (error) {
+      this.logger.error('Error fetching watched feed:', error);
+      throw error;
+    }
+
+    const hasMore = rows && rows.length > limit;
+    const rowsToReturn = hasMore ? rows.slice(0, limit) : rows || [];
+
+    // Check which of these the user has liked / bookmarked
+    let userLikes = new Set<string>();
+    let userBookmarks = new Set<string>();
+
+    if (rowsToReturn.length > 0) {
+      const videoIds = rowsToReturn.map((r) => r.video_id);
+      const [likesResult, bookmarksResult] = await Promise.all([
+        supabase
+          .from('video_likes')
+          .select('video_id')
+          .eq('user_id', userId)
+          .in('video_id', videoIds),
+        supabase
+          .from('video_bookmarks')
+          .select('video_id')
+          .eq('user_id', userId)
+          .in('video_id', videoIds),
+      ]);
+
+      if (likesResult.data) userLikes = new Set(likesResult.data.map((l) => l.video_id));
+      if (bookmarksResult.data) userBookmarks = new Set(bookmarksResult.data.map((b) => b.video_id));
+    }
+
+    const getVideo = (r: (typeof rowsToReturn)[0]) =>
+      Array.isArray(r.video) ? r.video[0] : r.video;
+
+    const validRows = rowsToReturn.filter((r) => getVideo(r));
+
+    const resolvedUrls = await Promise.all(
+      validRows.map((r) => this.resolveVideoUrl(getVideo(r)!.video_url)),
+    );
+    const urlMap = new Map(validRows.map((r, i) => [r.video_id, resolvedUrls[i]]));
+
+    const videosDtos: VideoDto[] = validRows.map((r) =>
+      this.transformVideoToDto(getVideo(r)!, userLikes, userBookmarks, urlMap.get(r.video_id)),
+    );
+
+    return {
+      videos: videosDtos,
+      nextCursor: hasMore && rowsToReturn.length > 0
+        ? rowsToReturn[rowsToReturn.length - 1].video_id
         : null,
       hasMore,
     };

@@ -23,6 +23,8 @@ import { AppDispatch, RootState } from '../../../store/store';
 import {
   fetchMyProfile,
   fetchBookmarkedVideos,
+  fetchLikedVideos,
+  fetchWatchedVideos,
   setActiveTab,
   clearProfile,
 } from '../store/profileSlice';
@@ -51,45 +53,63 @@ export const ProfileScreen: React.FC = () => {
     bookmarksError,
     hasMoreBookmarks,
     bookmarksCursor,
+    likedVideos,
+    likesLoading,
+    likesError,
+    hasMoreLikes,
+    likesCursor,
+    watchedVideos,
+    watchedLoading,
+    watchedError,
+    hasMoreWatched,
+    watchedCursor,
   } = useSelector((state: RootState) => state.profile);
 
-  // Load profile on mount
+  // Load profile and initial tab data on mount
   useEffect(() => {
     dispatch(fetchMyProfile());
     dispatch(fetchBookmarkedVideos({ limit: 20 }));
+    dispatch(fetchLikedVideos({ limit: 20 }));
+    dispatch(fetchWatchedVideos({ limit: 20 }));
   }, [dispatch]);
 
-  // Handle tab change
+  // Handle tab change — lazy-load if data hasn't been fetched yet
   const handleTabChange = useCallback((tab: ProfileTab) => {
     dispatch(setActiveTab(tab));
 
-    // Load data for the selected tab
     if (tab === 'bookmarks' && bookmarkedVideos.length === 0) {
       dispatch(fetchBookmarkedVideos({ limit: 20 }));
     }
-    // TODO: Add handlers for likes and watched tabs when implemented
-  }, [dispatch, bookmarkedVideos.length]);
+    if (tab === 'likes' && likedVideos.length === 0) {
+      dispatch(fetchLikedVideos({ limit: 20 }));
+    }
+    if (tab === 'watched' && watchedVideos.length === 0) {
+      dispatch(fetchWatchedVideos({ limit: 20 }));
+    }
+  }, [dispatch, bookmarkedVideos.length, likedVideos.length, watchedVideos.length]);
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
     dispatch(fetchMyProfile());
     if (activeTab === 'bookmarks') {
       dispatch(fetchBookmarkedVideos({ limit: 20 }));
+    } else if (activeTab === 'likes') {
+      dispatch(fetchLikedVideos({ limit: 20 }));
+    } else if (activeTab === 'watched') {
+      dispatch(fetchWatchedVideos({ limit: 20 }));
     }
-    // TODO: Add refresh for other tabs
   }, [dispatch, activeTab]);
 
-  // Handle load more
+  // Handle load more (pagination)
   const handleLoadMore = useCallback(() => {
     if (activeTab === 'bookmarks' && hasMoreBookmarks && !bookmarksLoading && bookmarksCursor) {
-      dispatch(fetchBookmarkedVideos({
-        limit: 20,
-        cursor: bookmarksCursor,
-        loadMore: true,
-      }));
+      dispatch(fetchBookmarkedVideos({ limit: 20, cursor: bookmarksCursor, loadMore: true }));
+    } else if (activeTab === 'likes' && hasMoreLikes && !likesLoading && likesCursor) {
+      dispatch(fetchLikedVideos({ limit: 20, cursor: likesCursor, loadMore: true }));
+    } else if (activeTab === 'watched' && hasMoreWatched && !watchedLoading && watchedCursor) {
+      dispatch(fetchWatchedVideos({ limit: 20, cursor: watchedCursor, loadMore: true }));
     }
-    // TODO: Add load more for other tabs
-  }, [dispatch, activeTab, hasMoreBookmarks, bookmarksLoading, bookmarksCursor]);
+  }, [dispatch, activeTab, hasMoreBookmarks, bookmarksLoading, bookmarksCursor, hasMoreLikes, likesLoading, likesCursor, hasMoreWatched, watchedLoading, watchedCursor]);
 
   // Handle video press
   const handleVideoPress = useCallback((video: Video) => {
@@ -126,9 +146,9 @@ export const ProfileScreen: React.FC = () => {
       case 'bookmarks':
         return bookmarkedVideos;
       case 'likes':
-        return []; // TODO: Implement liked videos
+        return likedVideos;
       case 'watched':
-        return []; // TODO: Implement watched videos
+        return watchedVideos;
       default:
         return [];
     }
@@ -140,9 +160,9 @@ export const ProfileScreen: React.FC = () => {
       case 'bookmarks':
         return bookmarksLoading;
       case 'likes':
-        return false; // TODO: Implement
+        return likesLoading;
       case 'watched':
-        return false; // TODO: Implement
+        return watchedLoading;
       default:
         return false;
     }
@@ -154,9 +174,9 @@ export const ProfileScreen: React.FC = () => {
       case 'bookmarks':
         return bookmarksError;
       case 'likes':
-        return null; // TODO: Implement
+        return likesError;
       case 'watched':
-        return null; // TODO: Implement
+        return watchedError;
       default:
         return null;
     }
@@ -225,7 +245,7 @@ export const ProfileScreen: React.FC = () => {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={profileLoading || bookmarksLoading}
+            refreshing={profileLoading || bookmarksLoading || likesLoading || watchedLoading}
             onRefresh={handleRefresh}
             tintColor="#FF8C42"
           />
@@ -242,8 +262,8 @@ export const ProfileScreen: React.FC = () => {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           bookmarkCount={bookmarkedVideos.length}
-          likeCount={0} // TODO: Implement
-          watchedCount={0} // TODO: Implement
+          likeCount={likedVideos.length}
+          watchedCount={profile.totalVideosWatched}
         />
 
         {/* Video Grid without header */}
@@ -253,7 +273,7 @@ export const ProfileScreen: React.FC = () => {
           error={getCurrentTabError()}
           onVideoPress={handleVideoPress}
           onLoadMore={handleLoadMore}
-          hasMore={activeTab === 'bookmarks' ? hasMoreBookmarks : false}
+          hasMore={activeTab === 'bookmarks' ? hasMoreBookmarks : activeTab === 'likes' ? hasMoreLikes : hasMoreWatched}
           emptyMessage={getEmptyMessage()}
         />
       </ScrollView>

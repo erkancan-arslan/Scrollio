@@ -13,25 +13,23 @@ export class JobLogsService {
     status: string,
     message: string,
     payload?: Record<string, unknown>,
-  ) {
+  ): Promise<void> {
     const admin = this.supabaseService.getAdminClient();
-
     const { error } = await admin.from('generation_job_logs').insert({
       job_id: jobId,
       step_name: stepName,
       status,
       message,
-      payload: payload || null,
+      payload: payload ?? null,
     });
 
     if (error) {
-      this.logger.error(`Failed to log step ${stepName} for job ${jobId}`, error);
+      this.logger.error(`Failed to write job log for job ${jobId}: ${error.message}`);
     }
   }
 
   async getLogsForJob(jobId: string) {
     const admin = this.supabaseService.getAdminClient();
-
     const { data, error } = await admin
       .from('generation_job_logs')
       .select('*')
@@ -39,9 +37,10 @@ export class JobLogsService {
       .order('created_at', { ascending: true });
 
     if (error) {
-      this.logger.error(`Failed to fetch logs for job ${jobId}`, error);
-      throw error;
+      this.logger.error(`Failed to fetch logs for job ${jobId}: ${error.message}`);
+      throw new Error(error.message);
     }
-    return data ?? [];
+
+    return data;
   }
 }

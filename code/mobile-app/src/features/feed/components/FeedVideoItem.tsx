@@ -39,7 +39,7 @@ interface FeedVideoItemProps {
   itemHeight: number;
 }
 
-export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
+export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoItem({
   video,
   isActive,
   isMuted,
@@ -51,7 +51,7 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   onTopicPress,
   onVideoEnd,
   itemHeight,
-}) => {
+}) {
   const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
   // Check cache to see if this video has already loaded - skip loading indicator if so
@@ -64,6 +64,8 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wasPlayingRef = useRef(false);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pauseIconTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Calculate bottom offset for content to not overlap with any UI
   const bottomOffset = useMemo(() => 16 + insets.bottom, [insets.bottom]);
@@ -121,19 +123,20 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     player.pause();
   });
 
-  // Debug: Log video URL and player errors
+  // Release the native player on unmount to prevent memory leaks (expo-video v3 bug).
+  // Guard with try-catch: if the native object was already destroyed (e.g. by a
+  // re-render cycle), calling pause/release on the stale JS reference throws
+  // NativeSharedObjectNotFoundException.
   useEffect(() => {
-    console.log('Video URL:', video.videoUrl);
-    
-    const errorSubscription = player.addListener('statusChange', (status) => {
-      console.log('Player status:', status.status);
-      if (status.status === 'error') {
-        console.error('Video playback error:', status.error);
+    return () => {
+      try {
+        player.pause();
+        player.release();
+      } catch {
+        // Native player already released — nothing to do
       }
-    });
-
-    return () => errorSubscription.remove();
-  }, [player, video.videoUrl]);
+    };
+  }, [player]);
 
   // Note: Preloading removed to reduce memory usage and prevent crashes
   // HLS streaming is already fast enough without preloading
@@ -161,21 +164,20 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     };
   }, [player, onVideoEnd]);
 
-  // Listen for buffering state changes
+  // Listen for buffering/error state and playback stalls
   useEffect(() => {
     const statusSubscription = player.addListener('statusChange', (status) => {
-      // When status is 'loading' after initial load, it means buffering
-      if (status.status === 'loading' && !isLoading) {
+      if (status.status === 'error') {
+        console.error('Video playback error:', status.error);
+      } else if (status.status === 'loading' && !isLoading) {
         setIsBuffering(true);
       } else if (status.status === 'readyToPlay') {
         setIsBuffering(false);
       }
     });
 
-    // Also track playback state to detect stalls
     const playingSubscription = player.addListener('playingChange', (isPlaying) => {
       if (isActive && wasPlayingRef.current && !isPlaying.isPlaying && !player.currentTime) {
-        // Was playing but suddenly stopped - likely buffering
         setIsBuffering(true);
       } else if (isPlaying.isPlaying) {
         setIsBuffering(false);
@@ -219,7 +221,7 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
       if (player.playing) {
         player.pause();
         setShowPauseIcon(true);
-        setTimeout(() => setShowPauseIcon(false), 800);
+        pauseIconTimerRef.current = setTimeout(() => setShowPauseIcon(false), 800);
         // Hide UI when pausing
         clearHideTimer();
         setShowUI(false);
@@ -239,6 +241,14 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     }
   }, [showUI, player, clearHideTimer, uiOpacity, revealUI, startHideTimer]);
 
+  // Cancel pending tap/pause-icon timers on unmount
+  useEffect(() => {
+    return () => {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+      if (pauseIconTimerRef.current) clearTimeout(pauseIconTimerRef.current);
+    };
+  }, []);
+
   // Double tap detection
   const lastTap = useRef<number>(0);
   const handleTap = useCallback(() => {
@@ -246,10 +256,11 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
       handleDoubleTap();
     } else {
       // Single tap - toggle UI with delay to check for double tap
-      setTimeout(() => {
+      tapTimerRef.current = setTimeout(() => {
         if (Date.now() - lastTap.current >= DOUBLE_TAP_DELAY) {
           handleSingleTap();
         }
@@ -339,7 +350,7 @@ export const FeedVideoItem: React.FC<FeedVideoItemProps> = ({
       </TouchableWithoutFeedback>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

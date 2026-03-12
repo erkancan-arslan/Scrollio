@@ -228,7 +228,8 @@ export const KidsFeedScreen: React.FC = () => {
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 100,
   }).current;
 
   // Render each video item
