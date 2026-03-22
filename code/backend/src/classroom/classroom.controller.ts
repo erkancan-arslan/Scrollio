@@ -153,6 +153,6 @@ export class ClassroomController {
         @Request() req: any,
     ) {
         const userId = req.user.id;
-        return this.classroomService.submitAnswer(userId, dto.matchId, dto.answer);
+        return this.classroomService.submitAnswer(userId, dto.matchId, dto.score);
     }
 }

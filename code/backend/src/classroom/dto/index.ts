@@ -44,8 +44,8 @@ export class SubmitAnswerDto {
     @IsString()
     matchId: string;
 
-    @IsBoolean()
-    answer: boolean;
+    @IsNumber()
+    score: number;
 }
 
 export class GetMatchStateDto {

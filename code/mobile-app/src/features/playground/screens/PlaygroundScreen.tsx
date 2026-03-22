@@ -8,6 +8,7 @@ import { listGames } from '../platform/gameRegistry';
 import { initializeGameRegistry } from '../registryInit';
 import { colors } from '../../../theme';
 import { GameId } from '../platform/types';
+import { BilVeFethetMenuScreen } from '../games/bil_ve_fethet/BilVeFethetMenuScreen';
 
 // Ensure games are registered
 initializeGameRegistry();
@@ -16,7 +17,7 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 // Games that have their own dedicated screens (bypassing PlaygroundGameShell)
 const STANDALONE_GAMES: Record<string, boolean> = {
-    bil_ve_fethet_classroom: true,
+    'bil_ve_fethet': true,
 };
 
 export const PlaygroundScreen: React.FC = () => {
@@ -25,12 +26,7 @@ export const PlaygroundScreen: React.FC = () => {
     const games = listGames();
 
     const handleGameSelect = (gameId: GameId) => {
-        if (gameId === 'bil_ve_fethet_classroom') {
-            // Classroom game has its own standalone navigation flow
-            navigation.navigate('ClassroomMenu' as any);
-        } else {
-            setSelectedGameId(gameId);
-        }
+        setSelectedGameId(gameId);
     };
 
     // If a non-standalone game is selected, show it in the GameShell
@@ -39,6 +35,16 @@ export const PlaygroundScreen: React.FC = () => {
             <View style={styles.container}>
                 <PlaygroundGameShell gameId={selectedGameId} />
             </View>
+        );
+    }
+
+    // Standalone: Bil ve Fethet
+    if (selectedGameId === 'bil_ve_fethet') {
+        return (
+            <BilVeFethetMenuScreen
+                onSinglePlayer={() => {}}
+                onExit={() => setSelectedGameId(null)}
+            />
         );
     }
 

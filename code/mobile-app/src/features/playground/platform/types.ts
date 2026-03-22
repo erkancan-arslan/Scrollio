@@ -7,7 +7,8 @@ import { ReactNode } from 'react';
  */
 export type GameId =
     | 'infinite_flow'
-    | 'bil_ve_fethet_classroom';
+    | 'bil_ve_fethet_classroom'
+    | 'bil_ve_fethet';
 
 
 export type GameMode = 'single' | 'hotseat' | 'multiplayer';

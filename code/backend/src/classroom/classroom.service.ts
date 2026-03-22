@@ -37,7 +37,7 @@ const GRID_COLS = 8;
 const TOTAL_SEATS = GRID_ROWS * GRID_COLS;
 const CONQUEST_STREAK_REQUIRED = 2;
 const MAX_TURNS = 200;
-const QUESTION_TIMER_MS = 15000;
+const QUESTION_TIMER_MS = 20000;
 const QUEUE_BOT_FILL_DELAY_MS = 10000;
 const ROOM_CODE_LENGTH = 6;
 
@@ -83,13 +83,9 @@ export interface ClassroomMatchState {
         attackerStreakOnTarget: number;
     };
     question: {
-        questionId: number;
-        questionText: string;
-        correctAnswer: boolean;
-        questionIndex: number;
         startedAt: number;
         endsAt: number;
-        answersByPlayerId: Record<string, boolean | null>;
+        scoresByPlayerId: Record<string, number | null>;
         answeredPlayerIds: string[];
     } | null;
     lastQuestionResult: {
@@ -97,7 +93,9 @@ export interface ClassroomMatchState {
         defenderId: string;
         attackerCorrect: boolean;
         defenderCorrect: boolean;
-        outcome: 'attacker_wrong' | 'both_correct' | 'streak_up' | 'conquered';
+        attackerRoundScore: number;
+        defenderRoundScore: number;
+        outcome: 'attacker_wrong' | 'both_correct' | 'streak_up' | 'conquered' | 'defender_wins';
         streakAfter: number;
         conqueredSeatIndex: number | null;
         targetSeatIndex: number;
@@ -575,27 +573,16 @@ export class ClassroomService {
             match.attack.defenderId = defenderId;
             match.attack.targetSeatIndex = targetSeatIndex;
 
-            // Transition to question phase
-            const questionIndex = match.currentQuestionPoolIndex;
-            match.currentQuestionPoolIndex++;
-
-            const questions = getShuffledQuestions(match.seed);
-            const q = questions[questionIndex % questions.length];
-
             match.question = {
-                questionId: q.id,
-                questionText: q.question,
-                correctAnswer: q.answer,
-                questionIndex,
                 startedAt: Date.now(),
                 endsAt: Date.now() + QUESTION_TIMER_MS,
-                answersByPlayerId: {},
+                scoresByPlayerId: {},
                 answeredPlayerIds: [],
             };
 
-            // Initialize answers for attacker and defender
+            // Initialize scores for attacker and defender
             for (const p of match.players) {
-                match.question.answersByPlayerId[p.id] = null;
+                match.question.scoresByPlayerId[p.id] = null;
             }
 
             match.phase = 'question';
@@ -616,7 +603,7 @@ export class ClassroomService {
     // Question Phase — Answer Submission
     // =====================================================
 
-    async submitAnswer(userId: string, matchId: string, answer: boolean): Promise<ClassroomMatchState> {
+    async submitAnswer(userId: string, matchId: string, score: number): Promise<ClassroomMatchState> {
         return this.runWithLock(matchId, async () => {
             const match = this.matches.get(matchId);
             if (!match) throw new NotFoundException('Match not found');
@@ -632,8 +619,8 @@ export class ClassroomService {
             const isParticipant = match.players.some(p => p.id === userId);
             if (!isParticipant) throw new ForbiddenException('Not a participant');
 
-            // Record answer
-            match.question.answersByPlayerId[userId] = answer;
+            // Record score
+            match.question.scoresByPlayerId[userId] = score;
             match.question.answeredPlayerIds.push(userId);
 
             this.broadcastMatchState(match);
@@ -659,58 +646,35 @@ export class ClassroomService {
         if (!match.question || !match.attack.attackerId || !match.attack.defenderId) return;
 
         const { attackerId, defenderId, targetSeatIndex } = match.attack;
-        const correctAnswer = match.question.correctAnswer;
 
-        const attackerAnswer = match.question.answersByPlayerId[attackerId];
-        const defenderAnswer = match.question.answersByPlayerId[defenderId];
+        const attackerScore = match.question.scoresByPlayerId[attackerId];
+        const defenderScore = match.question.scoresByPlayerId[defenderId];
 
-        // Handle timeouts as wrong answers
-        const attackerCorrect = attackerAnswer === correctAnswer;
-        const defenderCorrect = defenderAnswer === correctAnswer;
+        const attackerRoundScore = attackerScore ?? 0;
+        const defenderRoundScore = defenderScore ?? 0;
+
+        // Since we don't track correct/incorrect explicitly anymore, we just infer from scores
+        // or hardcode true/false based on > 0 if needed for backward compatibility in lastQuestionResult
+        const attackerCorrect = attackerRoundScore > 0;
+        const defenderCorrect = defenderRoundScore > 0;
 
         this.logger.log(
-            `Match ${match.matchId}: Q resolved. Attacker ${attackerCorrect ? '✓' : '✗'}, Defender ${defenderCorrect ? '✓' : '✗'}`,
+            `Match ${match.matchId}: Round resolved. Attacker score: ${attackerRoundScore}, Defender score: ${defenderRoundScore}`,
         );
 
         match.question = null;
 
-        if (!attackerCorrect) {
-            // Attacker wrong → streak reset, attack ends, next player's turn
-            match.lastQuestionResult = {
-                attackerId, defenderId,
-                attackerCorrect: false, defenderCorrect,
-                outcome: 'attacker_wrong',
-                streakAfter: 0,
-                conqueredSeatIndex: null,
-                targetSeatIndex: targetSeatIndex!,
-                timestamp: Date.now(),
-            };
-            match.attack.attackerStreakOnTarget = 0;
-            match.attack = { attackerId: null, defenderId: null, targetSeatIndex: null, attackerStreakOnTarget: 0 };
-            match.phase = 'attack';
-            match.currentTurnPlayerId = this.getNextTurnPlayer(match);
-            match.turnCount++;
-        } else if (defenderCorrect) {
-            // Both correct → no progress, attacker keeps turn
-            match.lastQuestionResult = {
-                attackerId, defenderId,
-                attackerCorrect: true, defenderCorrect: true,
-                outcome: 'both_correct',
-                streakAfter: match.attack.attackerStreakOnTarget,
-                conqueredSeatIndex: null,
-                targetSeatIndex: targetSeatIndex!,
-                timestamp: Date.now(),
-            };
-            match.phase = 'attack';
-        } else {
-            // Attacker correct + Defender wrong → streak++
+        // Attacker wins if they score strictly higher than defender
+        if (attackerRoundScore > defenderRoundScore) {
+            // Attacker wins the round -> streak++
             match.attack.attackerStreakOnTarget++;
 
             if (match.attack.attackerStreakOnTarget >= CONQUEST_STREAK_REQUIRED) {
                 // CONQUEST!
                 match.lastQuestionResult = {
                     attackerId, defenderId,
-                    attackerCorrect: true, defenderCorrect: false,
+                    attackerCorrect, defenderCorrect,
+                    attackerRoundScore, defenderRoundScore,
                     outcome: 'conquered',
                     streakAfter: match.attack.attackerStreakOnTarget,
                     conqueredSeatIndex: targetSeatIndex!,
@@ -722,7 +686,8 @@ export class ClassroomService {
                 // Streak up but not yet conquered
                 match.lastQuestionResult = {
                     attackerId, defenderId,
-                    attackerCorrect: true, defenderCorrect: false,
+                    attackerCorrect, defenderCorrect,
+                    attackerRoundScore, defenderRoundScore,
                     outcome: 'streak_up',
                     streakAfter: match.attack.attackerStreakOnTarget,
                     conqueredSeatIndex: null,
@@ -730,6 +695,31 @@ export class ClassroomService {
                     timestamp: Date.now(),
                 };
                 match.phase = 'attack';
+            }
+        } else {
+            // Defender wins or ties (defender outscores or draws)
+            // Attacker wrong -> streak reset, attack ends, next player's turn
+            match.lastQuestionResult = {
+                attackerId, defenderId,
+                attackerCorrect, defenderCorrect,
+                attackerRoundScore, defenderRoundScore,
+                outcome: attackerRoundScore === defenderRoundScore && attackerCorrect ? 'both_correct' : 'defender_wins',
+                streakAfter: 0,
+                conqueredSeatIndex: null,
+                targetSeatIndex: targetSeatIndex!,
+                timestamp: Date.now(),
+            };
+            
+            if (match.lastQuestionResult.outcome === 'both_correct') {
+                // Per old design, both correct keeps turn. We will honor this for ties > 0.
+                match.lastQuestionResult.streakAfter = match.attack.attackerStreakOnTarget;
+                match.phase = 'attack';
+            } else {
+                 match.attack.attackerStreakOnTarget = 0;
+                 match.attack = { attackerId: null, defenderId: null, targetSeatIndex: null, attackerStreakOnTarget: 0 };
+                 match.phase = 'attack';
+                 match.currentTurnPlayerId = this.getNextTurnPlayer(match);
+                 match.turnCount++;
             }
         }
 
@@ -868,25 +858,16 @@ export class ClassroomService {
                 match.attack.defenderId = defenderId;
                 match.attack.targetSeatIndex = targetIndex;
 
-                // Create question
-                const questionIndex = match.currentQuestionPoolIndex;
-                match.currentQuestionPoolIndex++;
-                const questions = getShuffledQuestions(match.seed);
-                const q = questions[questionIndex % questions.length];
-
+                // Create question round
                 match.question = {
-                    questionId: q.id,
-                    questionText: q.question,
-                    correctAnswer: q.answer,
-                    questionIndex,
                     startedAt: Date.now(),
                     endsAt: Date.now() + QUESTION_TIMER_MS,
-                    answersByPlayerId: {},
+                    scoresByPlayerId: {},
                     answeredPlayerIds: [],
                 };
 
                 for (const p of match.players) {
-                    match.question.answersByPlayerId[p.id] = null;
+                    match.question.scoresByPlayerId[p.id] = null;
                 }
 
                 match.phase = 'question';
@@ -904,7 +885,6 @@ export class ClassroomService {
         if (!rng) return;
 
         const { attackerId, defenderId } = match.attack;
-        const correctAnswer = match.question.correctAnswer;
         const matchId = match.matchId;
 
         // Determine if a human is involved in this question (attacker or defender)
@@ -915,9 +895,7 @@ export class ClassroomService {
         for (const player of match.players) {
             if (!player.isBot) continue;
 
-            const accuracy = 0.70 + rng() * 0.10;
-            const isCorrect = rng() < accuracy;
-            const botAnswer = isCorrect ? correctAnswer : !correctAnswer;
+            const botScore = Math.max(-2, Math.floor(rng() * 10) - 2); // Score between -2 and 7
 
             // Is this bot the attacker or defender in the current question?
             const isCombatant = player.id === attackerId || player.id === defenderId;
@@ -945,7 +923,7 @@ export class ClassroomService {
                     if (humanAnswered || elapsed >= timerThreshold) {
                         clearInterval(pollInterval);
                         setTimeout(() => {
-                            this.submitBotAnswer(matchId, player.id, botAnswer).catch(e =>
+                            this.submitBotAnswer(matchId, player.id, botScore).catch(e =>
                                 this.logger.error(`Bot answer error: ${e.message}`),
                             );
                         }, humanAnswered ? botDelay : 500);
@@ -955,7 +933,7 @@ export class ClassroomService {
                 // Bot is a spectator or both combatants are bots — answer quickly
                 const delay = Math.floor(400 + rng() * 800);
                 setTimeout(() => {
-                    this.submitBotAnswer(matchId, player.id, botAnswer).catch(e =>
+                    this.submitBotAnswer(matchId, player.id, botScore).catch(e =>
                         this.logger.error(`Bot answer error: ${e.message}`),
                     );
                 }, delay);
@@ -963,13 +941,13 @@ export class ClassroomService {
         }
     }
 
-    private async submitBotAnswer(matchId: string, botId: string, answer: boolean): Promise<void> {
+    private async submitBotAnswer(matchId: string, botId: string, score: number): Promise<void> {
         return this.runWithLock(matchId, async () => {
             const match = this.matches.get(matchId);
             if (!match || match.phase !== 'question' || !match.question) return;
             if (match.question.answeredPlayerIds.includes(botId)) return;
 
-            match.question.answersByPlayerId[botId] = answer;
+            match.question.scoresByPlayerId[botId] = score;
             match.question.answeredPlayerIds.push(botId);
 
             this.broadcastMatchState(match);
@@ -1042,19 +1020,19 @@ export class ClassroomService {
             const match = this.matches.get(matchId);
             if (!match || match.phase !== 'question' || !match.question) return;
 
-            // Time's up — treat unanswered as wrong
+            // Time's up — treat unanswered as null score
             const { attackerId, defenderId } = match.attack;
             const attackerAnswered = match.question.answeredPlayerIds.includes(attackerId!);
             const defenderAnswered = match.question.answeredPlayerIds.includes(defenderId!);
 
             if (!attackerAnswered || !defenderAnswered) {
-                // Fill in null answers for those who didn't answer
+                // Fill in null scores for those who didn't answer
                 if (!attackerAnswered && attackerId) {
-                    match.question.answersByPlayerId[attackerId] = null;
+                    match.question.scoresByPlayerId[attackerId] = null;
                     match.question.answeredPlayerIds.push(attackerId);
                 }
                 if (!defenderAnswered && defenderId) {
-                    match.question.answersByPlayerId[defenderId] = null;
+                    match.question.scoresByPlayerId[defenderId] = null;
                     match.question.answeredPlayerIds.push(defenderId);
                 }
 
@@ -1128,11 +1106,7 @@ export class ClassroomService {
             return { ...rest, question: null };
         }
 
-        // Remove correct answer from question sent to clients
-        const { correctAnswer, ...sanitizedQuestion } = question;
-        return {
-            ...rest,
-            question: sanitizedQuestion,
-        };
+        // No sensitive data to remove under new protocol
+        return match;
     }
 }
