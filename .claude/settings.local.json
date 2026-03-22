@@ -7,7 +7,19 @@
       "Bash(npm install:*)",
       "Bash(ls:*)",
       "Bash(npx tsc:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(git -C /Users/komacyus/Desktop/projects/Scrollio show HEAD:code/mobile-app/src/features/playground/games/bil-ve-fethet-classroom/definition.tsx)",
+      "Bash(git -C /Users/komacyus/Desktop/projects/Scrollio log --name-status -5 --oneline -- code/mobile-app/src/features/playground/games/bil-ve-fethet-classroom/)",
+      "Bash(git -C /Users/komacyus/Desktop/projects/Scrollio show HEAD:code/mobile-app/src/features/playground/games/bil-ve-fethet-classroom/types.ts)",
+      "Bash(grep -r \"socket.io\\\\|websocket\\\\|gateway\\\\|GatewayModule\" /Users/komacyus/Desktop/projects/Scrollio/code/backend/src --include=*.ts)",
+      "Bash(grep -r \"prisma\\\\|typeorm\\\\|sequelize\\\\|mongodb\" /Users/komacyus/Desktop/projects/Scrollio/code/backend --include=*.ts --include=*.json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,v\\) for k,v in {**d.get\\(''''dependencies'''',{}\\),**d.get\\(''''devDependencies'''',{}\\)}.items\\(\\)]\")",
+      "Bash(npx expo:*)",
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
