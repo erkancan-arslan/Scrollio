@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Real feature screens
 import { KidsFeedScreen } from '../features/kids/feed/screens/KidsFeedScreen';
+import { KidsClassroomScreen } from '../features/kids/classroom/screens/KidsClassroomScreen';
 import { KidsPlaygroundScreen } from '../features/kids/playground/screens/KidsPlaygroundScreen';
 import { KidsProfileScreen } from '../features/kids/profile/screens/KidsProfileScreen';
 import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettingsScreen';
@@ -19,6 +20,7 @@ import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettin
 
 export type KidsMainTabParamList = {
   KidsFeed: undefined;
+  KidsClassroom: undefined;
   KidsPlayground: undefined;
   KidsProfile: undefined;
   KidsSettings: undefined;
@@ -57,6 +59,22 @@ export const KidsMainTabNavigator: React.FC = () => {
             <View style={styles.iconContainer}>
               <Ionicons
                 name={focused ? 'book' : 'book-outline'}
+                size={24}
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="KidsClassroom"
+        component={KidsClassroomScreen}
+        options={{
+          tabBarLabel: 'Classroom',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? 'school' : 'school-outline'}
                 size={24}
                 color={color}
               />

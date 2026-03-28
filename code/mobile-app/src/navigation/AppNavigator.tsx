@@ -16,6 +16,7 @@ import { DuelLobbyScreen } from '../features/playground/screens/DuelLobbyScreen'
 import { DuelGameScreen } from '../features/playground/screens/DuelGameScreen';
 import { DuelRequestModal } from '../features/playground/components/DuelRequestModal';
 import { AdminNavigator } from './AdminNavigator';
+import { TeacherNavigator } from './TeacherNavigator';
 
 export type RootStackParamList = {
     AppLanding: undefined;
@@ -59,6 +60,7 @@ export type RootStackParamList = {
     };
 
     Admin: undefined;
+    Teacher: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -155,6 +157,13 @@ export const AppNavigator = () => {
                 <Stack.Screen
                     name="Admin"
                     component={AdminNavigator}
+                    options={{ headerShown: false }}
+                />
+
+                {/* Teacher Panel */}
+                <Stack.Screen
+                    name="Teacher"
+                    component={TeacherNavigator}
                     options={{ headerShown: false }}
                 />
             </Stack.Navigator>

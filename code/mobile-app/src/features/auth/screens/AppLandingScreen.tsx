@@ -90,6 +90,14 @@ export const AppLandingScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
 
                     <TouchableOpacity
+                        style={styles.teacherLink}
+                        onPress={() => navigation.navigate('Teacher')}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <Text style={styles.teacherLinkText}>Teacher Panel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                         style={styles.adminLink}
                         onPress={() => navigation.navigate('Admin')}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -244,8 +252,19 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    adminLink: {
+    teacherLink: {
         marginTop: spacing.xl,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+    },
+    teacherLinkText: {
+        fontSize: 14,
+        color: '#0277BD',
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+    adminLink: {
+        marginTop: spacing.sm,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.md,
     },

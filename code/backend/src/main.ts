@@ -17,10 +17,12 @@ async function bootstrap() {
       ? (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
           // Allow requests with no origin (mobile apps, curl, etc.)
           if (!origin) return callback(null, true);
-          // Allow all localhost origins in dev
+          // Allow all localhost origins in dev (127.0.0.1 — Expo Web sometimes uses it)
           if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) return callback(null, true);
+          if (origin.match(/^https?:\/\/127\.0\.0\.1(:\d+)?$/)) return callback(null, true);
           // Allow LAN IPs in dev
           if (origin.match(/^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/)) return callback(null, true);
+          if (origin.match(/^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/)) return callback(null, true);
           if (origin.match(/^https?:\/\/172\.\d+\.\d+\.\d+(:\d+)?$/)) return callback(null, true);
           const allowed = configService.get<string>('CORS_ORIGINS')?.split(',') || [];
           if (allowed.includes(origin)) return callback(null, true);

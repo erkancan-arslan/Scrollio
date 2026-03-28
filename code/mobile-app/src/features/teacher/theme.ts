@@ -1,0 +1,15 @@
+export const teacherColors = {
+  primary: '#0277BD',
+  primaryDark: '#01579B',
+  primaryLight: '#4FC3F7',
+  background: '#FFFFFF',
+  backgroundTint: '#E1F5FE',
+  border: '#B3E5FC',
+  text: '#1A1A2E',
+  textSecondary: '#37474F',
+  textMuted: '#78909C',
+  inverse: '#FFFFFF',
+  success: '#2E7D32',
+  error: '#C62828',
+  warning: '#F57F17',
+};

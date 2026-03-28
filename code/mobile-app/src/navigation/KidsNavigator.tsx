@@ -33,6 +33,10 @@ import { KidsRoleBlockedScreen } from '../features/kids/auth/screens/RoleBlocked
 // Main tabs
 import { KidsMainTabNavigator, KidsMainTabParamList } from './KidsMainTabNavigator';
 
+// Classroom screens
+import { KidsClassroomLessonsScreen } from '../features/kids/classroom/screens/KidsClassroomLessonsScreen';
+import { KidsLessonPlayerScreen } from '../features/kids/classroom/screens/KidsLessonPlayerScreen';
+
 // Parental screens
 import { KidsParentalDashboardScreen } from '../features/kids/parental/screens/KidsParentalDashboardScreen';
 import { KidsActivityMonitorScreen } from '../features/kids/parental/screens/KidsActivityMonitorScreen';
@@ -58,6 +62,10 @@ export type KidsStackParamList = {
 
   // Main app
   KidsMainTabs: NavigatorScreenParams<KidsMainTabParamList>;
+
+  // Classroom
+  KidsClassroomLessons: { classroomId: string; classroomName: string };
+  KidsLessonPlayer: { lessonId: string };
 
   // Parental
   KidsParentalDashboard: undefined;
@@ -155,6 +163,14 @@ export const KidsNavigator: React.FC = () => {
       <Stack.Screen
         name="KidsMainTabs"
         component={KidsMainTabNavigator}
+        options={{ gestureEnabled: false }}
+      />
+
+      {/* Classroom screens */}
+      <Stack.Screen name="KidsClassroomLessons" component={KidsClassroomLessonsScreen} />
+      <Stack.Screen
+        name="KidsLessonPlayer"
+        component={KidsLessonPlayerScreen}
         options={{ gestureEnabled: false }}
       />
 

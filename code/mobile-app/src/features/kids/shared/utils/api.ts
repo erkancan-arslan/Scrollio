@@ -9,6 +9,7 @@
  */
 
 import { secureStorage } from '../../../../services/storage/secureStorage';
+import { resolveExpoPublicApiBaseUrl } from '../../../../config/resolveApiBaseUrl';
 
 // ── Lazy store reference (set once at app init to break import cycle) ──
 let _getActiveChildId: (() => string | null) | null = null;
@@ -21,24 +22,8 @@ export function setStoreRef(getter: () => string | null): void {
   _getActiveChildId = getter;
 }
 
-// ── Base URL (same logic as Core apiClient) ──────────────────────────
-const getBaseUrl = (): string => {
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
-    return 'https://api.scrollio.app/api/v1';
-  }
-  // Prefer env so local backend port (e.g. 3001) is used on web too
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  const isWeb =
-    typeof window !== 'undefined' && typeof window.location?.hostname === 'string';
-  if (
-    isWeb &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ) {
-    return 'http://localhost:3001/api/v1';
-  }
-  return 'http://localhost:3001/api/v1';
-};
+// ── Base URL (same as Core apiClient — resolveApiBaseUrl) ────────────
+const getBaseUrl = (): string => resolveExpoPublicApiBaseUrl();
 
 const TIMEOUT_MS = 30_000;
 /** Longer timeout for AI generation (e.g. generate-mentor). Exported for callers that need it. */

@@ -18,13 +18,9 @@ import { adminColors } from '../theme';
 import { AdminHeader } from '../components/AdminHeader';
 import * as adminApi from '../services/adminApi';
 import { secureStorage } from '../../../services/storage/secureStorage';
+import { resolveExpoPublicApiBaseUrl } from '../../../config/resolveApiBaseUrl';
 
-const API_BASE = (() => {
-  if (!__DEV__) return 'https://api.scrollio.app/api/v1';
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  return 'http://localhost:3001/api/v1';
-})();
+const API_BASE = resolveExpoPublicApiBaseUrl();
 
 export const UploadReferenceVideoScreen: React.FC = () => {
   const navigation = useNavigation<any>();
