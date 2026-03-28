@@ -19,7 +19,12 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(python3 -c \"from PIL import Image; img=Image.open\\(''/Users/komacyus/projects/Scrollio/code/mobile-app/assets/class.png''\\); print\\(''class.png:'', img.size\\); img2=Image.open\\(''/Users/komacyus/projects/Scrollio/code/mobile-app/assets/desk.png''\\); print\\(''desk.png:'', img2.size\\)\")",
+      "Bash(python3 -c \"from PIL import Image; img=Image.open\\(''/Users/komacyus/projects/Scrollio/code/mobile-app/assets/map.png''\\); print\\(''size:'', img.size, ''mode:'', img.mode\\)\")",
+      "Bash(python3:*)",
+      "Bash(pip3 list:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": [],
     "ask": []

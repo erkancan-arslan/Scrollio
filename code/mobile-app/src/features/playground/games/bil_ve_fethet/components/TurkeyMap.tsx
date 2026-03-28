@@ -1,8 +1,10 @@
 import React, { memo, useEffect, useRef } from 'react';
 import { Animated, View, StyleSheet } from 'react-native';
-import Svg, { Path, Text as SvgText, G } from 'react-native-svg';
+import Svg, { Path, G, Image as SvgImage, Circle, Text as SvgText } from 'react-native-svg';
 import { REGIONS, Region } from '../data/regions';
-import { ProvinceOwnership, PlayerId, TurnPhase, PLAYER_COLORS, NEUTRAL_COLOR } from '../types';
+import { ProvinceOwnership, PlayerId, TurnPhase, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../types';
+
+const MAP_IMAGE = require('../../../../../../assets/lastmap.png');
 
 interface TurkeyMapProps {
     ownership: ProvinceOwnership;
@@ -11,12 +13,11 @@ interface TurkeyMapProps {
     phase: TurnPhase;
 }
 
-const VIEW_BOX = '0 0 1000 580';
+const VIEW_BOX = '0 0 720 1280';
 
-// Animated.createAnimatedComponent doesn't work directly with react-native-svg Path
-// so we animate the wrapper G's opacity instead (native driver ok).
 const RegionPath = memo(({
     region,
+    owner,
     fillColor,
     isSelectable,
     isSelecting,
@@ -24,24 +25,23 @@ const RegionPath = memo(({
     pulseAnim,
 }: {
     region: Region;
+    owner: PlayerId | 'neutral' | undefined;
     fillColor: string;
     isSelectable: boolean;
     isSelecting: boolean;
     onPress: (id: string) => void;
     pulseAnim: Animated.Value;
 }) => {
-    const baseOpacity = isSelecting && !isSelectable ? 0.38 : 1;
-    const strokeColor = isSelectable ? '#FFFFFF' : 'rgba(255,255,255,0.18)';
-    const strokeWidth = isSelectable ? 4 : 1.5;
+    const isNeutral = !owner || owner === 'neutral';
+    const baseOpacity = isSelecting && !isSelectable ? 0.4 : 1;
 
-    // For selectable regions, add an animated glow ring using a second (wider, semi-transparent) path
     return (
         <G opacity={baseOpacity}>
             {isSelectable && (
                 <Path
                     d={region.svgPath}
                     fill="none"
-                    stroke="rgba(255,255,255,0.35)"
+                    stroke="rgba(255,255,255,0.6)"
                     strokeWidth={10}
                     strokeLinejoin="round"
                     opacity={pulseAnim as any}
@@ -49,23 +49,40 @@ const RegionPath = memo(({
             )}
             <Path
                 d={region.svgPath}
-                fill={fillColor}
-                stroke={strokeColor}
-                strokeWidth={strokeWidth}
-                strokeLinejoin="round"
+                fill="none"
+                stroke="none"
                 onPress={isSelectable ? () => onPress(region.id) : undefined}
             />
-            <SvgText
-                x={region.labelX}
-                y={region.labelY}
-                fontSize={26}
-                fill="rgba(255,255,255,0.88)"
-                textAnchor="middle"
-                fontWeight="700"
-                pointerEvents="none"
-            >
-                {region.name}
-            </SvgText>
+            {!isNeutral && (
+                <G>
+                    <Circle
+                        cx={region.labelX}
+                        cy={region.labelY}
+                        r={22}
+                        fill={fillColor}
+                        opacity={0.92}
+                    />
+                    <Circle
+                        cx={region.labelX}
+                        cy={region.labelY}
+                        r={22}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.8)"
+                        strokeWidth={2.5}
+                    />
+                    <SvgText
+                        x={region.labelX}
+                        y={region.labelY + 5}
+                        fontSize={12}
+                        fill="#FFFFFF"
+                        textAnchor="middle"
+                        fontWeight="700"
+                        pointerEvents="none"
+                    >
+                        {PLAYER_LABELS[owner as PlayerId]}
+                    </SvgText>
+                </G>
+            )}
         </G>
     );
 });
@@ -79,7 +96,6 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = memo(({
     const isSelecting = phase === 'selecting' || phase === 'claiming';
     const selectableSet = new Set(selectableRegionIds);
 
-    // Shared pulse animation for all selectable region glow rings
     const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
@@ -89,16 +105,8 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = memo(({
         }
         const loop = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 0.85,
-                    duration: 700,
-                    useNativeDriver: false,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 0.2,
-                    duration: 700,
-                    useNativeDriver: false,
-                }),
+                Animated.timing(pulseAnim, { toValue: 0.85, duration: 700, useNativeDriver: false }),
+                Animated.timing(pulseAnim, { toValue: 0.2, duration: 700, useNativeDriver: false }),
             ]),
         );
         loop.start();
@@ -112,26 +120,37 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = memo(({
                 style={styles.svg}
                 preserveAspectRatio="xMidYMid meet"
             >
-                {REGIONS.map(region => {
-                    const owner = ownership[region.id];
-                    const fillColor =
-                        owner === 'neutral' || owner === undefined
-                            ? NEUTRAL_COLOR
-                            : PLAYER_COLORS[owner as PlayerId];
-                    const isSelectable = selectableSet.has(region.id);
+                <SvgImage
+                    x={0}
+                    y={0}
+                    width={720}
+                    height={1280}
+                    href={MAP_IMAGE}
+                    preserveAspectRatio="xMidYMid meet"
+                />
+                <G transform="translate(0, 25)">
+                    {REGIONS.map(region => {
+                        const owner = ownership[region.id];
+                        const fillColor =
+                            owner === 'neutral' || owner === undefined
+                                ? NEUTRAL_COLOR
+                                : PLAYER_COLORS[owner as PlayerId];
+                        const isSelectable = selectableSet.has(region.id);
 
-                    return (
-                        <RegionPath
-                            key={region.id}
-                            region={region}
-                            fillColor={fillColor}
-                            isSelectable={isSelectable}
-                            isSelecting={isSelecting}
-                            onPress={onRegionPress}
-                            pulseAnim={pulseAnim}
-                        />
-                    );
-                })}
+                        return (
+                            <RegionPath
+                                key={region.id}
+                                region={region}
+                                owner={owner}
+                                fillColor={fillColor}
+                                isSelectable={isSelectable}
+                                isSelecting={isSelecting}
+                                onPress={onRegionPress}
+                                pulseAnim={pulseAnim}
+                            />
+                        );
+                    })}
+                </G>
             </Svg>
         </View>
     );
@@ -141,7 +160,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         width: '100%',
-        backgroundColor: '#0A1628',
+        backgroundColor: '#1A3A5C',
     },
     svg: {
         flex: 1,

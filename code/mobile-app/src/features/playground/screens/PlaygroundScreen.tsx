@@ -9,6 +9,7 @@ import { initializeGameRegistry } from '../registryInit';
 import { colors } from '../../../theme';
 import { GameId } from '../platform/types';
 import { BilVeFethetMenuScreen } from '../games/bil_ve_fethet/BilVeFethetMenuScreen';
+import { BilVeFethetKidsScreen } from '../games/bil-ve-fethet-kids/BilVeFethetKidsScreen';
 
 // Ensure games are registered
 initializeGameRegistry();
@@ -18,6 +19,7 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 // Games that have their own dedicated screens (bypassing PlaygroundGameShell)
 const STANDALONE_GAMES: Record<string, boolean> = {
     'bil_ve_fethet': true,
+    'bil_ve_fethet_kids': true,
 };
 
 export const PlaygroundScreen: React.FC = () => {
@@ -43,6 +45,15 @@ export const PlaygroundScreen: React.FC = () => {
         return (
             <BilVeFethetMenuScreen
                 onSinglePlayer={() => {}}
+                onExit={() => setSelectedGameId(null)}
+            />
+        );
+    }
+
+    // Standalone: Sınıfı Fethet (Kids)
+    if (selectedGameId === 'bil_ve_fethet_kids') {
+        return (
+            <BilVeFethetKidsScreen
                 onExit={() => setSelectedGameId(null)}
             />
         );

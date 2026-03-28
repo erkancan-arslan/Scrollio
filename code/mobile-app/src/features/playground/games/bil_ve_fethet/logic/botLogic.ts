@@ -52,6 +52,13 @@ export const simulateBotBattleScore = (): number => {
     return score;
 };
 
+/** Simulate a bot's guess for a numeric question. Applies ±25% variance (min ±5). */
+export const simulateBotGuess = (correctAnswer: number): number => {
+    const maxVariance = Math.max(Math.round(correctAnswer * 0.25), 5);
+    const variance = Math.floor(Math.random() * (maxVariance * 2 + 1)) - maxVariance;
+    return Math.max(1, correctAnswer + variance);
+};
+
 /**
  * Run all bot turns (every non-player entry in turnOrder).
  * Neutral targets are claimed for free; enemy-owned targets require a simulated battle.

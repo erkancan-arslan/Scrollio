@@ -1,6 +1,6 @@
-import { REGIONS } from '../data/regions';
-import { INFINITE_FLOW_QUESTIONS_ENGLISH } from '../../../data/infiniteFlowQuestions';
-import { GUESSING_QUESTIONS } from '../data/guessingQuestions';
+import { DESKS } from '../data/classroom';
+import { KIDS_QUESTIONS } from '../data/kidsQuestions';
+import { KIDS_GUESSING_QUESTIONS } from '../data/kidsGuessingQuestions';
 import { simulateBotBattleScore, simulateBotGuess } from './botLogic';
 import {
     BilVeFethetState,
@@ -10,9 +10,7 @@ import {
     GuessingResult,
     PlayerId,
     ProvinceOwnership,
-} from '../types';
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
+} from '../../../games/bil_ve_fethet/types';
 
 export const fisherYates = (arr: number[]): number[] => {
     const a = [...arr];
@@ -23,11 +21,11 @@ export const fisherYates = (arr: number[]): number[] => {
     return a;
 };
 
-const countRegionsFor = (ownership: ProvinceOwnership, pid: PlayerId | 'neutral') =>
+const countDesksFor = (ownership: ProvinceOwnership, pid: PlayerId | 'neutral') =>
     Object.values(ownership).filter(o => o === pid).length;
 
 const pickGuessingQuestion = (): GuessingQuestion =>
-    GUESSING_QUESTIONS[Math.floor(Math.random() * GUESSING_QUESTIONS.length)];
+    KIDS_GUESSING_QUESTIONS[Math.floor(Math.random() * KIDS_GUESSING_QUESTIONS.length)];
 
 /** Returns true if the attacker won the guessing round. Tie → defender wins. */
 export const resolveGuessingRound = (
@@ -42,7 +40,7 @@ export const resolveGuessingRound = (
 
     let attackerWon: boolean;
     if (tie) {
-        attackerWon = false; // defender always wins ties
+        attackerWon = false;
     } else if (attackerId === 'player') {
         attackerWon = playerDistance < botDistance;
     } else {
@@ -52,9 +50,7 @@ export const resolveGuessingRound = (
     return { conquered: attackerWon, tie, playerDistance, botDistance };
 };
 
-const DECK_SIZE = INFINITE_FLOW_QUESTIONS_ENGLISH.length;
-
-// ─── Actions ────────────────────────────────────────────────────────────────
+const DECK_SIZE = KIDS_QUESTIONS.length;
 
 export type GameAction =
     | { type: 'CLAIM_REGION'; regionId: string }
@@ -76,11 +72,9 @@ export type GameAction =
     | { type: 'SKIP_PLAYER_TURN' }
     | { type: 'RESTART_GAME' };
 
-// ─── Initial state ───────────────────────────────────────────────────────────
-
 export const createInitialState = (): BilVeFethetState => {
     const ownership: ProvinceOwnership = {};
-    REGIONS.forEach(r => (ownership[r.id] = 'neutral'));
+    DESKS.forEach(d => (ownership[d.id] = 'neutral'));
 
     return {
         phase: 'claiming',
@@ -99,20 +93,16 @@ export const createInitialState = (): BilVeFethetState => {
     };
 };
 
-// ─── Win/loss checks ─────────────────────────────────────────────────────────
-
 const checkWin = (
     ownership: ProvinceOwnership,
     turnOrder: PlayerId[]
 ): PlayerId | null => {
     for (const pid of turnOrder) {
-        if (countRegionsFor(ownership, pid) === REGIONS.length) return pid;
+        if (countDesksFor(ownership, pid) === DESKS.length) return pid;
     }
     if (turnOrder.length === 1) return turnOrder[0];
     return null;
 };
-
-// ─── Reducer ─────────────────────────────────────────────────────────────────
 
 export const gameReducer = (
     state: BilVeFethetState,
@@ -128,7 +118,7 @@ export const gameReducer = (
             const newOwnership = { ...state.ownership, [action.regionId]: actor };
             const nextIndex = state.claimingTurnIndex + 1;
 
-            if (nextIndex >= REGIONS.length) {
+            if (nextIndex >= DESKS.length) {
                 return { ...state, ownership: newOwnership, phase: 'selecting', claimingTurnIndex: nextIndex, botTurnIndex: 0 };
             }
             return { ...state, ownership: newOwnership, claimingTurnIndex: nextIndex };
@@ -150,7 +140,6 @@ export const gameReducer = (
                 return { ...state, ownership: newOwnership, phase: 'bot_turn', lastResult: null, botTurnIndex: 0 };
             }
 
-            // Enemy-owned — randomly choose round type
             const useGuessing = Math.random() < 0.5;
 
             if (useGuessing) {
@@ -194,9 +183,7 @@ export const gameReducer = (
             const newOwnership = { ...state.ownership };
             if (conquered) newOwnership[targetRegionId] = 'player';
 
-            const result: TurnResult = {
-                conquered, attackerScore, defenderScore, regionId: targetRegionId, attackerId, defenderId,
-            };
+            const result: TurnResult = { conquered, attackerScore, defenderScore, regionId: targetRegionId, attackerId, defenderId };
 
             const winner = checkWin(newOwnership, state.turnOrder);
             if (winner) {
@@ -221,11 +208,9 @@ export const gameReducer = (
             const newOwnership = { ...state.ownership };
             if (conquered) newOwnership[targetRegionId] = attackerId;
 
-            const result: TurnResult = {
-                conquered, attackerScore, defenderScore, regionId: targetRegionId, attackerId, defenderId,
-            };
+            const result: TurnResult = { conquered, attackerScore, defenderScore, regionId: targetRegionId, attackerId, defenderId };
 
-            if (countRegionsFor(newOwnership, 'player') === 0) {
+            if (countDesksFor(newOwnership, 'player') === 0) {
                 return { ...state, ownership: newOwnership, activeBattle: null, lastResult: result, phase: 'game_over', winner: attackerId };
             }
 
@@ -252,7 +237,7 @@ export const gameReducer = (
             const newOwnership = { ...state.ownership };
             if (conquered) newOwnership[targetRegionId] = attackerId;
 
-            if (conquered && countRegionsFor(newOwnership, 'player') === 0) {
+            if (conquered && countDesksFor(newOwnership, 'player') === 0) {
                 const winner = (state.turnOrder.find(p => p !== 'player') ?? 'bot1') as PlayerId;
                 return { ...state, ownership: newOwnership, activeBattle: null, guessingQuestion: null, botGuess: null, phase: 'game_over', winner };
             }
@@ -283,12 +268,7 @@ export const gameReducer = (
         case 'ACKNOWLEDGE_GUESSING_RESULT': {
             if (state.phase !== 'guessing_result') return state;
             const wasDefense = state.lastGuessingResult?.defenderId === 'player';
-            return {
-                ...state,
-                phase: 'bot_turn',
-                lastGuessingResult: null,
-                botTurnIndex: wasDefense ? state.botTurnIndex : 0,
-            };
+            return { ...state, phase: 'bot_turn', lastGuessingResult: null, botTurnIndex: wasDefense ? state.botTurnIndex : 0 };
         }
 
         case 'START_PLAYER_GUESSING_DEFENSE': {
@@ -319,9 +299,8 @@ export const gameReducer = (
             return { ...state, ownership: newOwnership, botTurnIndex: state.botTurnIndex + 1 };
         }
 
-        case 'BOT_SKIP': {
+        case 'BOT_SKIP':
             return { ...state, botTurnIndex: state.botTurnIndex + 1 };
-        }
 
         case 'START_PLAYER_DEFENSE': {
             const { botId, regionId, botAttackScore, shuffledDeck } = action;
@@ -342,28 +321,24 @@ export const gameReducer = (
             const newOwnership = { ...state.ownership };
             if (conquered) newOwnership[regionId] = botId;
 
-            const result: TurnResult = {
-                conquered, attackerScore, defenderScore, regionId, attackerId: botId, defenderId: targetOwner,
-            };
+            const result: TurnResult = { conquered, attackerScore, defenderScore, regionId, attackerId: botId, defenderId: targetOwner };
 
             const winner = checkWin(newOwnership, state.turnOrder);
             if (winner) {
                 return { ...state, ownership: newOwnership, lastResult: result, phase: 'game_over', winner, botTurnIndex: state.botTurnIndex + 1 };
             }
-
             return { ...state, ownership: newOwnership, lastResult: result, phase: 'bot_result', botTurnIndex: state.botTurnIndex + 1 };
         }
 
-        case 'BOT_RESULT_NEXT': {
+        case 'BOT_RESULT_NEXT':
             return { ...state, phase: 'bot_turn', lastResult: null };
-        }
 
         case 'ALL_BOTS_DONE': {
             const newTurnOrder = state.turnOrder.filter(pid =>
-                pid === 'player' || countRegionsFor(state.ownership, pid) > 0
+                pid === 'player' || countDesksFor(state.ownership, pid) > 0
             );
 
-            if (countRegionsFor(state.ownership, 'player') === 0) {
+            if (countDesksFor(state.ownership, 'player') === 0) {
                 const winner = (newTurnOrder.find(pid => pid !== 'player') ?? 'bot1') as PlayerId;
                 return { ...state, turnOrder: newTurnOrder, phase: 'game_over', winner, botTurnIndex: 0 };
             }

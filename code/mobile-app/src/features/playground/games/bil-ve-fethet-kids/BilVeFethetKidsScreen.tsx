@@ -11,25 +11,24 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { INFINITE_FLOW_QUESTIONS_ENGLISH } from '../../data/infiniteFlowQuestions';
-import { REGIONS, REGION_BY_ID, getAdjacentRegions } from './data/regions';
-import { GUESSING_QUESTIONS } from './data/guessingQuestions';
+import { DESKS, DESK_BY_ID, getAdjacentDesks } from './data/classroom';
+import { KIDS_QUESTIONS } from './data/kidsQuestions';
+import { KIDS_GUESSING_QUESTIONS } from './data/kidsGuessingQuestions';
 import { gameReducer, createInitialState, fisherYates } from './logic/gameReducer';
 import { selectBotTarget, simulateBotBattleScore, simulateBotGuess } from './logic/botLogic';
-import { TurkeyMap } from './components/TurkeyMap';
-import { BattleModal } from './components/BattleModal';
-import { GuessingModal } from './components/GuessingModal';
-import { ResultOverlay } from './components/ResultOverlay';
-import { PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from './types';
+import { ClassroomMap } from './components/ClassroomMap';
+import { BattleModal } from '../bil_ve_fethet/components/BattleModal';
+import { GuessingModal } from '../bil_ve_fethet/components/GuessingModal';
+import { KidsResultOverlay } from './components/KidsResultOverlay';
+import { PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../bil_ve_fethet/types';
 
-interface BilVeFethetScreenProps {
+interface BilVeFethetKidsScreenProps {
     onExit: () => void;
 }
 
-export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) => {
+export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ onExit }) => {
     const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
 
-    // Game over entrance animation
     const gameOverFade = useRef(new Animated.Value(0)).current;
     const gameOverScale = useRef(new Animated.Value(0.85)).current;
 
@@ -37,8 +36,8 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
     useEffect(() => {
         if (state.phase !== 'claiming') return;
         const actor = state.turnOrder[state.claimingTurnIndex % state.turnOrder.length];
-        if (actor === 'player') return; // player picks manually
-        const neutralIds = REGIONS.filter(r => state.ownership[r.id] === 'neutral').map(r => r.id);
+        if (actor === 'player') return;
+        const neutralIds = DESKS.filter(d => state.ownership[d.id] === 'neutral').map(d => d.id);
         if (neutralIds.length === 0) return;
         const pick = neutralIds[Math.floor(Math.random() * neutralIds.length)];
         const timer = setTimeout(() => dispatch({ type: 'CLAIM_REGION', regionId: pick }), 700);
@@ -76,7 +75,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
         if (targetOwner === 'player') {
             const useGuessing = Math.random() < 0.5;
             if (useGuessing) {
-                const question = GUESSING_QUESTIONS[Math.floor(Math.random() * GUESSING_QUESTIONS.length)];
+                const question = KIDS_GUESSING_QUESTIONS[Math.floor(Math.random() * KIDS_GUESSING_QUESTIONS.length)];
                 const botGuess = simulateBotGuess(question.answer);
                 const timer = setTimeout(() => {
                     dispatch({ type: 'START_PLAYER_GUESSING_DEFENSE', botId, regionId: target, guessingQuestion: question, botGuess });
@@ -84,14 +83,13 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 return () => clearTimeout(timer);
             }
             const botAttackScore = simulateBotBattleScore();
-            const deck = fisherYates(Array.from({ length: INFINITE_FLOW_QUESTIONS_ENGLISH.length }, (_, i) => i));
+            const deck = fisherYates(Array.from({ length: KIDS_QUESTIONS.length }, (_, i) => i));
             const timer = setTimeout(() => {
                 dispatch({ type: 'START_PLAYER_DEFENSE', botId, regionId: target, botAttackScore, shuffledDeck: deck });
             }, 800);
             return () => clearTimeout(timer);
         }
 
-        // Bot vs another bot — simulate and show result
         const attackerScore = simulateBotBattleScore();
         const defenderScore = simulateBotBattleScore();
         const timer = setTimeout(() => {
@@ -107,16 +105,14 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
         return () => clearTimeout(timer);
     }, [state.phase, state.botTurnIndex, state.turnOrder, state.ownership]);
 
-    // ── Auto-dismiss bot vs bot result after 2.5s ─────────────────────────────
+    // ── Auto-dismiss bot result ───────────────────────────────────────────────
     useEffect(() => {
         if (state.phase !== 'bot_result') return;
-        const timer = setTimeout(() => {
-            dispatch({ type: 'BOT_RESULT_NEXT' });
-        }, 2500);
+        const timer = setTimeout(() => dispatch({ type: 'BOT_RESULT_NEXT' }), 2500);
         return () => clearTimeout(timer);
     }, [state.phase, state.botTurnIndex]);
 
-    // ── Game over entrance animation + haptic ─────────────────────────────────
+    // ── Game over animation ───────────────────────────────────────────────────
     useEffect(() => {
         if (state.phase !== 'game_over') return;
         gameOverFade.setValue(0);
@@ -132,24 +128,20 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
         ]).start();
     }, [state.phase]);
 
-    // ── Selectable regions ────────────────────────────────────────────────────
-    const selectableRegionIds = useMemo((): string[] => {
-        // Claiming phase: player can pick any neutral region on their turn
+    // ── Selectable desks ──────────────────────────────────────────────────────
+    const selectableIds = useMemo((): string[] => {
         if (state.phase === 'claiming') {
             const actor = state.turnOrder[state.claimingTurnIndex % state.turnOrder.length];
             if (actor !== 'player') return [];
-            return REGIONS.filter(r => state.ownership[r.id] === 'neutral').map(r => r.id);
+            return DESKS.filter(d => state.ownership[d.id] === 'neutral').map(d => d.id);
         }
 
         if (state.phase !== 'selecting') return [];
 
-        const playerRegions = REGIONS
-            .filter(r => state.ownership[r.id] === 'player')
-            .map(r => r.id);
-
+        const playerDesks = DESKS.filter(d => state.ownership[d.id] === 'player').map(d => d.id);
         const reachable = new Set<string>();
-        for (const rid of playerRegions) {
-            for (const adj of getAdjacentRegions(rid)) {
+        for (const did of playerDesks) {
+            for (const adj of getAdjacentDesks(did)) {
                 if (state.ownership[adj.id] !== 'player') {
                     reachable.add(adj.id);
                 }
@@ -158,26 +150,26 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
         return Array.from(reachable);
     }, [state.phase, state.ownership, state.claimingTurnIndex, state.turnOrder]);
 
-    // ── Detect player trapped (no moves) ─────────────────────────────────────
+    // ── Skip if trapped ───────────────────────────────────────────────────────
     useEffect(() => {
-        if (state.phase === 'selecting' && selectableRegionIds.length === 0) {
+        if (state.phase === 'selecting' && selectableIds.length === 0) {
             dispatch({ type: 'SKIP_PLAYER_TURN' } as any);
         }
-    }, [state.phase, selectableRegionIds.length]);
+    }, [state.phase, selectableIds.length]);
 
     // ── Battle questions ──────────────────────────────────────────────────────
     const battleQuestions = useMemo(() => {
         if (!state.activeBattle) return [];
-        return state.shuffledDeck.map(i => INFINITE_FLOW_QUESTIONS_ENGLISH[i]).filter(Boolean);
+        return state.shuffledDeck.map(i => KIDS_QUESTIONS[i]).filter(Boolean);
     }, [state.activeBattle?.targetRegionId]);
 
     // ── Handlers ─────────────────────────────────────────────────────────────
-    const handleRegionPress = useCallback((regionId: string) => {
+    const handleDeskPress = useCallback((id: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         if (state.phase === 'claiming') {
-            dispatch({ type: 'CLAIM_REGION', regionId });
+            dispatch({ type: 'CLAIM_REGION', regionId: id });
         } else {
-            dispatch({ type: 'SELECT_ATTACK_TARGET', regionId });
+            dispatch({ type: 'SELECT_ATTACK_TARGET', regionId: id });
         }
     }, [state.phase]);
 
@@ -218,19 +210,16 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
     }, []);
 
     // ── Derived values ────────────────────────────────────────────────────────
-    const playerRegionCount = useMemo(
+    const playerDeskCount = useMemo(
         () => Object.values(state.ownership).filter(o => o === 'player').length,
         [state.ownership]
     );
 
-    const targetRegion = state.activeBattle
-        ? REGION_BY_ID[state.activeBattle.targetRegionId]
-        : null;
+    const targetDesk = state.activeBattle ? DESK_BY_ID[state.activeBattle.targetRegionId] : null;
 
     const currentBotId = useMemo((): PlayerId | null => {
         if (state.phase !== 'bot_turn' && state.phase !== 'bot_result') return null;
         const bots = state.turnOrder.filter(id => id !== 'player') as PlayerId[];
-        // In bot_result, botTurnIndex was already incremented, so show previous bot
         const idx = state.phase === 'bot_result' ? state.botTurnIndex - 1 : state.botTurnIndex;
         return bots[idx] ?? null;
     }, [state.phase, state.turnOrder, state.botTurnIndex]);
@@ -239,23 +228,24 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
         switch (state.phase) {
             case 'claiming': {
                 const round = Math.floor(state.claimingTurnIndex / state.turnOrder.length) + 1;
-                const totalRounds = Math.ceil(REGIONS.length / state.turnOrder.length);
+                const totalRounds = Math.ceil(DESKS.length / state.turnOrder.length);
                 const actor = state.turnOrder[state.claimingTurnIndex % state.turnOrder.length];
                 const actorLabel = actor === 'player' ? 'Sen' : PLAYER_LABELS[actor];
-                return `Harita Paylaşımı • Tur ${round}/${totalRounds} — ${actorLabel} bölge seçiyor`;
+                return `Sıra Paylaşımı • Tur ${round}/${totalRounds} — ${actorLabel} sıra seçiyor`;
             }
             case 'selecting':
-                if (selectableRegionIds.length === 0) return 'Hareket edilecek bölge yok…';
-                const hasNeutral = selectableRegionIds.some(id => state.ownership[id] === 'neutral');
-                return hasNeutral ? 'Nötr bölge al veya rakibe saldır' : 'Rakip bölgeye saldır';
+                if (selectableIds.length === 0) return 'Hareket edilecek sıra yok…';
+                return selectableIds.some(id => state.ownership[id] === 'neutral')
+                    ? 'Boş sıra al veya rakibe saldır'
+                    : 'Rakip sıraya saldır';
             case 'battling':
-                return `⚔️ Saldırı: ${targetRegion?.name ?? ''}`;
+                return `⚔️ Saldırı: ${targetDesk?.name ?? ''} sırası`;
             case 'guessing':
-                return `🎯 Tahmin Turu: ${targetRegion?.name ?? ''}`;
+                return `🎯 Tahmin Turu: ${targetDesk?.name ?? ''} sırası`;
             case 'guessing_result':
                 return state.lastGuessingResult?.conquered
-                    ? `${REGION_BY_ID[state.lastGuessingResult.regionId]?.name} fethedildi!`
-                    : `${REGION_BY_ID[state.lastGuessingResult?.regionId ?? '']?.name} savunuldu!`;
+                    ? `${DESK_BY_ID[state.lastGuessingResult.regionId]?.name} sırası fethedildi!`
+                    : `${DESK_BY_ID[state.lastGuessingResult?.regionId ?? '']?.name} sırası savunuldu!`;
             case 'defending': {
                 const attackerLabel = PLAYER_LABELS[state.activeBattle?.attackerId ?? 'bot1'];
                 return `🛡️ ${attackerLabel} sana saldırıyor! Savun!`;
@@ -268,35 +258,34 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
             case 'bot_result':
                 if (!state.lastResult) return '';
                 return state.lastResult.conquered
-                    ? `⚔️ ${PLAYER_LABELS[state.lastResult.attackerId as PlayerId]} ${REGION_BY_ID[state.lastResult.regionId]?.name}'ı fethetti!`
-                    : `🛡️ ${REGION_BY_ID[state.lastResult.regionId]?.name} savunuldu!`;
+                    ? `⚔️ ${PLAYER_LABELS[state.lastResult.attackerId as PlayerId]} ${DESK_BY_ID[state.lastResult.regionId]?.name} sırasını fethetti!`
+                    : `🛡️ ${DESK_BY_ID[state.lastResult.regionId]?.name} sırası savunuldu!`;
             case 'result':
                 return state.lastResult?.conquered
-                    ? `${REGION_BY_ID[state.lastResult.regionId]?.name} fethedildi!`
-                    : `${REGION_BY_ID[state.lastResult?.regionId ?? '']?.name} savunuldu!`;
+                    ? `${DESK_BY_ID[state.lastResult.regionId]?.name} sırası fethedildi!`
+                    : `${DESK_BY_ID[state.lastResult?.regionId ?? '']?.name} sırası savunuldu!`;
             case 'game_over':
-                return state.winner === 'player' ? '🏆 Tüm bölgeler senin!' : '💀 Elimine edildin!';
+                return state.winner === 'player' ? '🏆 Tüm sıralar senin!' : '💀 Elimine edildin!';
             default:
                 return '';
         }
-    }, [state.phase, state.lastResult, state.lastGuessingResult, state.winner, selectableRegionIds, state.ownership, state.activeBattle, state.botTurnIndex, state.turnOrder, state.claimingTurnIndex, targetRegion]);
+    }, [state.phase, state.lastResult, state.lastGuessingResult, state.winner, selectableIds, state.ownership, state.activeBattle, state.botTurnIndex, state.turnOrder, state.claimingTurnIndex, targetDesk]);
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" />
 
             {/* HUD */}
             <View style={styles.hud}>
                 <TouchableOpacity onPress={onExit} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <Ionicons name="close" size={26} color="white" />
+                    <Ionicons name="close" size={26} color="#333" />
                 </TouchableOpacity>
-                <Text style={styles.hudTitle}>Bil ve Fethet</Text>
+                <Text style={styles.hudTitle}>🏫 Sınıfı Fethet!</Text>
                 <View style={styles.hudBadge}>
                     <Text style={styles.hudBadgeText}>
                         {state.phase === 'claiming'
-                            ? `📍 ${state.claimingTurnIndex}/12`
-                            : `🗺️ ${playerRegionCount}/12`}
+                            ? `📍 ${state.claimingTurnIndex}/${DESKS.length}`
+                            : `🪑 ${playerDeskCount}/${DESKS.length}`}
                     </Text>
                 </View>
             </View>
@@ -339,12 +328,12 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 <Text style={styles.phaseText} numberOfLines={1}>{phaseText}</Text>
             </View>
 
-            {/* Map */}
+            {/* Classroom map */}
             <View style={styles.mapContainer}>
-                <TurkeyMap
+                <ClassroomMap
                     ownership={state.ownership}
-                    selectableRegionIds={selectableRegionIds}
-                    onRegionPress={handleRegionPress}
+                    selectableIds={selectableIds}
+                    onDeskPress={handleDeskPress}
                     phase={state.phase}
                 />
             </View>
@@ -355,10 +344,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                     const count = Object.values(state.ownership).filter(o => o === pid).length;
                     const eliminated = !state.turnOrder.includes(pid);
                     return (
-                        <View
-                            key={pid}
-                            style={[styles.legendItem, { opacity: eliminated ? 0.3 : 1 }]}
-                        >
+                        <View key={pid} style={[styles.legendItem, { opacity: eliminated ? 0.3 : 1 }]}>
                             <View style={[styles.legendDot, { backgroundColor: PLAYER_COLORS[pid] }]} />
                             <Text style={styles.legendText}>
                                 {pid === 'player' ? 'Sen' : `Bot ${pid.slice(3)}`}: {count}
@@ -369,7 +355,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: NEUTRAL_COLOR }]} />
                     <Text style={styles.legendText}>
-                        Nötr: {Object.values(state.ownership).filter(o => o === 'neutral').length}
+                        Boş: {Object.values(state.ownership).filter(o => o === 'neutral').length}
                     </Text>
                 </View>
             </View>
@@ -379,7 +365,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 visible={state.phase === 'battling'}
                 attackerId={state.activeBattle?.attackerId ?? 'player'}
                 defenderId={state.activeBattle?.defenderId ?? 'neutral'}
-                targetProvinceName={targetRegion?.name ?? ''}
+                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
                 currentScore={state.activeBattle?.attackerScore ?? 0}
                 questions={battleQuestions}
                 onAnswer={handleAnswer}
@@ -391,8 +377,8 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
             <BattleModal
                 visible={state.phase === 'defending'}
                 attackerId={state.activeBattle?.attackerId ?? 'bot1'}
-                defenderId={'player'}
-                targetProvinceName={targetRegion?.name ?? ''}
+                defenderId='player'
+                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
                 currentScore={state.activeBattle?.defenderScore ?? 0}
                 questions={battleQuestions}
                 onAnswer={handleDefenseAnswer}
@@ -405,7 +391,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 visible={state.phase === 'guessing' || state.phase === 'guessing_result'}
                 attackerId={state.activeBattle?.attackerId ?? 'player'}
                 defenderId={state.activeBattle?.defenderId ?? 'neutral'}
-                targetProvinceName={targetRegion?.name ?? ''}
+                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
                 question={state.guessingQuestion}
                 botGuess={state.botGuess}
                 guessingResult={state.lastGuessingResult}
@@ -414,25 +400,25 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                 isDefending={state.activeBattle?.defenderId === 'player'}
             />
 
-            {/* Player Result Overlay (player attacked or defended) */}
+            {/* Player result overlay */}
             {state.lastResult && state.phase === 'result' && (
-                <ResultOverlay
+                <KidsResultOverlay
                     visible={true}
                     result={state.lastResult}
                     onContinue={handleContinue}
                 />
             )}
 
-            {/* Bot Result Overlay (bot vs bot, auto-dismisses) */}
+            {/* Bot result overlay (auto-dismisses) */}
             {state.lastResult && state.phase === 'bot_result' && (
-                <ResultOverlay
+                <KidsResultOverlay
                     visible={true}
                     result={state.lastResult}
                     onContinue={handleBotResultNext}
                 />
             )}
 
-            {/* Game Over Overlay */}
+            {/* Game Over */}
             {state.phase === 'game_over' && (
                 <Animated.View style={[styles.gameOverOverlay, { opacity: gameOverFade }]}>
                     <Animated.View
@@ -442,11 +428,11 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
                             {state.winner === 'player' ? '🏆' : '💀'}
                         </Text>
                         <Text style={styles.gameOverTitle}>
-                            {state.winner === 'player' ? 'Tüm Bölgeler Senin!' : 'Elimine Edildin!'}
+                            {state.winner === 'player' ? 'Tüm Sıralar Senin!' : 'Elimine Edildin!'}
                         </Text>
                         <Text style={styles.gameOverSub}>
                             {state.winner === 'player'
-                                ? `${playerRegionCount} bölgeye hükmediyorsun`
+                                ? `${playerDeskCount} sıraya hükmediyorsun`
                                 : state.winner
                                 ? `${PLAYER_LABELS[state.winner as PlayerId]} kazandı`
                                 : ''}
@@ -467,7 +453,7 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: '#F5ECD7',
     },
     hud: {
         flexDirection: 'row',
@@ -476,31 +462,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 4,
         height: 52,
+        backgroundColor: '#F5ECD7',
     },
-    backBtn: {
-        width: 36,
-        height: 36,
-        justifyContent: 'center',
-    },
-    hudTitle: {
-        color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-    },
+    backBtn: { width: 36, height: 36, justifyContent: 'center' },
+    hudTitle: { color: '#3D2B1A', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
     hudBadge: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: '#E8D5B0',
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: '#C8A870',
     },
-    hudBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 13,
-        fontWeight: '700',
-    },
+    hudBadgeText: { color: '#3D2B1A', fontSize: 13, fontWeight: '700' },
     turnBanner: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -509,60 +483,32 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderBottomWidth: 1,
     },
-    turnDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    turnBannerText: {
-        fontSize: 13,
-        fontWeight: '700',
-        letterSpacing: 0.2,
-    },
+    turnDot: { width: 8, height: 8, borderRadius: 4 },
+    turnBannerText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
     phaseBar: {
-        backgroundColor: '#0D0D0D',
+        backgroundColor: '#EDD9A3',
         paddingHorizontal: 16,
         paddingVertical: 7,
         borderBottomWidth: 1,
-        borderBottomColor: '#1C1C1E',
+        borderBottomColor: '#C8A870',
     },
-    phaseText: {
-        color: '#AEAEB2',
-        fontSize: 13,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    mapContainer: {
-        flex: 1,
-    },
+    phaseText: { color: '#5C3D1E', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+    mapContainer: { flex: 1 },
     legend: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         paddingVertical: 10,
         paddingHorizontal: 8,
-        backgroundColor: '#0D0D0D',
+        backgroundColor: '#EDD9A3',
         borderTopWidth: 1,
-        borderTopColor: '#1C1C1E',
+        borderTopColor: '#C8A870',
     },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-    legendDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-    },
-    legendText: {
-        color: '#AEAEB2',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    // Game Over
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendText: { color: '#5C3D1E', fontSize: 12, fontWeight: '600' },
     gameOverOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.92)',
+        backgroundColor: 'rgba(0,0,0,0.88)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 300,
@@ -573,9 +519,7 @@ const styles = StyleSheet.create({
         gap: 14,
         width: '100%',
     },
-    gameOverEmoji: {
-        fontSize: 64,
-    },
+    gameOverEmoji: { fontSize: 64 },
     gameOverTitle: {
         color: '#FFFFFF',
         fontSize: 26,
@@ -583,12 +527,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         letterSpacing: 0.5,
     },
-    gameOverSub: {
-        color: '#8E8E93',
-        fontSize: 15,
-        textAlign: 'center',
-        marginBottom: 8,
-    },
+    gameOverSub: { color: '#8E8E93', fontSize: 15, textAlign: 'center', marginBottom: 8 },
     restartBtn: {
         backgroundColor: '#007AFF',
         borderRadius: 14,
@@ -597,24 +536,16 @@ const styles = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
     },
-    restartBtnText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '700',
-    },
+    restartBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
     exitBtn: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: '#E8D5B0',
         borderRadius: 14,
         paddingVertical: 14,
         paddingHorizontal: 48,
         width: '100%',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: '#C8A870',
     },
-    exitBtnText: {
-        color: '#AEAEB2',
-        fontSize: 16,
-        fontWeight: '600',
-    },
+    exitBtnText: { color: '#5C3D1E', fontSize: 16, fontWeight: '600' },
 });
