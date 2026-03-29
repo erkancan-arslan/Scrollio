@@ -187,31 +187,39 @@ export class LessonOrchestratorService {
       cleaned = cleaned.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '');
     }
 
-    // Sanitize LaTeX backslashes that break JSON
-    cleaned = cleaned.replace(/\\\\/g, '\\\\\\\\');
-
-    try {
-      const parsed = JSON.parse(cleaned);
-      if (!Array.isArray(parsed)) throw new Error('Not an array');
-
-      return parsed.slice(0, expectedCount).map((s: any, i: number) => ({
+    const mapSlides = (parsed: any[]): Slide[] =>
+      parsed.slice(0, expectedCount).map((s: any, i: number) => ({
         index: s.index ?? i,
         title: s.title || `Slide ${i + 1}`,
         content: s.content || '',
         bulletPoints: Array.isArray(s.bulletPoints) ? s.bulletPoints : [],
         narrationText: s.narrationText || s.narration_text || s.narration || '',
       }));
-    } catch {
-      this.logger.warn('Failed to parse slides JSON, creating fallback');
-      return [
-        {
-          index: 0,
-          title: 'Introduction',
-          content: raw.slice(0, 500),
-          bulletPoints: [],
-          narrationText: raw.slice(0, 300),
-        },
-      ];
-    }
+
+    // Attempt 1: parse as-is (LLM already emits correctly escaped JSON)
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) return mapSlides(parsed);
+    } catch { /* fall through */ }
+
+    // Attempt 2: fix bare single backslashes the LLM forgot to escape
+    // e.g. "\frac" → "\\frac". The lookahead preserves valid JSON escapes
+    // like \\, \", \n, \t, \r, \b, \f, \uXXXX.
+    try {
+      const fixed = cleaned.replace(/\\(?!["\\/bfnrtu0-9])/g, '\\\\');
+      const parsed = JSON.parse(fixed);
+      if (Array.isArray(parsed)) return mapSlides(parsed);
+    } catch { /* fall through */ }
+
+    this.logger.warn('Failed to parse slides JSON, creating fallback');
+    return [
+      {
+        index: 0,
+        title: 'Introduction',
+        content: raw.slice(0, 500),
+        bulletPoints: [],
+        narrationText: raw.slice(0, 300),
+      },
+    ];
   }
 }

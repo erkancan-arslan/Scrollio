@@ -13,23 +13,29 @@ interface Props {
   slide: Slide;
 }
 
-function escapeHtml(str: string): string {
-  return (str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+/**
+ * Build the slide HTML.
+ *
+ * Content is injected via JSON.stringify into a <script> block and written
+ * to the DOM with .textContent so that HTML-special characters (&, <, >, ")
+ * are never mangled before KaTeX sees them.  KaTeX scripts are placed at the
+ * end of <body> (no defer) so execution order is guaranteed.
+ */
+const buildHtml = (slide: Slide): string => {
+  // Serialize slide data as JSON for safe injection into the inline script.
+  // JSON.stringify handles all escaping including backslashes and quotes.
+  const dataJson = JSON.stringify({
+    title: slide.title || '',
+    content: slide.content || '',
+    bulletPoints: Array.isArray(slide.bulletPoints) ? slide.bulletPoints : [],
+  });
 
-const buildHtml = (slide: Slide): string => `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"
-  onload="renderMathInElement(document.body, { throwOnError: false })"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -41,19 +47,49 @@ const buildHtml = (slide: Slide): string => `<!DOCTYPE html>
   .content{font-size:16px;line-height:1.6;margin-bottom:16px;color:#333}
   ul{list-style:none;padding:0}
   li{font-size:15px;line-height:1.5;padding:6px 0 6px 22px;position:relative;color:#37474F}
-  li::before{content:'•';position:absolute;left:0;color:#FF6B35;font-weight:700;font-size:18px}
+  li::before{content:'\\2022';position:absolute;left:0;color:#FF6B35;font-weight:700;font-size:18px}
   .katex{font-size:1.1em}
 </style>
 </head>
 <body>
-  <h1>${escapeHtml(slide.title)}</h1>
-  <div class="content">${escapeHtml(slide.content)}</div>
-  ${slide.bulletPoints && slide.bulletPoints.length > 0 ? `
-  <ul>
-    ${slide.bulletPoints.map(bp => `<li>${escapeHtml(bp)}</li>`).join('\n    ')}
-  </ul>` : ''}
+  <h1 id="slide-title"></h1>
+  <div class="content" id="slide-content"></div>
+  <ul id="slide-bullets"></ul>
+
+  <!-- Populate DOM via textContent so LaTeX delimiters ($, \\) are never HTML-escaped -->
+  <script>
+    (function() {
+      var d = ${dataJson};
+      document.getElementById('slide-title').textContent   = d.title;
+      document.getElementById('slide-content').textContent = d.content;
+      var ul = document.getElementById('slide-bullets');
+      (d.bulletPoints || []).forEach(function(bp) {
+        var li = document.createElement('li');
+        li.textContent = bp;
+        ul.appendChild(li);
+      });
+    })();
+  </script>
+
+  <!-- KaTeX loaded synchronously at end-of-body: guaranteed execution order -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <script>
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$',  right: '$',  display: false},
+          {left: '\\\\(', right: '\\\\)', display: false},
+          {left: '\\\\[', right: '\\\\]', display: true}
+        ],
+        throwOnError: false
+      });
+    }
+  </script>
 </body>
 </html>`;
+};
 
 /* ------------------------------------------------------------------ */
 /* Web fallback: plain React Native render (iframe not available in RN) */

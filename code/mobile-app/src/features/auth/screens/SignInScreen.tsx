@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { spacing, typography } from '../../../theme';
-import { authService, apiClient } from '../../../services';
+import { authService } from '../../../services';
 
 type SignInScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
@@ -47,13 +47,10 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            // If user has parent/school role, send them to Kids flow
-            const meRes = await apiClient.get<{ primaryRole?: string }>('/kids/auth/me').catch(() => ({ data: null }));
-            const role = meRes?.data?.primaryRole;
-            const isParentOrSchool = role === 'parent' || role === 'school';
+            // Core sign-in always opens the main (Core) app. Kids is entered only from the landing "Scrollio Kids" path.
             navigation.reset({
                 index: 0,
-                routes: [{ name: isParentOrSchool ? 'Kids' : 'MainTabs' }],
+                routes: [{ name: 'MainTabs' }],
             });
         } else {
             setError(result.error || 'Sign in failed. Please try again.');
