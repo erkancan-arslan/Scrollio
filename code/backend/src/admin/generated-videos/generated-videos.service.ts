@@ -9,9 +9,11 @@ interface CreateFromJobInput {
   subject?: string;
   contentTarget: string;
   language: string;
+  difficulty?: string | null;
   script?: string;
   audioUrl?: string;
   videoUrl: string;
+  thumbnailUrl?: string;
   referenceVideoId?: string;
 }
 
@@ -31,9 +33,11 @@ export class GeneratedVideosService {
       subject: input.subject || null,
       content_target: input.contentTarget,
       language: input.language,
+      difficulty: input.difficulty || null,
       script: input.script || null,
       audio_url: input.audioUrl || null,
       video_url: input.videoUrl,
+      thumbnail_url: input.thumbnailUrl || null,
       reference_video_id: input.referenceVideoId || null,
       status: 'active',
     };

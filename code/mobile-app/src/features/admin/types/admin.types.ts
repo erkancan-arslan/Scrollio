@@ -75,15 +75,73 @@ export interface GeneratedVideo {
   subject?: string;
   content_target: string;
   language: string;
+  difficulty?: string;
   script?: string;
   audio_url?: string;
   video_url: string;
+  thumbnail_url?: string;
   reference_video_id?: string;
   status: string;
   published_by?: string;
   created_at: string;
   updated_at: string;
   feed_items?: FeedItem[];
+}
+
+export interface BatchJob {
+  id: string;
+  title: string;
+  topic: string;
+  subject?: string;
+  content_target: string;
+  language: string;
+  tone: string;
+  reference_video_id: string;
+  custom_prompt?: string;
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  status: 'pending' | 'pending_scripts' | 'running' | 'completed' | 'failed';
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BatchJobSummaryJob {
+  id: string;
+  title: string;
+  topic: string;
+  suggested_sub_topic?: string;
+  difficulty?: string;
+  status: string;
+  current_step?: string;
+  progress_percent: number;
+  error_message?: string;
+  script_approved?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BatchJobScriptJob {
+  id: string;
+  title: string;
+  topic: string;
+  difficulty?: string;
+  status: string;
+  generated_script?: string;
+  cleaned_narration_text?: string;
+  script_approved?: boolean;
+  error_message?: string;
+}
+
+export interface BatchJobDetail {
+  batch: BatchJob;
+  jobs: BatchJobSummaryJob[];
+}
+
+export interface BatchJobScripts {
+  batch: BatchJob;
+  jobs: BatchJobScriptJob[];
 }
 
 export interface FeedItem {

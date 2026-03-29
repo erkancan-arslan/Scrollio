@@ -45,7 +45,7 @@ export class GenerationJobsService {
     const admin = this.supabaseService.getAdminClient();
     let q = admin
       .from('generated_video_jobs')
-      .select('*, reference_videos(id, title, public_url, thumbnail_url)', { count: 'exact' })
+      .select('*, reference_videos!generated_video_jobs_reference_video_id_fkey(id, title, public_url, thumbnail_url)', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (query.status) q = q.eq('status', query.status);
@@ -68,7 +68,7 @@ export class GenerationJobsService {
     const admin = this.supabaseService.getAdminClient();
     const { data, error } = await admin
       .from('generated_video_jobs')
-      .select('*, reference_videos(id, title, public_url, thumbnail_url, persona_name)')
+      .select('*, reference_videos!generated_video_jobs_reference_video_id_fkey(id, title, public_url, thumbnail_url, persona_name)')
       .eq('id', id)
       .single();
 
@@ -91,6 +91,7 @@ export class GenerationJobsService {
       finalVideoUrl?: string;
       finalVideoProvider?: string;
       referenceVideoUrlSnapshot?: string;
+      thumbnailUrl?: string;
     },
   ) {
     const admin = this.supabaseService.getAdminClient();
@@ -106,6 +107,7 @@ export class GenerationJobsService {
     if (updates.finalVideoUrl !== undefined) fields.final_video_url = updates.finalVideoUrl;
     if (updates.finalVideoProvider !== undefined) fields.final_video_provider = updates.finalVideoProvider;
     if (updates.referenceVideoUrlSnapshot !== undefined) fields.reference_video_url_snapshot = updates.referenceVideoUrlSnapshot;
+    if (updates.thumbnailUrl !== undefined) fields.thumbnail_url = updates.thumbnailUrl;
 
     const { data, error } = await admin
       .from('generated_video_jobs')

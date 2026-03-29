@@ -6,6 +6,8 @@ import {
   FeedItem,
   JobLog,
   AdminStats,
+  BatchJobDetail,
+  BatchJobScripts,
   PaginatedResponse,
 } from '../types/admin.types';
 
@@ -165,6 +167,78 @@ export async function unpublishVideo(id: string): Promise<ApiResponse<{ message:
 
 export async function getJobLogs(jobId: string): Promise<ApiResponse<JobLog[]>> {
   return apiClient.get<JobLog[]>(`${PREFIX}/generation-jobs/${jobId}/logs`);
+}
+
+// ---- Batch Jobs ----
+
+export async function createBatchJob(data: {
+  title: string;
+  topic: string;
+  subject?: string;
+  contentTarget: string;
+  language: string;
+  tone?: string;
+  customPrompt?: string;
+  referenceVideoId: string;
+}): Promise<ApiResponse<BatchJobDetail>> {
+  return apiClient.post<BatchJobDetail>(`${PREFIX}/batch-jobs`, data);
+}
+
+export async function startBatchJob(id: string): Promise<ApiResponse<{ message: string; batchId: string; jobCount: number }>> {
+  return apiClient.post<{ message: string; batchId: string; jobCount: number }>(`${PREFIX}/batch-jobs/${id}/start`);
+}
+
+export async function getBatchJob(id: string): Promise<ApiResponse<BatchJobDetail>> {
+  return apiClient.get<BatchJobDetail>(`${PREFIX}/batch-jobs/${id}`);
+}
+
+export async function listBatchJobs(filters?: {
+  limit?: number;
+  offset?: number;
+}): Promise<ApiResponse<PaginatedResponse<BatchJobDetail['batch']>>> {
+  const params = new URLSearchParams();
+  if (filters?.limit) params.set('limit', String(filters.limit));
+  if (filters?.offset) params.set('offset', String(filters.offset));
+  const qs = params.toString();
+  return apiClient.get<PaginatedResponse<BatchJobDetail['batch']>>(
+    `${PREFIX}/batch-jobs${qs ? `?${qs}` : ''}`,
+  );
+}
+
+export async function approveAndSuggestNext(
+  batchId: string,
+  currentDifficulty: 'beginner' | 'intermediate',
+  approvedJobs: Array<{ jobId: string; title: string; subTopic: string }>,
+): Promise<ApiResponse<{ nextDifficulty: string; jobs: any[] }>> {
+  return apiClient.post<{ nextDifficulty: string; jobs: any[] }>(
+    `${PREFIX}/batch-jobs/${batchId}/approve-and-suggest-next`,
+    { currentDifficulty, approvedJobs },
+  );
+}
+
+export async function approveTopics(
+  batchId: string,
+  jobs: Array<{ jobId: string; title: string; subTopic: string }>,
+): Promise<ApiResponse<{ message: string; batchId: string; jobCount: number }>> {
+  return apiClient.post<{ message: string; batchId: string; jobCount: number }>(
+    `${PREFIX}/batch-jobs/${batchId}/approve-topics`,
+    { jobs },
+  );
+}
+
+export async function getBatchScripts(batchId: string): Promise<ApiResponse<BatchJobScripts>> {
+  return apiClient.get<BatchJobScripts>(`${PREFIX}/batch-jobs/${batchId}/scripts`);
+}
+
+export async function approveScript(
+  batchId: string,
+  jobId: string,
+  script?: string,
+): Promise<ApiResponse<{ message: string; batchId: string; jobId: string }>> {
+  return apiClient.post<{ message: string; batchId: string; jobId: string }>(
+    `${PREFIX}/batch-jobs/${batchId}/approve-script/${jobId}`,
+    { script },
+  );
 }
 
 // ---- Feed Items ----

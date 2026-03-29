@@ -15,10 +15,15 @@ import { GeneratedVideosService } from './generated-videos/generated-videos.serv
 import { ScriptGenerationService } from './ai/script-generation.service';
 import { TtsService } from './ai/tts.service';
 import { LipsyncService } from './ai/lipsync.service';
+import { ThumbnailService } from './ai/thumbnail.service';
+import { TopicSuggestionService } from './ai/topic-suggestion.service';
 
 import { FeedPublishingService } from './feeds/feed-publishing.service';
 import { JobLogsService } from './logs/job-logs.service';
 import { AdminStorageService } from './storage/admin-storage.service';
+
+import { BatchJobsController } from './batch-jobs/batch-jobs.controller';
+import { BatchJobsService } from './batch-jobs/batch-jobs.service';
 
 @Module({
   imports: [SupabaseModule, ConfigModule],
@@ -26,6 +31,7 @@ import { AdminStorageService } from './storage/admin-storage.service';
     ReferenceVideosController,
     GenerationJobsController,
     GeneratedVideosController,
+    BatchJobsController,
   ],
   providers: [
     ReferenceVideosService,
@@ -35,9 +41,12 @@ import { AdminStorageService } from './storage/admin-storage.service';
     ScriptGenerationService,
     TtsService,
     LipsyncService,
+    ThumbnailService,
+    TopicSuggestionService,
     FeedPublishingService,
     JobLogsService,
     AdminStorageService,
+    BatchJobsService,
   ],
   exports: [
     ReferenceVideosService,
