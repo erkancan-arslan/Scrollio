@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR, GuessingQuestion, GuessingResult } from '../types';
+import { PlayerId, PLAYER_COLORS, NEUTRAL_COLOR, GuessingQuestion, GuessingResult } from '../types';
+import { Lang, t, getPlayerLabel, getNeutralLabel } from '../i18n';
 
 interface GuessingModalProps {
     visible: boolean;
@@ -28,6 +29,7 @@ interface GuessingModalProps {
     onSubmit: (playerGuess: number) => void;
     onContinue: () => void;
     isDefending: boolean;
+    lang?: Lang;
 }
 
 type DisplayPhase = 'input' | 'revealing' | 'result';
@@ -45,7 +47,11 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
     onSubmit,
     onContinue,
     isDefending,
+    lang = 'tr',
 }) => {
+    const q = question ? (lang === 'en' ? question.questionEn : question.question) : '';
+    const qHint = question ? (lang === 'en' ? question.hintEn : question.hint) : '';
+    const qUnit = question ? (lang === 'en' ? question.unitEn : question.unit) : '';
     const [timeLeft, setTimeLeft] = useState(GUESS_DURATION);
     const [inputValue, setInputValue] = useState('');
     const [displayPhase, setDisplayPhase] = useState<DisplayPhase>('input');
@@ -166,7 +172,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
 
     const attackerColor = PLAYER_COLORS[attackerId];
     const defenderColor = defenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[defenderId as PlayerId];
-    const defenderLabel = defenderId === 'neutral' ? 'Nötr' : PLAYER_LABELS[defenderId as PlayerId];
+    const defenderLabel = defenderId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(defenderId as PlayerId, lang);
     const timerColor = timeLeft <= 3 ? '#FF3B30' : timeLeft <= 5 ? '#FF9500' : '#34C759';
     const timerBarColor: [string, string] = timeLeft <= 3
         ? ['#FF3B30', '#FF6B60']
@@ -179,16 +185,16 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
     const isPlayerAttacking = attackerId === 'player';
     const playerWon = r ? (r.tie ? !isPlayerAttacking : (isPlayerAttacking ? r.conquered : !r.conquered)) : false;
     const winnerLabel = r?.tie
-        ? '🤝 Beraberlik — Savunan Kazanır!'
+        ? t(lang, 'tieBanner')
         : playerWon
-            ? '🏆 Kazandın!'
-            : '😤 Kaybettin!';
+            ? t(lang, 'youWon')
+            : t(lang, 'youLost');
     const winnerColor = r?.tie ? '#FF9500' : playerWon ? '#34C759' : '#FF3B30';
 
     // Opponent color in result
     const opponentId = isPlayerAttacking ? defenderId : attackerId;
     const opponentColor = opponentId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[opponentId as PlayerId];
-    const opponentLabel = opponentId === 'neutral' ? 'Nötr' : PLAYER_LABELS[opponentId as PlayerId];
+    const opponentLabel = opponentId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(opponentId as PlayerId, lang);
 
     return (
         <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
@@ -201,13 +207,13 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                     {/* Defense banner */}
                     {isDefending && (
                         <View style={styles.defendBanner}>
-                            <Text style={styles.defendBannerText}>🛡️ SAVUNMA MODU</Text>
+                            <Text style={styles.defendBannerText}>{t(lang, 'defenseBanner')}</Text>
                         </View>
                     )}
 
                     {/* Round type badge */}
                     <View style={styles.badge}>
-                        <Text style={styles.badgeText}>🎯 TAHMİN TURU</Text>
+                        <Text style={styles.badgeText}>{t(lang, 'guessBadge')}</Text>
                     </View>
 
                     {/* ── INPUT PHASE ── */}
@@ -217,7 +223,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                 <View style={[styles.playerPill, { backgroundColor: attackerColor + '20' }]}>
                                     <View style={[styles.playerDot, { backgroundColor: attackerColor }]} />
                                     <Text style={[styles.playerLabel, { color: attackerColor }]}>
-                                        {PLAYER_LABELS[attackerId]}
+                                        {getPlayerLabel(attackerId, lang)}
                                     </Text>
                                 </View>
                                 <View style={[styles.timerCircle, { borderColor: timerColor }]}>
@@ -242,14 +248,14 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                             </View>
 
                             <Text style={styles.targetLabel}>
-                                <Text style={{ color: '#AEAEB2' }}>Hedef: </Text>
+                                <Text style={{ color: '#AEAEB2' }}>{t(lang, 'target')} </Text>
                                 <Text style={{ color: '#FFF', fontWeight: '700' }}>{targetProvinceName}</Text>
                             </Text>
 
-                            <Text style={styles.questionText}>{question?.question}</Text>
+                            <Text style={styles.questionText}>{q}</Text>
 
-                            {question?.hint ? (
-                                <Text style={styles.hintText}>💡 {question.hint}</Text>
+                            {qHint ? (
+                                <Text style={styles.hintText}>💡 {qHint}</Text>
                             ) : null}
 
                             <View style={styles.inputRow}>
@@ -259,7 +265,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                     value={inputValue}
                                     onChangeText={setInputValue}
                                     keyboardType="numeric"
-                                    placeholder="Tahminin…"
+                                    placeholder={t(lang, 'guessPlaceholder')}
                                     placeholderTextColor="rgba(255,255,255,0.25)"
                                     maxLength={8}
                                     autoFocus
@@ -267,8 +273,8 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                     onSubmitEditing={() => inputValue ? handleSubmit() : null}
                                     selectionColor="#007AFF"
                                 />
-                                {question?.unit ? (
-                                    <Text style={styles.unitLabel}>{question.unit}</Text>
+                                {qUnit ? (
+                                    <Text style={styles.unitLabel}>{qUnit}</Text>
                                 ) : null}
                             </View>
 
@@ -278,7 +284,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                 disabled={!inputValue}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.submitBtnText}>Tahmin Et →</Text>
+                                <Text style={styles.submitBtnText}>{t(lang, 'submitGuess')}</Text>
                             </TouchableOpacity>
                         </>
                     )}
@@ -286,16 +292,16 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                     {/* ── REVEALING PHASE ── */}
                     {displayPhase === 'revealing' && (
                         <Animated.View style={[styles.revealContainer, { opacity: revealFade }]}>
-                            <Text style={styles.revealTitle}>Rakibin tahmini açıklanıyor…</Text>
-                            <Text style={styles.revealQuestion} numberOfLines={3}>{question?.question}</Text>
+                            <Text style={styles.revealTitle}>{t(lang, 'revealTitle')}</Text>
+                            <Text style={styles.revealQuestion} numberOfLines={3}>{q}</Text>
 
                             <View style={styles.revealCards}>
                                 <View style={[styles.revealCard, { borderColor: '#007AFF' }]}>
-                                    <Text style={styles.revealCardLabel}>Sen</Text>
+                                    <Text style={styles.revealCardLabel}>{t(lang, 'you')}</Text>
                                     <Text style={[styles.revealCardValue, { color: '#007AFF' }]}>
                                         {r?.playerGuess ?? 0}
                                     </Text>
-                                    <Text style={styles.revealCardUnit}>{question?.unit}</Text>
+                                    <Text style={styles.revealCardUnit}>{qUnit}</Text>
                                 </View>
 
                                 <Text style={styles.revealVs}>vs</Text>
@@ -307,20 +313,20 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                 </View>
                             </View>
 
-                            <Text style={styles.revealSuspense}>⏳ Hesaplanıyor…</Text>
+                            <Text style={styles.revealSuspense}>{t(lang, 'calculating')}</Text>
                         </Animated.View>
                     )}
 
                     {/* ── RESULT PHASE ── */}
                     {displayPhase === 'result' && r && (
                         <Animated.View style={[styles.resultContainer, { opacity: resultFade }]}>
-                            <Text style={styles.resultQuestion} numberOfLines={3}>{question?.question}</Text>
+                            <Text style={styles.resultQuestion} numberOfLines={3}>{q}</Text>
 
                             {/* Correct answer */}
                             <View style={styles.correctRow}>
-                                <Text style={styles.correctLabel}>Doğru Cevap:</Text>
+                                <Text style={styles.correctLabel}>{t(lang, 'correctAnswer')}</Text>
                                 <Text style={styles.correctValue}>
-                                    {r.correctAnswer} {question?.unit}
+                                    {r.correctAnswer} {qUnit}
                                 </Text>
                             </View>
 
@@ -331,7 +337,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                             >
                                 {/* Player row */}
                                 <View style={styles.barRow}>
-                                    <Text style={[styles.barLabel, { color: '#007AFF' }]}>Sen</Text>
+                                    <Text style={[styles.barLabel, { color: '#007AFF' }]}>{t(lang, 'you')}</Text>
                                     <View style={styles.barTrack}>
                                         <Animated.View
                                             style={[
@@ -348,7 +354,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                     </View>
                                     <Text style={[styles.barDiff, { color: '#007AFF' }]}>
                                         {r.playerGuess}
-                                        <Text style={styles.barDiffSub}> ({r.playerDistance} fark)</Text>
+                                        <Text style={styles.barDiffSub}> ({r.playerDistance} {t(lang, 'diff')})</Text>
                                     </Text>
                                 </View>
 
@@ -371,7 +377,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                                     </View>
                                     <Text style={[styles.barDiff, { color: opponentColor }]}>
                                         {r.botGuess}
-                                        <Text style={styles.barDiffSub}> ({r.botDistance} fark)</Text>
+                                        <Text style={styles.barDiffSub}> ({r.botDistance} {t(lang, 'diff')})</Text>
                                     </Text>
                                 </View>
                             </View>
@@ -386,12 +392,12 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                             >
                                 <Text style={[styles.winnerText, { color: winnerColor }]}>{winnerLabel}</Text>
                                 {r.tie && (
-                                    <Text style={styles.winnerSub}>Eşitlikte savunan kazanır</Text>
+                                    <Text style={styles.winnerSub}>{t(lang, 'tieNote')}</Text>
                                 )}
                             </Animated.View>
 
                             <TouchableOpacity style={styles.continueBtn} onPress={onContinue} activeOpacity={0.8}>
-                                <Text style={styles.continueBtnText}>Devam Et</Text>
+                                <Text style={styles.continueBtnText}>{t(lang, 'continueBtn')}</Text>
                             </TouchableOpacity>
                         </Animated.View>
                     )}

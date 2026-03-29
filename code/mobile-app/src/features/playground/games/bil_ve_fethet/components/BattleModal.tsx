@@ -9,7 +9,8 @@ import {
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SwipeableCardStack } from '../../../components/SwipeableCardStack';
-import { PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../types';
+import { PlayerId, PLAYER_COLORS, NEUTRAL_COLOR } from '../types';
+import { Lang, t, getPlayerLabel, getNeutralLabel } from '../i18n';
 
 interface QuestionItem {
     id: number;
@@ -29,6 +30,7 @@ interface BattleModalProps {
     onAnswer: (isCorrect: boolean) => void;
     onTimeUp: () => void;
     isDefending?: boolean;
+    lang?: Lang;
 }
 
 const BATTLE_DURATION = 10;
@@ -43,6 +45,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     onAnswer,
     onTimeUp,
     isDefending = false,
+    lang = 'tr',
 }) => {
     const [timeLeft, setTimeLeft] = useState(BATTLE_DURATION);
     const timerFiredRef = useRef(false);
@@ -167,7 +170,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
     const attackerColor = PLAYER_COLORS[attackerId];
     const defenderColor = defenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[defenderId as PlayerId];
-    const defenderLabel = defenderId === 'neutral' ? 'Nötr' : PLAYER_LABELS[defenderId as PlayerId];
+    const defenderLabel = defenderId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(defenderId as PlayerId, lang);
 
     const timerColor = timeLeft <= 3 ? '#FF3B30' : timeLeft <= 5 ? '#FF9500' : '#34C759';
     const timerBarColor: [string, string] =
@@ -200,7 +203,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                     {/* Defense mode banner */}
                     {isDefending && (
                         <View style={styles.defendBanner}>
-                            <Text style={styles.defendBannerText}>🛡️ SAVUNMA MODU</Text>
+                            <Text style={styles.defendBannerText}>{t(lang, 'defenseBanner')}</Text>
                         </View>
                     )}
 
@@ -209,7 +212,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                         <View style={[styles.playerPill, { backgroundColor: attackerColor + '20' }]}>
                             <View style={[styles.playerDot, { backgroundColor: attackerColor }]} />
                             <Text style={[styles.playerLabel, { color: attackerColor }]}>
-                                {PLAYER_LABELS[attackerId]}
+                                {getPlayerLabel(attackerId, lang)}
                             </Text>
                         </View>
 
@@ -244,13 +247,13 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
                     {/* Province target */}
                     <Text style={styles.targetLabel}>
-                        <Text style={{ color: '#AEAEB2' }}>Hedef: </Text>
+                        <Text style={{ color: '#AEAEB2' }}>{t(lang, 'target')} </Text>
                         <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{targetProvinceName}</Text>
                     </Text>
 
                     {/* Animated score */}
                     <View style={styles.scoreRow}>
-                        <Text style={styles.scoreLabel}>Puan: </Text>
+                        <Text style={styles.scoreLabel}>{t(lang, 'score')} </Text>
                         <Animated.Text
                             style={[
                                 styles.scoreValue,
@@ -272,7 +275,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                             renderItem={(item: QuestionItem) => (
                                 <View style={styles.cardContent}>
                                     <View style={styles.cardBadge}>
-                                        <Text style={styles.cardBadgeText}>DOĞRU / YANLIŞ</Text>
+                                        <Text style={styles.cardBadgeText}>{t(lang, 'trueFalse')}</Text>
                                     </View>
                                     <Text style={styles.questionText}>{item.question}</Text>
                                     {item.hint ? (
@@ -286,10 +289,10 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                     {/* Swipe hint */}
                     <View style={styles.hintRow}>
                         <View style={styles.hintPill}>
-                            <Text style={styles.hintLeft}>← Yanlış</Text>
+                            <Text style={styles.hintLeft}>{t(lang, 'swipeLeft')}</Text>
                         </View>
                         <View style={[styles.hintPill, { backgroundColor: 'rgba(52,199,89,0.12)' }]}>
-                            <Text style={styles.hintRight}>Doğru →</Text>
+                            <Text style={styles.hintRight}>{t(lang, 'swipeRight')}</Text>
                         </View>
                     </View>
                 </Animated.View>

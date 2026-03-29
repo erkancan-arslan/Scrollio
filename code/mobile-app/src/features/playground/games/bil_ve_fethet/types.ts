@@ -31,9 +31,12 @@ export const PLAYER_LABELS: Record<PlayerId, string> = {
 export interface GuessingQuestion {
     id: number;
     question: string;
+    questionEn: string;
     answer: number;
     unit: string;
+    unitEn: string;
     hint: string;
+    hintEn: string;
 }
 
 export interface GuessingResult {

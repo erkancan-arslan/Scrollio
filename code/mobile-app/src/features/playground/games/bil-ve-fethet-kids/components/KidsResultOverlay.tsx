@@ -7,16 +7,18 @@ import {
     View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { TurnResult, PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../../../games/bil_ve_fethet/types';
+import { TurnResult, PlayerId, PLAYER_COLORS, NEUTRAL_COLOR } from '../../../games/bil_ve_fethet/types';
+import { Lang, t, getPlayerLabel, getNeutralLabel } from '../../../games/bil_ve_fethet/i18n';
 import { DESK_BY_ID } from '../data/classroom';
 
 interface KidsResultOverlayProps {
     visible: boolean;
     result: TurnResult;
     onContinue: () => void;
+    lang?: Lang;
 }
 
-export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, result, onContinue }) => {
+export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, result, onContinue, lang = 'tr' }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.7)).current;
     const cardSlideAnim = useRef(new Animated.Value(60)).current;
@@ -69,15 +71,22 @@ export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, r
     if (!visible) return null;
 
     const desk = DESK_BY_ID[result.regionId];
-    const deskName = desk ? `${desk.name} sırası` : result.regionId;
     const conquered = result.conquered;
-    const headline = conquered ? '⚔️ Sıra Fethedildi!' : '🛡️ Sıra Savunuldu!';
+    const headline = conquered ? t(lang, 'deskConqueredHeadline') : t(lang, 'deskDefendedHeadline');
     const headlineColor = conquered ? '#34C759' : '#FF9500';
     const borderGlow = conquered ? 'rgba(52,199,89,0.35)' : 'rgba(255,149,0,0.35)';
 
+    const deskName = desk
+        ? lang === 'tr'
+            ? `${desk.name} ${t(lang, 'deskSuffix')}`
+            : `${desk.name} ${t(lang, 'deskSuffix')}`
+        : result.regionId;
+
     const attackerColor = PLAYER_COLORS[result.attackerId];
     const defenderColor = result.defenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[result.defenderId as PlayerId];
-    const defenderLabel = result.defenderId === 'neutral' ? 'Nötr' : PLAYER_LABELS[result.defenderId as PlayerId];
+    const defenderLabel = result.defenderId === 'neutral'
+        ? getNeutralLabel(lang)
+        : getPlayerLabel(result.defenderId as PlayerId, lang);
     const attackerWon = result.attackerScore > result.defenderScore;
 
     return (
@@ -97,12 +106,12 @@ export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, r
                 <View style={styles.scoreRow}>
                     <View style={[styles.scoreBox, attackerWon && styles.winnerBox]}>
                         <Text style={[styles.scoreLabel, { color: attackerColor }]}>
-                            {PLAYER_LABELS[result.attackerId]}
+                            {getPlayerLabel(result.attackerId, lang)}
                         </Text>
                         <Text style={[styles.scoreValue, attackerWon && styles.winnerScore]}>
                             {displayAttacker}
                         </Text>
-                        <Text style={styles.scoreSub}>puan</Text>
+                        <Text style={styles.scoreSub}>{t(lang, 'pts')}</Text>
                         {attackerWon && <Text style={styles.crownEmoji}>👑</Text>}
                     </View>
 
@@ -117,7 +126,7 @@ export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, r
                         <Text style={[styles.scoreValue, !attackerWon && styles.winnerScore]}>
                             {displayDefender}
                         </Text>
-                        <Text style={styles.scoreSub}>puan</Text>
+                        <Text style={styles.scoreSub}>{t(lang, 'pts')}</Text>
                         {!attackerWon && <Text style={styles.crownEmoji}>👑</Text>}
                     </View>
                 </View>
@@ -127,7 +136,7 @@ export const KidsResultOverlay: React.FC<KidsResultOverlayProps> = ({ visible, r
                     onPress={onContinue}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.continueBtnText}>Devam Et</Text>
+                    <Text style={styles.continueBtnText}>{t(lang, 'continueBtn')}</Text>
                 </TouchableOpacity>
             </Animated.View>
         </Animated.View>

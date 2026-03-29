@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
     Animated,
     SafeAreaView,
@@ -20,7 +20,8 @@ import { ClassroomMap } from './components/ClassroomMap';
 import { BattleModal } from '../bil_ve_fethet/components/BattleModal';
 import { GuessingModal } from '../bil_ve_fethet/components/GuessingModal';
 import { KidsResultOverlay } from './components/KidsResultOverlay';
-import { PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../bil_ve_fethet/types';
+import { PlayerId, PLAYER_COLORS, NEUTRAL_COLOR } from '../bil_ve_fethet/types';
+import { Lang, t, getPlayerLabel } from '../bil_ve_fethet/i18n';
 
 interface BilVeFethetKidsScreenProps {
     onExit: () => void;
@@ -28,6 +29,7 @@ interface BilVeFethetKidsScreenProps {
 
 export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ onExit }) => {
     const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
+    const [lang, setLang] = useState<Lang>('tr');
 
     const gameOverFade = useRef(new Animated.Value(0)).current;
     const gameOverScale = useRef(new Animated.Value(0.85)).current;
@@ -216,6 +218,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
     );
 
     const targetDesk = state.activeBattle ? DESK_BY_ID[state.activeBattle.targetRegionId] : null;
+    const targetDeskName = targetDesk ? `${targetDesk.name} ${t(lang, 'deskSuffix')}` : '';
 
     const currentBotId = useMemo((): PlayerId | null => {
         if (state.phase !== 'bot_turn' && state.phase !== 'bot_result') return null;
@@ -230,46 +233,55 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 const round = Math.floor(state.claimingTurnIndex / state.turnOrder.length) + 1;
                 const totalRounds = Math.ceil(DESKS.length / state.turnOrder.length);
                 const actor = state.turnOrder[state.claimingTurnIndex % state.turnOrder.length];
-                const actorLabel = actor === 'player' ? 'Sen' : PLAYER_LABELS[actor];
-                return `Sıra Paylaşımı • Tur ${round}/${totalRounds} — ${actorLabel} sıra seçiyor`;
+                const actorLabel = actor === 'player' ? t(lang, 'you') : getPlayerLabel(actor, lang);
+                return `${t(lang, 'deskShare')} • ${t(lang, 'round')} ${round}/${totalRounds} — ${actorLabel} ${t(lang, 'picksDesk')}`;
             }
             case 'selecting':
-                if (selectableIds.length === 0) return 'Hareket edilecek sıra yok…';
+                if (selectableIds.length === 0) return t(lang, 'noDeskMoves');
                 return selectableIds.some(id => state.ownership[id] === 'neutral')
-                    ? 'Boş sıra al veya rakibe saldır'
-                    : 'Rakip sıraya saldır';
+                    ? t(lang, 'takeDeskOrAttack')
+                    : t(lang, 'attackDeskEnemy');
             case 'battling':
-                return `⚔️ Saldırı: ${targetDesk?.name ?? ''} sırası`;
+                return `${t(lang, 'attackPhase')} ${targetDeskName}`;
             case 'guessing':
-                return `🎯 Tahmin Turu: ${targetDesk?.name ?? ''} sırası`;
-            case 'guessing_result':
+                return `${t(lang, 'guessPhase')} ${targetDeskName}`;
+            case 'guessing_result': {
+                const deskName = DESK_BY_ID[state.lastGuessingResult?.regionId ?? ''];
+                const name = deskName ? `${deskName.name} ${t(lang, 'deskSuffix')}` : '';
                 return state.lastGuessingResult?.conquered
-                    ? `${DESK_BY_ID[state.lastGuessingResult.regionId]?.name} sırası fethedildi!`
-                    : `${DESK_BY_ID[state.lastGuessingResult?.regionId ?? '']?.name} sırası savunuldu!`;
+                    ? `${name} ${t(lang, 'deskConquered')}`
+                    : `${name} ${t(lang, 'deskDefended')}`;
+            }
             case 'defending': {
-                const attackerLabel = PLAYER_LABELS[state.activeBattle?.attackerId ?? 'bot1'];
-                return `🛡️ ${attackerLabel} sana saldırıyor! Savun!`;
+                const attackerLabel = getPlayerLabel(state.activeBattle?.attackerId ?? 'bot1', lang);
+                return `🛡️ ${attackerLabel} ${t(lang, 'attackingDefend')}`;
             }
             case 'bot_turn': {
                 const bots = state.turnOrder.filter(id => id !== 'player') as PlayerId[];
                 const bot = bots[state.botTurnIndex];
-                return bot ? `${PLAYER_LABELS[bot]} oynuyor…` : 'Botlar oynuyor…';
+                return bot ? `${getPlayerLabel(bot, lang)} ${t(lang, 'playing')}` : t(lang, 'botsPlaying');
             }
-            case 'bot_result':
+            case 'bot_result': {
                 if (!state.lastResult) return '';
+                const deskName = DESK_BY_ID[state.lastResult.regionId];
+                const name = deskName ? `${deskName.name} ${t(lang, 'deskSuffix')}` : '';
                 return state.lastResult.conquered
-                    ? `⚔️ ${PLAYER_LABELS[state.lastResult.attackerId as PlayerId]} ${DESK_BY_ID[state.lastResult.regionId]?.name} sırasını fethetti!`
-                    : `🛡️ ${DESK_BY_ID[state.lastResult.regionId]?.name} sırası savunuldu!`;
-            case 'result':
+                    ? `⚔️ ${getPlayerLabel(state.lastResult.attackerId as PlayerId, lang)} — ${name} ${t(lang, 'deskConquered')}`
+                    : `🛡️ ${name} ${t(lang, 'deskDefended')}`;
+            }
+            case 'result': {
+                const deskName = DESK_BY_ID[state.lastResult?.regionId ?? ''];
+                const name = deskName ? `${deskName.name} ${t(lang, 'deskSuffix')}` : '';
                 return state.lastResult?.conquered
-                    ? `${DESK_BY_ID[state.lastResult.regionId]?.name} sırası fethedildi!`
-                    : `${DESK_BY_ID[state.lastResult?.regionId ?? '']?.name} sırası savunuldu!`;
+                    ? `${name} ${t(lang, 'deskConquered')}`
+                    : `${name} ${t(lang, 'deskDefended')}`;
+            }
             case 'game_over':
-                return state.winner === 'player' ? '🏆 Tüm sıralar senin!' : '💀 Elimine edildin!';
+                return state.winner === 'player' ? `🏆 ${t(lang, 'allDesksYours')}` : `💀 ${t(lang, 'eliminated')}`;
             default:
                 return '';
         }
-    }, [state.phase, state.lastResult, state.lastGuessingResult, state.winner, selectableIds, state.ownership, state.activeBattle, state.botTurnIndex, state.turnOrder, state.claimingTurnIndex, targetDesk]);
+    }, [state.phase, state.lastResult, state.lastGuessingResult, state.winner, selectableIds, state.ownership, state.activeBattle, state.botTurnIndex, state.turnOrder, state.claimingTurnIndex, targetDeskName, lang]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -280,13 +292,22 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 <TouchableOpacity onPress={onExit} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Ionicons name="close" size={26} color="#333" />
                 </TouchableOpacity>
-                <Text style={styles.hudTitle}>🏫 Sınıfı Fethet!</Text>
-                <View style={styles.hudBadge}>
-                    <Text style={styles.hudBadgeText}>
-                        {state.phase === 'claiming'
-                            ? `📍 ${state.claimingTurnIndex}/${DESKS.length}`
-                            : `🪑 ${playerDeskCount}/${DESKS.length}`}
-                    </Text>
+                <Text style={styles.hudTitle}>{t(lang, 'kidsGameTitle')}</Text>
+                <View style={styles.hudRight}>
+                    <TouchableOpacity
+                        onPress={() => setLang(l => l === 'tr' ? 'en' : 'tr')}
+                        style={styles.langBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Text style={styles.langBtnText}>{t(lang, 'langBtn')}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.hudBadge}>
+                        <Text style={styles.hudBadgeText}>
+                            {state.phase === 'claiming'
+                                ? `${t(lang, 'claiming')} ${state.claimingTurnIndex}/${DESKS.length}`
+                                : `${t(lang, 'desks')} ${playerDeskCount}/${DESKS.length}`}
+                        </Text>
+                    </View>
                 </View>
             </View>
 
@@ -294,7 +315,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
             {state.phase === 'claiming' && (() => {
                 const actor = state.turnOrder[state.claimingTurnIndex % state.turnOrder.length];
                 const color = PLAYER_COLORS[actor];
-                const label = actor === 'player' ? 'Senin Seçimin' : `${PLAYER_LABELS[actor]} Seçiyor`;
+                const label = actor === 'player' ? t(lang, 'yourChoice') : `${getPlayerLabel(actor, lang)} ${t(lang, 'choosing')}`;
                 return (
                     <View style={[styles.turnBanner, { backgroundColor: color + '22', borderColor: color }]}>
                         <View style={[styles.turnDot, { backgroundColor: color }]} />
@@ -305,20 +326,20 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
             {(state.phase === 'selecting' || state.phase === 'battling') && (
                 <View style={[styles.turnBanner, { backgroundColor: PLAYER_COLORS.player + '22', borderColor: PLAYER_COLORS.player }]}>
                     <View style={[styles.turnDot, { backgroundColor: PLAYER_COLORS.player }]} />
-                    <Text style={[styles.turnBannerText, { color: PLAYER_COLORS.player }]}>Senin Turun</Text>
+                    <Text style={[styles.turnBannerText, { color: PLAYER_COLORS.player }]}>{t(lang, 'yourTurn')}</Text>
                 </View>
             )}
             {(state.phase === 'bot_turn' || state.phase === 'bot_result') && currentBotId && (
                 <View style={[styles.turnBanner, { backgroundColor: PLAYER_COLORS[currentBotId] + '22', borderColor: PLAYER_COLORS[currentBotId] }]}>
                     <View style={[styles.turnDot, { backgroundColor: PLAYER_COLORS[currentBotId] }]} />
-                    <Text style={[styles.turnBannerText, { color: PLAYER_COLORS[currentBotId] }]}>{PLAYER_LABELS[currentBotId]}'in Turu</Text>
+                    <Text style={[styles.turnBannerText, { color: PLAYER_COLORS[currentBotId] }]}>{getPlayerLabel(currentBotId, lang)}{t(lang, 'sTurn')}</Text>
                 </View>
             )}
             {state.phase === 'defending' && state.activeBattle && (
                 <View style={[styles.turnBanner, { backgroundColor: '#FF3B3022', borderColor: '#FF3B30' }]}>
                     <View style={[styles.turnDot, { backgroundColor: '#FF3B30' }]} />
                     <Text style={[styles.turnBannerText, { color: '#FF3B30' }]}>
-                        {PLAYER_LABELS[state.activeBattle.attackerId]} saldırıyor — Savun!
+                        {getPlayerLabel(state.activeBattle.attackerId, lang)} {t(lang, 'attackingDefend')}
                     </Text>
                 </View>
             )}
@@ -347,7 +368,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                         <View key={pid} style={[styles.legendItem, { opacity: eliminated ? 0.3 : 1 }]}>
                             <View style={[styles.legendDot, { backgroundColor: PLAYER_COLORS[pid] }]} />
                             <Text style={styles.legendText}>
-                                {pid === 'player' ? 'Sen' : `Bot ${pid.slice(3)}`}: {count}
+                                {getPlayerLabel(pid, lang)}: {count}
                             </Text>
                         </View>
                     );
@@ -355,7 +376,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: NEUTRAL_COLOR }]} />
                     <Text style={styles.legendText}>
-                        Boş: {Object.values(state.ownership).filter(o => o === 'neutral').length}
+                        {t(lang, 'empty')}: {Object.values(state.ownership).filter(o => o === 'neutral').length}
                     </Text>
                 </View>
             </View>
@@ -365,12 +386,13 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 visible={state.phase === 'battling'}
                 attackerId={state.activeBattle?.attackerId ?? 'player'}
                 defenderId={state.activeBattle?.defenderId ?? 'neutral'}
-                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
+                targetProvinceName={targetDeskName}
                 currentScore={state.activeBattle?.attackerScore ?? 0}
                 questions={battleQuestions}
                 onAnswer={handleAnswer}
                 onTimeUp={handleTimeUp}
                 isDefending={false}
+                lang={lang}
             />
 
             {/* Battle Modal — player defending */}
@@ -378,12 +400,13 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 visible={state.phase === 'defending'}
                 attackerId={state.activeBattle?.attackerId ?? 'bot1'}
                 defenderId='player'
-                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
+                targetProvinceName={targetDeskName}
                 currentScore={state.activeBattle?.defenderScore ?? 0}
                 questions={battleQuestions}
                 onAnswer={handleDefenseAnswer}
                 onTimeUp={handleDefenseTimeUp}
                 isDefending={true}
+                lang={lang}
             />
 
             {/* Guessing Modal */}
@@ -391,13 +414,14 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                 visible={state.phase === 'guessing' || state.phase === 'guessing_result'}
                 attackerId={state.activeBattle?.attackerId ?? 'player'}
                 defenderId={state.activeBattle?.defenderId ?? 'neutral'}
-                targetProvinceName={targetDesk ? `${targetDesk.name} Sırası` : ''}
+                targetProvinceName={targetDeskName}
                 question={state.guessingQuestion}
                 botGuess={state.botGuess}
                 guessingResult={state.lastGuessingResult}
                 onSubmit={handleGuessingSubmit}
                 onContinue={handleGuessingContinue}
                 isDefending={state.activeBattle?.defenderId === 'player'}
+                lang={lang}
             />
 
             {/* Player result overlay */}
@@ -406,6 +430,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                     visible={true}
                     result={state.lastResult}
                     onContinue={handleContinue}
+                    lang={lang}
                 />
             )}
 
@@ -415,6 +440,7 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                     visible={true}
                     result={state.lastResult}
                     onContinue={handleBotResultNext}
+                    lang={lang}
                 />
             )}
 
@@ -428,20 +454,20 @@ export const BilVeFethetKidsScreen: React.FC<BilVeFethetKidsScreenProps> = ({ on
                             {state.winner === 'player' ? '🏆' : '💀'}
                         </Text>
                         <Text style={styles.gameOverTitle}>
-                            {state.winner === 'player' ? 'Tüm Sıralar Senin!' : 'Elimine Edildin!'}
+                            {state.winner === 'player' ? t(lang, 'allDesksYours') : t(lang, 'eliminated')}
                         </Text>
                         <Text style={styles.gameOverSub}>
                             {state.winner === 'player'
-                                ? `${playerDeskCount} sıraya hükmediyorsun`
+                                ? `${playerDeskCount} ${t(lang, 'desksControlled')}`
                                 : state.winner
-                                ? `${PLAYER_LABELS[state.winner as PlayerId]} kazandı`
+                                ? `${getPlayerLabel(state.winner as PlayerId, lang)} ${t(lang, 'won')}`
                                 : ''}
                         </Text>
                         <TouchableOpacity style={styles.restartBtn} onPress={handleRestart} activeOpacity={0.8}>
-                            <Text style={styles.restartBtnText}>Tekrar Oyna</Text>
+                            <Text style={styles.restartBtnText}>{t(lang, 'playAgain')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.exitBtn} onPress={onExit} activeOpacity={0.8}>
-                            <Text style={styles.exitBtnText}>Ana Menüye Dön</Text>
+                            <Text style={styles.exitBtnText}>{t(lang, 'backToMenu')}</Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </Animated.View>
@@ -466,6 +492,25 @@ const styles = StyleSheet.create({
     },
     backBtn: { width: 36, height: 36, justifyContent: 'center' },
     hudTitle: { color: '#3D2B1A', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+    hudRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    langBtn: {
+        backgroundColor: '#E8D5B0',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#C8A870',
+    },
+    langBtnText: {
+        color: '#5C3D1E',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
     hudBadge: {
         backgroundColor: '#E8D5B0',
         paddingHorizontal: 10,

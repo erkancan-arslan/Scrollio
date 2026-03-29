@@ -7,16 +7,18 @@ import {
     View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { TurnResult, PlayerId, PLAYER_COLORS, PLAYER_LABELS, NEUTRAL_COLOR } from '../types';
+import { TurnResult, PlayerId, PLAYER_COLORS, NEUTRAL_COLOR } from '../types';
 import { REGION_BY_ID } from '../data/regions';
+import { Lang, t, getPlayerLabel, getNeutralLabel } from '../i18n';
 
 interface ResultOverlayProps {
     visible: boolean;
     result: TurnResult;
     onContinue: () => void;
+    lang?: Lang;
 }
 
-export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, onContinue }) => {
+export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, onContinue, lang = 'tr' }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.7)).current;
     const cardSlideAnim = useRef(new Animated.Value(60)).current;
@@ -90,7 +92,7 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, o
 
     const provinceName = REGION_BY_ID[result.regionId]?.name ?? result.regionId;
     const conquered = result.conquered;
-    const headline = conquered ? '⚔️ Fethedildi!' : '🛡️ Savunuldu!';
+    const headline = conquered ? t(lang, 'conqueredHeadline') : t(lang, 'defendedHeadline');
     const headlineColor = conquered ? '#34C759' : '#FF9500';
     const borderGlow = conquered ? 'rgba(52,199,89,0.35)' : 'rgba(255,149,0,0.35)';
 
@@ -98,7 +100,7 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, o
     const defenderColor =
         result.defenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[result.defenderId as PlayerId];
     const defenderLabel =
-        result.defenderId === 'neutral' ? 'Nötr' : PLAYER_LABELS[result.defenderId as PlayerId];
+        result.defenderId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(result.defenderId as PlayerId, lang);
 
     const attackerWon = result.attackerScore > result.defenderScore;
 
@@ -124,12 +126,12 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, o
                 <View style={styles.scoreRow}>
                     <View style={[styles.scoreBox, attackerWon && styles.winnerBox]}>
                         <Text style={[styles.scoreLabel, { color: attackerColor }]}>
-                            {PLAYER_LABELS[result.attackerId]}
+                            {getPlayerLabel(result.attackerId, lang)}
                         </Text>
                         <Text style={[styles.scoreValue, attackerWon && styles.winnerScore]}>
                             {displayAttacker}
                         </Text>
-                        <Text style={styles.scoreSub}>puan</Text>
+                        <Text style={styles.scoreSub}>{t(lang, 'pts')}</Text>
                         {attackerWon && <Text style={styles.crownEmoji}>👑</Text>}
                     </View>
 
@@ -144,7 +146,7 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, o
                         <Text style={[styles.scoreValue, !attackerWon && styles.winnerScore]}>
                             {displayDefender}
                         </Text>
-                        <Text style={styles.scoreSub}>puan</Text>
+                        <Text style={styles.scoreSub}>{t(lang, 'pts')}</Text>
                         {!attackerWon && <Text style={styles.crownEmoji}>👑</Text>}
                     </View>
                 </View>
@@ -155,7 +157,7 @@ export const ResultOverlay: React.FC<ResultOverlayProps> = ({ visible, result, o
                     onPress={onContinue}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.continueBtnText}>Devam Et</Text>
+                    <Text style={styles.continueBtnText}>{t(lang, 'continueBtn')}</Text>
                 </TouchableOpacity>
             </Animated.View>
         </Animated.View>

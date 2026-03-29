@@ -38,11 +38,17 @@ export const resolveGuessingRound = (
 ): { conquered: boolean; tie: boolean; playerDistance: number; botDistance: number } => {
     const playerDistance = Math.abs(playerGuess - correctAnswer);
     const botDistance = Math.abs(botGuess - correctAnswer);
+
+    // Perfect answer always wins unconditionally — no tie penalty
+    if (playerDistance === 0) {
+        return { conquered: attackerId === 'player', tie: false, playerDistance, botDistance };
+    }
+
     const tie = playerDistance === botDistance;
 
     let attackerWon: boolean;
     if (tie) {
-        attackerWon = false; // defender always wins ties
+        attackerWon = false; // defender wins ties (for imperfect guesses)
     } else if (attackerId === 'player') {
         attackerWon = playerDistance < botDistance;
     } else {
