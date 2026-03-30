@@ -1,51 +1,41 @@
 /**
- * Kids Feed API Service
- *
- * TEMPORARY: Points to the main /feed endpoint (which reads from the `videos`
- * table) so the kids UI can be tested while `kids_content` is still empty.
- * Revert to `/kids/feed` once kids content is available.
+ * Kids feed — uses `/kids/feed` (kids_content) with X-Child-Profile-Id; not the core `/feed`.
  */
 
 import { kidsApi, KidsApiResponse } from '../../shared/utils/api';
 
-// ── Main-feed Video shape (matches backend VideoDto) ────────────────
-interface MainFeedVideo {
+interface KidsFeedApiRow {
   id: string;
   title: string;
-  description: string | null;
-  videoUrl: string;
-  thumbnailUrl: string | null;
-  duration: number;
-  creator: {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-    isVerified: boolean;
-  };
-  stats: {
-    views: number;
-    likes: number;
-    comments: number;
-    bookmarks: number;
-    shares: number;
-  };
-  topic: string;
-  topicId: string | null;
-  tags: string[];
-  difficulty: string;
-  isLiked: boolean;
-  isBookmarked: boolean;
-  createdAt: string;
+  description?: string | null;
+  video_url?: string | null;
+  thumbnail_url?: string | null;
+  age_group?: string;
+  difficulty?: string | null;
+  topic_tags?: string[];
+  duration_seconds?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  isBookmarked?: boolean;
+  hasQuiz?: boolean;
+  isLiked?: boolean;
 }
 
-interface MainFeedResponse {
-  videos: MainFeedVideo[];
-  nextCursor: string | null;
-  hasMore: boolean;
+export type KidsFeedEmptyReason = 'no_mascot' | 'no_topics' | 'no_matching_content';
+
+interface KidsFeedHttpBody {
+  data: KidsFeedApiRow[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    emptyReason?: KidsFeedEmptyReason;
+  };
 }
 
-// ── Normalised shape expected by feedSlice ───────────────────────────
+/** Normalised shape expected by feedSlice */
 interface FeedItem {
   id: string;
   title: string;
@@ -53,7 +43,7 @@ interface FeedItem {
   video_url: string | null;
   thumbnail_url: string | null;
   age_group: string;
-  difficulty: string;
+  difficulty: string | null;
   topic_tags: string[];
   duration_seconds: number;
   is_active: boolean;
@@ -61,10 +51,6 @@ interface FeedItem {
   isBookmarked: boolean;
   hasQuiz: boolean;
   created_at: string;
-  // Extra fields carried through from main feed
-  creator_username?: string;
-  creator_display_name?: string;
-  creator_avatar_url?: string | null;
   view_count?: number;
   like_count?: number;
   bookmark_count?: number;
@@ -72,7 +58,13 @@ interface FeedItem {
 
 interface FeedResponse {
   data: FeedItem[];
-  meta: { page: number; limit: number; total: number; hasMore: boolean };
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    emptyReason?: KidsFeedEmptyReason;
+  };
 }
 
 interface TrackViewResponse {
@@ -81,88 +73,84 @@ interface TrackViewResponse {
   completed: boolean;
 }
 
-// Keep a cursor for infinite-scroll across pages
-let _nextCursor: string | null = null;
+function mapRow(r: KidsFeedApiRow): FeedItem {
+  return {
+    id: r.id,
+    title: r.title,
+    description: r.description ?? null,
+    video_url: r.video_url ?? null,
+    thumbnail_url: r.thumbnail_url ?? null,
+    age_group: r.age_group ?? '7-9',
+    difficulty: r.difficulty ?? null,
+    topic_tags: (r.topic_tags ?? []) as string[],
+    duration_seconds: r.duration_seconds ?? 0,
+    is_active: r.is_active ?? true,
+    isLiked: r.isLiked ?? false,
+    isBookmarked: r.isBookmarked ?? false,
+    hasQuiz: r.hasQuiz ?? false,
+    created_at: r.created_at ?? '',
+  };
+}
 
 /**
- * GET /api/v1/feed  (main feed, temporarily)
- * Adapts main-feed cursor pagination into the page/meta shape the kids
- * feedSlice expects.
+ * GET /api/v1/kids/feed?page=&limit=&topicId=
+ * Requires X-Child-Profile-Id (set by kidsApi).
  */
 export const getFeed = async (
   page: number,
   limit: number,
-  _topicId?: string,
+  topicId?: string,
 ): Promise<KidsApiResponse<FeedResponse>> => {
-  // Reset cursor when refreshing (page 1)
-  if (page === 1) {
-    _nextCursor = null;
-  }
-
   const params = new URLSearchParams();
+  params.set('page', String(page));
   params.set('limit', String(limit));
-  if (_nextCursor) params.set('cursor', _nextCursor);
+  if (topicId) params.set('topicId', topicId);
 
-  const res = await kidsApi.get<MainFeedResponse>(`/feed?${params.toString()}`);
-
+  const res = await kidsApi.get<KidsFeedHttpBody | { videos?: unknown[]; nextCursor?: unknown }>(
+    `/kids/feed?${params.toString()}`,
+  );
   if (res.error || !res.data) {
     return { data: null, error: res.error, status: res.status };
   }
 
-  const mainData = res.data;
-  _nextCursor = mainData.nextCursor;
+  const body = res.data as Record<string, unknown>;
+  // Core `/feed` returns { videos, nextCursor, hasMore } — if we see that, base URL or route is wrong.
+  if (Array.isArray(body.videos) && !Array.isArray(body.data)) {
+    return {
+      data: null,
+      error:
+        'Received main app feed shape. Set EXPO_PUBLIC_API_BASE_URL to include /api/v1 (e.g. http://HOST:PORT/api/v1) and reload.',
+      status: res.status,
+    };
+  }
 
-  // Map main-feed Video → kids FeedItem shape
-  const items: FeedItem[] = mainData.videos.map((v) => ({
-    id: v.id,
-    title: v.title,
-    description: v.description,
-    video_url: v.videoUrl,
-    thumbnail_url: v.thumbnailUrl,
-    age_group: '7-12',
-    difficulty: v.difficulty,
-    topic_tags: v.tags?.length ? v.tags : [v.topic],
-    duration_seconds: v.duration,
-    is_active: true,
-    isLiked: v.isLiked,
-    isBookmarked: v.isBookmarked,
-    hasQuiz: false,
-    created_at: v.createdAt,
-    creator_username: v.creator?.username,
-    creator_display_name: v.creator?.displayName,
-    creator_avatar_url: v.creator?.avatarUrl,
-    view_count: v.stats?.views ?? 0,
-    like_count: v.stats?.likes ?? 0,
-    bookmark_count: v.stats?.bookmarks ?? 0,
-  }));
-
-  const adapted: FeedResponse = {
-    data: items,
-    meta: {
-      page,
-      limit,
-      total: items.length,
-      hasMore: mainData.hasMore,
-    },
+  const items = ((body.data as KidsFeedApiRow[]) ?? []).map(mapRow);
+  const meta = (body.meta as KidsFeedHttpBody['meta']) ?? {
+    page,
+    limit,
+    total: items.length,
+    hasMore: false,
   };
 
-  return { data: adapted, error: null, status: res.status };
+  return {
+    data: {
+      data: items,
+      meta,
+    },
+    error: null,
+    status: res.status,
+  };
 };
 
 /**
- * POST /api/v1/feed/videos/:id/view  (main feed, temporarily)
+ * POST /api/v1/kids/feed/viewed
  */
 export const trackView = async (
   contentId: string,
   watchedSeconds: number,
 ): Promise<KidsApiResponse<TrackViewResponse>> => {
-  const res = await kidsApi.post<{ success: boolean }>(
-    `/feed/videos/${contentId}/view`,
-    { watchDuration: watchedSeconds, completed: false },
-  );
-  return {
-    data: { tracked: true, xpEarned: 0, completed: false },
-    error: res.error,
-    status: res.status,
-  };
+  return kidsApi.post<TrackViewResponse>(`/kids/feed/viewed`, {
+    contentId,
+    watchedSeconds,
+  });
 };

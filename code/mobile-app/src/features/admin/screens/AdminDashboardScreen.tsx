@@ -130,6 +130,12 @@ export const AdminDashboardScreen: React.FC = () => {
         >
           <Text style={styles.actionBtnText}>Create Batch (15 Videos)</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnKids]}
+          onPress={() => navigation.navigate('AdminKidsModuleVideoCreation')}
+        >
+          <Text style={styles.actionBtnText}>Create videos for kids module</Text>
+        </TouchableOpacity>
 
         {/* Recent Jobs */}
         <Text style={styles.sectionTitle}>Recent Jobs</Text>
@@ -222,6 +228,10 @@ const styles = StyleSheet.create({
   actionBtnBatch: {
     marginTop: spacing.xs,
     backgroundColor: '#6A1B9A',
+  },
+  actionBtnKids: {
+    marginTop: spacing.sm,
+    backgroundColor: '#00695C',
   },
   actionBtnText: {
     color: adminColors.inverse,

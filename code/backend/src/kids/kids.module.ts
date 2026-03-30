@@ -12,6 +12,7 @@ import { KidsParentalModule } from './parental/kids-parental.module';
 import { KidsVoiceModule } from './voice/kids-voice.module';
 import { KidsChildAuthModule } from './child-auth/kids-child-auth.module';
 import { KidsSettingsModule } from './settings/kids-settings.module';
+import { KidsCustomMascotModule } from './custom-mascot/kids-custom-mascot.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { KidsSettingsModule } from './settings/kids-settings.module';
     KidsVoiceModule,
     KidsChildAuthModule,
     KidsSettingsModule,
+    KidsCustomMascotModule,
   ],
 })
 export class KidsModule {}

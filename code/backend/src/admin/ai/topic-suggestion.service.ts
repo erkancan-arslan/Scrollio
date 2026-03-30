@@ -118,6 +118,65 @@ export class TopicSuggestionService {
     return items;
   }
 
+  /**
+   * Kids mascot batch: N distinct lesson angles on one theme (no difficulty tiers).
+   * Returns exactly `count` items (pads/truncates if the model misbehaves).
+   */
+  async suggestKidsMascotBatchTopics(
+    topic: string,
+    count: number,
+    language: string,
+    subject?: string,
+    customPrompt?: string,
+  ): Promise<Array<{ title: string; subTopic: string }>> {
+    const lang = language === 'tr' ? 'Turkish' : 'English';
+    const n = Math.min(Math.max(count, 1), 40);
+
+    const prompt = [
+      'You must respond with a single raw JSON array and absolutely nothing else.',
+      'No markdown, no prose — only the JSON array.',
+      '',
+      '=== TASK ===',
+      `Suggest exactly ${n} DISTINCT short educational video ideas for children aged 7–12 about: ${topic}`,
+      subject ? `Subject area: ${subject}` : '',
+      `Language for titles: ${lang}`,
+      'Audience: children. Topics must be age-appropriate, safe, and engaging.',
+      '',
+      '=== RULES ===',
+      `- Exactly ${n} items in the array — no more, no fewer.`,
+      '- Each item must cover a different angle — no overlap.',
+      '- subTopic is the specific concept the narrator will explain in that video.',
+      customPrompt ? `Additional guidance: ${customPrompt}` : '',
+      '',
+      '=== OUTPUT FORMAT ===',
+      '[',
+      '  { "title": "Short catchy title", "subTopic": "Specific concept for script generation" },',
+      '  ...',
+      ']',
+      '',
+      'Now output the JSON array:',
+    ]
+      .filter((l) => l !== '')
+      .join('\n');
+
+    this.logger.log(`Suggesting ${n} kids mascot batch sub-topics for "${topic}" (${lang})`);
+
+    const result = await this.callLlm(prompt);
+    let items = this.parseJsonArray(result);
+    if (items.length < n) {
+      for (let i = items.length; i < n; i++) {
+        items.push({
+          title: `${topic} — #${i + 1}`,
+          subTopic: `${topic} — lesson ${i + 1}`,
+        });
+      }
+    }
+    if (items.length > n) {
+      items = items.slice(0, n);
+    }
+    return items;
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private async callLlm(prompt: string): Promise<string> {

@@ -18,6 +18,7 @@ export class ReferenceVideosService {
       persona_name: dto.personaName,
       language: dto.language,
       audience_tag: dto.audienceTag || null,
+      character_id: dto.characterId ?? null,
       storage_path: dto.storagePath,
       public_url: dto.publicUrl || null,
       duration_seconds: dto.durationSeconds || null,
@@ -87,6 +88,7 @@ export class ReferenceVideosService {
     if (dto.personaName !== undefined) updateFields.persona_name = dto.personaName;
     if (dto.language !== undefined) updateFields.language = dto.language;
     if (dto.audienceTag !== undefined) updateFields.audience_tag = dto.audienceTag;
+    if (dto.characterId !== undefined) updateFields.character_id = dto.characterId;
     if (dto.publicUrl !== undefined) updateFields.public_url = dto.publicUrl;
     if (dto.thumbnailUrl !== undefined) updateFields.thumbnail_url = dto.thumbnailUrl;
     if (dto.status !== undefined) updateFields.status = dto.status;

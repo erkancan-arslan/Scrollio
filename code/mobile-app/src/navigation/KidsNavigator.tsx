@@ -16,7 +16,12 @@
 
 import React, { useRef } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigatorScreenParams } from '@react-navigation/native';
+import {
+  NavigatorScreenParams,
+  CompositeNavigationProp,
+} from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAppSelector } from '../store/hooks';
 import { UserRole } from '../features/kids/shared/types';
 
@@ -32,6 +37,9 @@ import { KidsRoleBlockedScreen } from '../features/kids/auth/screens/RoleBlocked
 
 // Main tabs
 import { KidsMainTabNavigator, KidsMainTabParamList } from './KidsMainTabNavigator';
+import { KidsTopicPreferencesScreen } from '../features/kids/settings/screens/KidsTopicPreferencesScreen';
+import { KidsYourMascotScreen } from '../features/kids/mascot/screens/KidsYourMascotScreen';
+import { KidsMascotDrawScreen } from '../features/kids/mascot/screens/KidsMascotDrawScreen';
 
 // Classroom screens
 import { KidsClassroomLessonsScreen } from '../features/kids/classroom/screens/KidsClassroomLessonsScreen';
@@ -58,10 +66,17 @@ export type KidsStackParamList = {
   // Child selection
   KidsChildSelector: undefined;
   KidsCreateChild: undefined;
-  KidsCharacterSelect: { childId: string };
+  KidsCharacterSelect: { childId: string; afterSave?: 'reset-to-tabs' | 'go-back' };
 
   // Main app
   KidsMainTabs: NavigatorScreenParams<KidsMainTabParamList>;
+
+  /** Topic checkboxes for the active child (from Settings). */
+  KidsTopicPreferences: undefined;
+
+  /** Custom drawn mascot demo (2D → pipeline → video). */
+  KidsYourMascot: undefined;
+  KidsMascotDraw: undefined;
 
   // Classroom
   KidsClassroomLessons: { classroomId: string; classroomName: string };
@@ -75,6 +90,12 @@ export type KidsStackParamList = {
 };
 
 const Stack = createStackNavigator<KidsStackParamList>();
+
+/** Tab screens that need to open stack modals (e.g. Settings → topic picker). */
+export type KidsTabCompositeNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<KidsMainTabParamList>,
+  StackNavigationProp<KidsStackParamList>
+>;
 
 const KIDS_BG = '#FFF8F0';
 const KIDS_ORANGE = '#FF6B35';
@@ -148,7 +169,46 @@ export const KidsNavigator: React.FC = () => {
 
       {/* Child management */}
       <Stack.Screen name="KidsChildSelector" component={KidsChildSelectorScreen} />
-      <Stack.Screen name="KidsCharacterSelect" component={KidsCharacterSelectScreen} />
+      <Stack.Screen
+        name="KidsCharacterSelect"
+        component={KidsCharacterSelectScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Your friend',
+          headerTintColor: KIDS_ORANGE,
+          headerStyle: { backgroundColor: KIDS_BG },
+        }}
+      />
+      <Stack.Screen
+        name="KidsTopicPreferences"
+        component={KidsTopicPreferencesScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'My topics',
+          headerTintColor: KIDS_ORANGE,
+          headerStyle: { backgroundColor: KIDS_BG },
+        }}
+      />
+      <Stack.Screen
+        name="KidsYourMascot"
+        component={KidsYourMascotScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Your mascot',
+          headerTintColor: KIDS_ORANGE,
+          headerStyle: { backgroundColor: KIDS_BG },
+        }}
+      />
+      <Stack.Screen
+        name="KidsMascotDraw"
+        component={KidsMascotDrawScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Draw mascot',
+          headerTintColor: KIDS_ORANGE,
+          headerStyle: { backgroundColor: KIDS_BG },
+        }}
+      />
       <Stack.Screen
         name="KidsCreateChild"
         component={KidsCreateChildScreen}

@@ -9,7 +9,22 @@ export class KidsFeedService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
-   * Get personalised feed for a child based on their selected topics.
+   * Map date of birth → kids_content.age_group band. Null if unknown / unparseable.
+   */
+  private ageGroupFromDob(dob: string | null | undefined): '7-9' | '10-12' | null {
+    if (!dob || typeof dob !== 'string') return null;
+    const birth = new Date(dob);
+    if (Number.isNaN(birth.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const md = now.getMonth() - birth.getMonth();
+    if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age--;
+    if (age <= 9) return '7-9';
+    return '10-12';
+  }
+
+  /**
+   * Get personalised feed for a child: kids_content only, filtered by mascot, topics, age band.
    * Excludes recently viewed content (last 24h) and paginates.
    */
   async getFeed(childId: string, query: GetKidsFeedDto) {
@@ -18,7 +33,32 @@ export class KidsFeedService {
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
 
-    // 1. Get child's selected topics
+    type EmptyReason = 'no_mascot' | 'no_topics' | 'no_matching_content';
+
+    const empty = (reason: EmptyReason) => ({
+      data: [] as Record<string, unknown>[],
+      meta: {
+        page,
+        limit,
+        total: 0,
+        hasMore: false,
+        emptyReason: reason,
+      },
+    });
+
+    // 1. Child profile (mascot + DOB for age band)
+    const { data: childProfile } = await admin
+      .from('kids_child_profiles')
+      .select('selected_character_id, date_of_birth')
+      .eq('id', childId)
+      .maybeSingle();
+
+    const mascotId = childProfile?.selected_character_id as string | null | undefined;
+    if (!mascotId?.trim()) {
+      return empty('no_mascot');
+    }
+
+    // 2. Selected topic names
     const { data: childTopics } = await admin
       .from('kids_child_topics')
       .select('topic_id, kids_topics(name)')
@@ -31,7 +71,11 @@ export class KidsFeedService {
       })
       .filter(Boolean) as string[];
 
-    // 2. Get recently viewed content IDs (last 24h) to exclude
+    if (!query.topicId && topicNames.length === 0) {
+      return empty('no_topics');
+    }
+
+    // 3. Recently viewed (last 24h) to exclude
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: recentViews } = await admin
       .from('kids_feed_views')
@@ -41,15 +85,21 @@ export class KidsFeedService {
 
     const viewedIds = (recentViews ?? []).map((v: { content_id: string }) => v.content_id);
 
-    // 3. Build feed query
+    const ageGroup = this.ageGroupFromDob(childProfile?.date_of_birth as string | null | undefined);
+
+    // 4. Build feed query on kids_content only
     let feedQuery = admin
       .from('kids_content')
       .select('*', { count: 'exact' })
       .eq('is_active', true)
+      .eq('character_id', mascotId.trim())
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Filter by specific topic if provided
+    if (ageGroup) {
+      feedQuery = feedQuery.eq('age_group', ageGroup);
+    }
+
     if (query.topicId) {
       const { data: topic } = await admin
         .from('kids_topics')
@@ -57,17 +107,15 @@ export class KidsFeedService {
         .eq('id', query.topicId)
         .maybeSingle();
 
-      if (topic) {
+      if (topic?.name) {
         feedQuery = feedQuery.contains('topic_tags', [topic.name]);
       }
-    } else if (topicNames.length > 0) {
-      // Filter by child's selected topics (overlap)
+    } else {
       feedQuery = feedQuery.overlaps('topic_tags', topicNames);
     }
 
-    // Exclude recently viewed
     if (viewedIds.length > 0) {
-      feedQuery = feedQuery.not('id', 'in', `(${viewedIds.join(',')})`);
+      feedQuery = feedQuery.filter('id', 'not.in', `(${viewedIds.join(',')})`);
     }
 
     const { data: items, count, error } = await feedQuery;
@@ -112,13 +160,18 @@ export class KidsFeedService {
       hasQuiz: quizContentSet.has(item.id as string),
     }));
 
+    const total = count ?? 0;
+    const emptyReason: EmptyReason | undefined =
+      total === 0 && feedItems.length === 0 ? 'no_matching_content' : undefined;
+
     return {
       data: feedItems,
       meta: {
         page,
         limit,
-        total: count ?? 0,
-        hasMore: offset + limit < (count ?? 0),
+        total,
+        hasMore: offset + limit < total,
+        ...(emptyReason ? { emptyReason } : {}),
       },
     };
   }

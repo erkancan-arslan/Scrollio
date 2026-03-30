@@ -1,5 +1,6 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, MaxLength, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { KIDS_MASCOT_CHARACTER_IDS } from '../../../kids/constants/kids-mascots';
 
 export class UploadReferenceVideoDto {
   @ApiProperty({ example: 'Fizik Dersi - Artun' })
@@ -25,6 +26,17 @@ export class UploadReferenceVideoDto {
   @IsOptional()
   @IsString()
   audienceTag?: string;
+
+  @ApiPropertyOptional({
+    example: 'bird',
+    description: 'Required for kids mascot base clips (bird | cat | dragon)',
+    enum: KIDS_MASCOT_CHARACTER_IDS,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @IsIn([...KIDS_MASCOT_CHARACTER_IDS])
+  characterId?: string;
 
   @ApiPropertyOptional({ example: 'brainrot', enum: ['reference', 'brainrot'] })
   @IsOptional()

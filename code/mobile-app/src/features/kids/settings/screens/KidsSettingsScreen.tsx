@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useAppSelector } from '../../../../store/hooks';
+import type { KidsTabCompositeNavigation } from '../../../../navigation/KidsNavigator';
 import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { getSettings, updateNotifications } from '../services/settingsApi';
 import { NotificationPrefs } from '../components/NotificationPrefs';
@@ -31,8 +31,8 @@ interface SettingsData {
 
 export const KidsSettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<{ navigate: (s: string) => void }>();
-  const { childProfile } = useActiveChild();
+  const navigation = useNavigation<KidsTabCompositeNavigation>();
+  const { childProfile, childId } = useActiveChild();
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -62,11 +62,17 @@ export const KidsSettingsScreen: React.FC = () => {
 
   const handleNavigate = (screen: string) => {
     if (screen === 'parental') {
-      navigation.navigate('KidsParentalDashboard' as never);
+      navigation.navigate('KidsParentalDashboard');
     } else if (screen === 'topics') {
-      navigation.navigate('KidsProfile' as never);
+      navigation.navigate('KidsTopicPreferences');
+    } else if (screen === 'mascot') {
+      if (!childId) {
+        Alert.alert('No profile', 'Select a child profile first.');
+        return;
+      }
+      navigation.navigate('KidsCharacterSelect', { childId, afterSave: 'go-back' });
     } else if (screen === 'avatar') {
-      navigation.navigate('KidsProfile' as never);
+      navigation.navigate('KidsProfile');
     }
   };
 

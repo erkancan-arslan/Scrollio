@@ -11,6 +11,7 @@ import { useNavigation, CommonActions, useRoute, RouteProp } from '@react-naviga
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { store } from '../../../../store/store';
 import { updateChildThunk, setError } from '../store/authSlice';
+import { resetFeed, fetchFeedThunk } from '../../feed/store/feedSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { KIDS_CHARACTERS } from '../../shared/constants/characters';
@@ -60,9 +61,16 @@ export const KidsCharacterSelectScreen: React.FC = () => {
             data: { selectedCharacterId: character.id },
           }),
         ).unwrap();
-        nav.dispatch(
-          CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),
-        );
+        dispatch(resetFeed());
+        dispatch(fetchFeedThunk({ page: 1, limit: 10 }));
+        const afterSave = paramsRef.current?.afterSave ?? 'reset-to-tabs';
+        if (afterSave === 'go-back' && nav.canGoBack()) {
+          nav.goBack();
+        } else {
+          nav.dispatch(
+            CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),
+          );
+        }
       } catch {
         // Error stored in kidsAuth.error and shown below
       }
@@ -88,14 +96,14 @@ export const KidsCharacterSelectScreen: React.FC = () => {
 
   if (!activeChild) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <Text style={styles.errorText}>No profile selected. Go back and pick who&apos;s learning.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Text style={styles.title}>Seni hangi arkadaş anlatsın?</Text>
       <Text style={styles.subtitle}>Bir canavar seç — videolarda o seninle olacak!</Text>
 
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: kidsColors.background,
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 16,
   },
   title: {
     ...kidsTypography.heading1,

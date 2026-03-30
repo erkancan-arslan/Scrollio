@@ -8,6 +8,11 @@ import { KidsFeedItem } from '../types/feed.types';
 import * as feedApi from '../services/feedApi';
 import * as quizApi from '../services/quizApi';
 
+function normalizeKidsDifficulty(v: unknown): 'easy' | 'medium' | 'hard' | null {
+  if (v === 'easy' || v === 'medium' || v === 'hard') return v;
+  return null;
+}
+
 interface FeedState {
   items: KidsFeedItem[];
   currentIndex: number;
@@ -15,6 +20,8 @@ interface FeedState {
   error: string | null;
   page: number;
   hasMore: boolean;
+  /** Why the last fetch returned no rows (from GET /kids/feed meta). */
+  emptyReason: 'no_mascot' | 'no_topics' | 'no_matching_content' | null;
   // Quiz state
   activeQuiz: {
     id: string;
@@ -38,6 +45,7 @@ const initialState: FeedState = {
   error: null,
   page: 1,
   hasMore: true,
+  emptyReason: null,
   activeQuiz: null,
   showQuiz: false,
   quizResult: null,
@@ -145,6 +153,9 @@ const feedSlice = createSlice({
         // Map raw response to KidsFeedItem shape
         const newItems: KidsFeedItem[] = data.map((rawItem: unknown, idx: number) => {
           const item = rawItem as Record<string, unknown>;
+          const band = (item.age_group as string) || '7-9';
+          const ageGroupMin = band === '10-12' ? 10 : 7;
+          const ageGroupMax = band === '10-12' ? 12 : 9;
           return {
           id: (item.id ?? '') as string,
           contentId: (item.id ?? '') as string,
@@ -157,9 +168,9 @@ const feedSlice = createSlice({
             duration: (item.duration_seconds ?? 0) as number,
             topicId: '',
             topicName: ((item.topic_tags as string[]) ?? [])[0] ?? '',
-            ageGroupMin: 7,
-            ageGroupMax: 12,
-            difficultyLevel: (item.difficulty ?? 'easy') as 'easy' | 'medium' | 'hard',
+            ageGroupMin,
+            ageGroupMax,
+            difficultyLevel: normalizeKidsDifficulty(item.difficulty),
             tags: (item.topic_tags ?? []) as string[],
             viewCount: ((item.view_count as number) ?? 0),
             likeCount: ((item.like_count as number) ?? 0),
@@ -182,6 +193,7 @@ const feedSlice = createSlice({
 
         if (requestedPage === 1) {
           state.items = newItems;
+          state.emptyReason = meta.emptyReason ?? null;
         } else {
           state.items = [...state.items, ...newItems];
         }

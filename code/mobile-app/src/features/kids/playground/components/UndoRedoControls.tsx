@@ -11,10 +11,8 @@ import { kidsTypography } from '../../shared/constants/typography';
 
 export const UndoRedoControls: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { paths, undonePathsCount } = useAppSelector((s) => ({
-    paths: s.kidsCanvas.paths,
-    undonePathsCount: s.kidsCanvas.undonePaths?.length ?? 0,
-  }));
+  const paths = useAppSelector((s) => s.kidsCanvas.paths);
+  const undonePathsCount = useAppSelector((s) => s.kidsCanvas.undonePaths?.length ?? 0);
 
   return (
     <View style={styles.container}>

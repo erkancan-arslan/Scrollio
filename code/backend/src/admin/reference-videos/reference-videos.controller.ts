@@ -63,6 +63,7 @@ export class ReferenceVideosController {
         language: body.language || 'tr',
         audienceTag: body.audienceTag,
         type: body.type,
+        characterId: body.characterId,
         storagePath,
         publicUrl,
       },

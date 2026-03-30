@@ -33,6 +33,7 @@ import {
   dismissQuiz,
   toggleBookmarkLocal,
   toggleLikeLocal,
+  resetFeed,
 } from '../store/feedSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { EmptyState } from '../../shared/components/EmptyState';
@@ -56,11 +57,14 @@ export const KidsFeedScreen: React.FC = () => {
     error,
     hasMore,
     page,
+    emptyReason,
     showQuiz,
     activeQuiz,
     quizResult,
     videosWatchedSinceQuiz,
   } = useAppSelector((s) => s.kidsFeed);
+
+  const activeChildProfileId = useAppSelector((s) => s.kidsAuth.activeChildProfileId);
 
   const flatListRef = useRef<FlatList>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,10 +85,12 @@ export const KidsFeedScreen: React.FC = () => {
     return calculated > 0 ? calculated : windowHeight;
   }, [windowHeight, tabBarHeight]);
 
-  // Initial fetch
+  // Load kids_content feed only when a child is selected (X-Child-Profile-Id). Reset when switching profiles.
   useEffect(() => {
+    if (!activeChildProfileId) return;
+    dispatch(resetFeed());
     dispatch(fetchFeedThunk({ page: 1, limit: 10 }));
-  }, [dispatch]);
+  }, [dispatch, activeChildProfileId]);
 
   // Track watch time for current video
   useEffect(() => {
@@ -232,6 +238,38 @@ export const KidsFeedScreen: React.FC = () => {
     minimumViewTime: 100,
   }).current;
 
+  const emptyStateCopy = useMemo(() => {
+    switch (emptyReason) {
+      case 'no_mascot':
+        return {
+          title: 'Pick a mascot',
+          message:
+            'Choose bird, cat, or dragon in your profile so videos match your friend.',
+          icon: '🐾',
+        };
+      case 'no_topics':
+        return {
+          title: 'Choose topics',
+          message: 'Select at least one topic in your profile so we can personalize the feed.',
+          icon: '📚',
+        };
+      case 'no_matching_content':
+        return {
+          title: 'Nothing to watch yet',
+          message:
+            'No kids video matches your mascot, age, and topics right now. Publish one from admin, or check that video topic tags use the same names as the topics you selected.',
+          icon: '📺',
+        };
+      default:
+        return {
+          title: 'No videos yet',
+          message:
+            'Pull to refresh, or check your mascot, topics, and age in your profile.',
+          icon: '📺',
+        };
+    }
+  }, [emptyReason]);
+
   // Render each video item
   const renderItem = useCallback(
     ({ item, index }: { item: KidsFeedItem; index: number }) => (
@@ -311,9 +349,9 @@ export const KidsFeedScreen: React.FC = () => {
       <>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <EmptyState
-          title="No Videos Yet"
-          message="Select some topics in your profile to see personalized content!"
-          icon="📺"
+          title={emptyStateCopy.title}
+          message={emptyStateCopy.message}
+          icon={emptyStateCopy.icon}
         />
       </>
     );

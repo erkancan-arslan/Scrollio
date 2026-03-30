@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { KidsFeedService } from './kids-feed.service';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -20,6 +20,9 @@ export class KidsFeedController {
     @CurrentChild() childId: string,
     @Query() query: GetKidsFeedDto,
   ) {
+    if (!childId?.trim()) {
+      throw new BadRequestException('X-Child-Profile-Id header is required for the kids feed');
+    }
     return this.kidsFeedService.getFeed(childId, query);
   }
 
@@ -29,6 +32,9 @@ export class KidsFeedController {
     @CurrentChild() childId: string,
     @Body() dto: ViewedEventDto,
   ) {
+    if (!childId?.trim()) {
+      throw new BadRequestException('X-Child-Profile-Id header is required');
+    }
     return this.kidsFeedService.trackView(childId, dto);
   }
 }

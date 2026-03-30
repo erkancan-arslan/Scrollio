@@ -17,6 +17,7 @@ import { AdminHeader } from '../components/AdminHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { BatchJobDetail } from '../types/admin.types';
 import * as adminApi from '../services/adminApi';
+import * as kidsAdminApi from '../services/kidsAdminApi';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   beginner: '#2E7D32',
@@ -28,27 +29,35 @@ export const BatchJobDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const batchId: string = route.params?.batchId;
+  const useKidsApi = route.params?.kidsApi === true;
 
   const [detail, setDetail] = useState<BatchJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [startingPipeline, setStartingPipeline] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await adminApi.getBatchJob(batchId);
+    const res = useKidsApi ? await kidsAdminApi.getKidsBatchJob(batchId) : await adminApi.getBatchJob(batchId);
     if (res.data) setDetail(res.data);
     setLoading(false);
     setRefreshing(false);
-  }, [batchId]);
+  }, [batchId, useKidsApi]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-poll while running
+  // Auto-poll while running; kids batches also while scripts are being generated or pending
   useEffect(() => {
-    if (!detail || detail.batch.status !== 'running') return;
+    if (!detail) return;
+    const s = detail.batch.status;
+    const pollKids =
+      useKidsApi &&
+      (s === 'running' || s === 'pending' || s === 'pending_scripts');
+    const pollCore = !useKidsApi && s === 'running';
+    if (!pollKids && !pollCore) return;
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [detail?.batch.status, load]);
+  }, [detail?.batch.status, load, useKidsApi]);
 
   const handleStart = async () => {
     setStarting(true);
@@ -56,6 +65,17 @@ export const BatchJobDetailScreen: React.FC = () => {
     setStarting(false);
     if (res.error) {
       Alert.alert('Error', String(res.error));
+    } else {
+      load();
+    }
+  };
+
+  const handleKidsStartPipeline = async () => {
+    setStartingPipeline(true);
+    const res = await kidsAdminApi.startKidsBatchPipeline(batchId, {});
+    setStartingPipeline(false);
+    if (res.error) {
+      Alert.alert('Error', Array.isArray(res.error) ? res.error.join(', ') : String(res.error));
     } else {
       load();
     }
@@ -83,6 +103,41 @@ export const BatchJobDetailScreen: React.FC = () => {
     jobs: jobs.filter((j) => j.difficulty === diff),
   }));
 
+  const kidsJobsFlat = useKidsApi ? [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at)) : [];
+
+  const renderJobCard = (job: (typeof jobs)[0]) => (
+    <TouchableOpacity
+      key={job.id}
+      style={styles.jobCard}
+      onPress={() => navigation.navigate('AdminJobDetail', { jobId: job.id, kidsApi: useKidsApi })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.jobCardTop}>
+        <Text style={styles.jobTitle} numberOfLines={2}>{job.title}</Text>
+        <StatusBadge status={job.status} />
+      </View>
+
+      {(job.status === 'processing' || job.status === 'queued') && (
+        <View style={styles.jobProgressRow}>
+          <View style={styles.jobProgressTrack}>
+            <View style={[styles.jobProgressFill, { width: `${job.progress_percent ?? 0}%` }]} />
+          </View>
+          <Text style={styles.jobProgressPct}>{job.progress_percent ?? 0}%</Text>
+        </View>
+      )}
+
+      {job.current_step && job.status === 'processing' && (
+        <Text style={styles.jobStep}>{job.current_step.replace(/_/g, ' ')}</Text>
+      )}
+
+      {job.error_message && (
+        <Text style={styles.jobError} numberOfLines={2}>{job.error_message}</Text>
+      )}
+
+      <Text style={styles.jobTapHint}>Tap to view details</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <AdminHeader title={batch.title} />
@@ -96,6 +151,7 @@ export const BatchJobDetailScreen: React.FC = () => {
           <BatchStatusBadge status={batch.status} />
           <Text style={styles.meta}>
             {batch.content_target.toUpperCase()} · {batch.language.toUpperCase()} · {batch.tone}
+            {useKidsApi ? ' · kids batch' : ''}
           </Text>
         </View>
 
@@ -121,8 +177,8 @@ export const BatchJobDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Start button (only when pending) */}
-        {batch.status === 'pending' && (
+        {/* Core: start 15 pipelines when pending */}
+        {!useKidsApi && batch.status === 'pending' && (
           <TouchableOpacity style={styles.startBtn} onPress={handleStart} disabled={starting}>
             {starting
               ? <ActivityIndicator color="#fff" />
@@ -131,51 +187,47 @@ export const BatchJobDetailScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* Jobs grouped by difficulty */}
-        {grouped.map(({ difficulty, jobs: diffJobs }) => (
-          <View key={difficulty} style={styles.diffGroup}>
+        {/* Kids: start pipeline (script gen for all jobs) */}
+        {useKidsApi && batch.status === 'pending' && (
+          <TouchableOpacity style={styles.startBtn} onPress={handleKidsStartPipeline} disabled={startingPipeline}>
+            {startingPipeline ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.startBtnText}>Start pipeline</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {useKidsApi && batch.status === 'pending_scripts' && (
+          <Text style={styles.kidsHint}>
+            Scripts are ready (or still finishing). Open each job below to review and approve to start video generation.
+          </Text>
+        )}
+
+        {/* Jobs: core = by difficulty; kids = flat list */}
+        {useKidsApi ? (
+          <View style={styles.diffGroup}>
             <View style={styles.diffHeader}>
-              <View style={[styles.diffDot, { backgroundColor: DIFFICULTY_COLORS[difficulty] }]} />
-              <Text style={[styles.diffTitle, { color: DIFFICULTY_COLORS[difficulty] }]}>
-                {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-              </Text>
-              <Text style={styles.diffCount}>{diffJobs.length} videos</Text>
+              <Text style={[styles.diffTitle, { color: colors.text.primary }]}>Videos</Text>
+              <Text style={styles.diffCount}>{kidsJobsFlat.length} jobs</Text>
             </View>
-
-            {diffJobs.map((job) => (
-              <TouchableOpacity
-                key={job.id}
-                style={styles.jobCard}
-                onPress={() => navigation.navigate('AdminJobDetail', { jobId: job.id })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.jobCardTop}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                  <StatusBadge status={job.status} />
-                </View>
-
-                {(job.status === 'processing' || job.status === 'queued') && (
-                  <View style={styles.jobProgressRow}>
-                    <View style={styles.jobProgressTrack}>
-                      <View style={[styles.jobProgressFill, { width: `${job.progress_percent}%` }]} />
-                    </View>
-                    <Text style={styles.jobProgressPct}>{job.progress_percent}%</Text>
-                  </View>
-                )}
-
-                {job.current_step && job.status === 'processing' && (
-                  <Text style={styles.jobStep}>{job.current_step.replace(/_/g, ' ')}</Text>
-                )}
-
-                {job.error_message && (
-                  <Text style={styles.jobError} numberOfLines={2}>{job.error_message}</Text>
-                )}
-
-                <Text style={styles.jobTapHint}>Tap to view details</Text>
-              </TouchableOpacity>
-            ))}
+            {kidsJobsFlat.map((job) => renderJobCard(job))}
           </View>
-        ))}
+        ) : (
+          grouped.map(({ difficulty, jobs: diffJobs }) => (
+            <View key={difficulty} style={styles.diffGroup}>
+              <View style={styles.diffHeader}>
+                <View style={[styles.diffDot, { backgroundColor: DIFFICULTY_COLORS[difficulty] }]} />
+                <Text style={[styles.diffTitle, { color: DIFFICULTY_COLORS[difficulty] }]}>
+                  {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                </Text>
+                <Text style={styles.diffCount}>{diffJobs.length} videos</Text>
+              </View>
+
+              {diffJobs.map((job) => renderJobCard(job))}
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -184,6 +236,7 @@ export const BatchJobDetailScreen: React.FC = () => {
 const BatchStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config: Record<string, { bg: string; text: string; label: string }> = {
     pending:   { bg: '#E3F2FD', text: '#1565C0', label: 'Pending' },
+    pending_scripts: { bg: '#F3E5F5', text: '#6A1B9A', label: 'Scripts ready' },
     running:   { bg: '#FFF3E0', text: '#E65100', label: 'Running' },
     completed: { bg: '#E8F5E9', text: '#2E7D32', label: 'Completed' },
     failed:    { bg: '#FFEBEE', text: '#C62828', label: 'Failed' },
@@ -253,6 +306,13 @@ const styles = StyleSheet.create({
     color: adminColors.inverse,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
+  },
+
+  kidsHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.md,
+    lineHeight: 20,
   },
 
   diffGroup: { marginBottom: spacing.lg },

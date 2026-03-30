@@ -71,6 +71,10 @@ export class FeedPublishingService {
       await this.publishToCoreVideosTable(admin, genVideo);
     }
 
+    if (contentTarget === 'kids') {
+      await this.publishToKidsContentTable(admin, genVideo);
+    }
+
     this.logger.log(`Published video ${generatedVideoId} to ${contentTarget} feed`);
     return { id: generatedVideoId, published: true };
   }
@@ -133,6 +137,84 @@ export class FeedPublishingService {
     this.logger.log(`Inserted admin-generated video into core videos table: ${data.id}`);
   }
 
+  /**
+   * Kids app feed reads `kids_content`. Requires job → reference_videos.character_id for mascot routing.
+   */
+  private async publishToKidsContentTable(admin: any, genVideo: any) {
+    const job = Array.isArray(genVideo.generated_video_jobs)
+      ? genVideo.generated_video_jobs[0]
+      : genVideo.generated_video_jobs;
+
+    const { data: ref, error: refErr } = await admin
+      .from('reference_videos')
+      .select('character_id')
+      .eq('id', job?.reference_video_id)
+      .maybeSingle();
+
+    if (refErr) {
+      this.logger.error('Failed to load reference video for kids publish', refErr);
+      throw new BadRequestException('Could not resolve mascot for kids publish');
+    }
+
+    const characterId = ref?.character_id as string | null | undefined;
+    if (!characterId) {
+      throw new BadRequestException(
+        'Kids publish requires reference_videos.character_id (mascot id). Re-upload or patch the reference asset.',
+      );
+    }
+
+    const ageGroup = job?.kids_age_group === '10-12' ? '10-12' : '7-9';
+    const topicTags: string[] =
+      Array.isArray(job?.kids_topic_tags) && job.kids_topic_tags.length > 0
+        ? job.kids_topic_tags
+        : [genVideo.topic].filter(Boolean);
+    const durationSeconds = job?.duration_target_seconds ?? 45;
+
+    const { data: existing } = await admin
+      .from('kids_content')
+      .select('id')
+      .eq('source_generated_video_id', genVideo.id)
+      .maybeSingle();
+
+    const payload = {
+      title: genVideo.title,
+      description: (genVideo.script || genVideo.topic || '').toString().slice(0, 500),
+      video_url: genVideo.video_url,
+      thumbnail_url: genVideo.thumbnail_url || null,
+      age_group: ageGroup,
+      difficulty: null,
+      topic_tags: topicTags,
+      duration_seconds: durationSeconds,
+      is_active: true,
+      character_id: characterId,
+      source_generated_video_id: genVideo.id,
+      kids_generation_group_id: job?.kids_generation_group_id ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing) {
+      const { error } = await admin.from('kids_content').update(payload).eq('id', existing.id);
+      if (error) {
+        this.logger.error('Failed to update kids_content', error);
+        throw error;
+      }
+      this.logger.log(`Updated kids_content ${existing.id} for generated video ${genVideo.id}`);
+      return;
+    }
+
+    const { error } = await admin.from('kids_content').insert({
+      ...payload,
+      created_by: job?.created_by ?? null,
+    });
+
+    if (error) {
+      this.logger.error('Failed to insert kids_content', error);
+      throw error;
+    }
+
+    this.logger.log(`Inserted kids_content for generated video ${genVideo.id} (mascot ${characterId})`);
+  }
+
   async unpublish(generatedVideoId: string) {
     const admin = this.supabaseService.getAdminClient();
 
@@ -154,6 +236,11 @@ export class FeedPublishingService {
     await admin
       .from('videos')
       .update({ is_published: false })
+      .eq('source_generated_video_id', generatedVideoId);
+
+    await admin
+      .from('kids_content')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('source_generated_video_id', generatedVideoId);
 
     this.logger.log(`Unpublished video ${generatedVideoId}`);

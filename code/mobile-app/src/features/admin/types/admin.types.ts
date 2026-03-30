@@ -22,6 +22,16 @@ export enum Tone {
   ENERGETIC = 'energetic',
 }
 
+/** kids_topics row — admin catalog for assigning feed tags */
+export interface KidsCatalogTopic {
+  id: string;
+  name: string;
+  icon_url?: string | null;
+  category?: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export interface ReferenceVideo {
   id: string;
   title: string;
@@ -29,6 +39,8 @@ export interface ReferenceVideo {
   persona_name?: string;
   language: string;
   audience_tag?: string;
+  /** Kids mascot slug when audience is kids (bird | cat | dragon) */
+  character_id?: string | null;
   storage_path: string;
   public_url?: string;
   duration_seconds?: number;
@@ -139,6 +151,15 @@ export interface BatchJobScriptJob {
 export interface BatchJobDetail {
   batch: BatchJob;
   jobs: BatchJobSummaryJob[];
+}
+
+/** Kids batch create: `videoCount` lesson angles × each mascot ref; backend adds `meta`. */
+export interface KidsBatchCreateResponse extends BatchJobDetail {
+  meta: {
+    videoCount: number;
+    mascotCount: number;
+    totalJobs: number;
+  };
 }
 
 export interface BatchJobScripts {
