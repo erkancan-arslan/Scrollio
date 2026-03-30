@@ -21,6 +21,12 @@ export class ReferenceVideoQueryDto {
   @IsIn(['ready', 'processing', 'failed'])
   status?: string;
 
+  @ApiPropertyOptional({ enum: ['reference', 'brainrot'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['reference', 'brainrot'])
+  type?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

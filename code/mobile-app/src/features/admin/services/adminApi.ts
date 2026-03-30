@@ -21,6 +21,7 @@ export async function uploadReferenceVideo(data: {
   personaName?: string;
   language: string;
   audienceTag?: string;
+  type?: string;
   storagePath: string;
   publicUrl?: string;
   durationSeconds?: number;
@@ -33,6 +34,7 @@ export async function listReferenceVideos(filters?: {
   language?: string;
   audienceTag?: string;
   status?: string;
+  type?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -41,6 +43,7 @@ export async function listReferenceVideos(filters?: {
   if (filters?.language) params.set('language', filters.language);
   if (filters?.audienceTag) params.set('audienceTag', filters.audienceTag);
   if (filters?.status) params.set('status', filters.status);
+  if (filters?.type) params.set('type', filters.type);
   if (filters?.search) params.set('search', filters.search);
   if (filters?.limit) params.set('limit', String(filters.limit));
   if (filters?.offset) params.set('offset', String(filters.offset));
@@ -180,6 +183,7 @@ export async function createBatchJob(data: {
   tone?: string;
   customPrompt?: string;
   referenceVideoId: string;
+  brainrotVideoId?: string;
 }): Promise<ApiResponse<BatchJobDetail>> {
   return apiClient.post<BatchJobDetail>(`${PREFIX}/batch-jobs`, data);
 }

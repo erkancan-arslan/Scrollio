@@ -22,6 +22,7 @@ export class ReferenceVideosService {
       public_url: dto.publicUrl || null,
       duration_seconds: dto.durationSeconds || null,
       thumbnail_url: dto.thumbnailUrl || null,
+      type: dto.type || 'reference',
       status: 'ready',
       uploaded_by: userId,
     };
@@ -49,6 +50,7 @@ export class ReferenceVideosService {
     if (query.language) q = q.eq('language', query.language);
     if (query.audienceTag) q = q.eq('audience_tag', query.audienceTag);
     if (query.status) q = q.eq('status', query.status);
+    if (query.type) q = q.eq('type', query.type);
     if (query.search) q = q.ilike('title', `%${query.search}%`);
     if (query.limit) q = q.limit(query.limit);
     if (query.offset) q = q.range(query.offset, query.offset + (query.limit || 50) - 1);

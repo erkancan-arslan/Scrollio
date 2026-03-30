@@ -47,4 +47,10 @@ export class CreateReferenceVideoDto {
   @IsOptional()
   @IsString()
   thumbnailUrl?: string;
+
+  @ApiPropertyOptional({ enum: ['reference', 'brainrot'], default: 'reference' })
+  @IsOptional()
+  @IsString()
+  @IsIn(['reference', 'brainrot'])
+  type?: string;
 }

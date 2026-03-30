@@ -16,6 +16,7 @@ import { ScriptGenerationService } from './ai/script-generation.service';
 import { TtsService } from './ai/tts.service';
 import { LipsyncService } from './ai/lipsync.service';
 import { ThumbnailService } from './ai/thumbnail.service';
+import { VideoCompositionService } from './ai/video-composition.service';
 import { TopicSuggestionService } from './ai/topic-suggestion.service';
 
 import { FeedPublishingService } from './feeds/feed-publishing.service';
@@ -42,6 +43,7 @@ import { BatchJobsService } from './batch-jobs/batch-jobs.service';
     TtsService,
     LipsyncService,
     ThumbnailService,
+    VideoCompositionService,
     TopicSuggestionService,
     FeedPublishingService,
     JobLogsService,

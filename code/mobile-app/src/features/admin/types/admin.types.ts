@@ -33,6 +33,7 @@ export interface ReferenceVideo {
   public_url?: string;
   duration_seconds?: number;
   thumbnail_url?: string;
+  type?: 'reference' | 'brainrot';
   status: string;
   uploaded_by?: string;
   created_at: string;
@@ -97,6 +98,7 @@ export interface BatchJob {
   language: string;
   tone: string;
   reference_video_id: string;
+  brainrot_video_id?: string;
   custom_prompt?: string;
   total_jobs: number;
   completed_jobs: number;

@@ -29,6 +29,7 @@ export const UploadReferenceVideoScreen: React.FC = () => {
   const [personaName, setPersonaName] = useState('');
   const [language, setLanguage] = useState<'tr' | 'en'>('tr');
   const [audienceTag, setAudienceTag] = useState<string>('');
+  const [videoType, setVideoType] = useState<'reference' | 'brainrot'>('reference');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -88,6 +89,7 @@ export const UploadReferenceVideoScreen: React.FC = () => {
         if (personaName.trim()) formData.append('personaName', personaName.trim());
         formData.append('language', language);
         if (audienceTag) formData.append('audienceTag', audienceTag);
+        formData.append('type', videoType);
 
         const fileUri = selectedFile.uri;
         const fileName = selectedFile.name || 'video.mp4';
@@ -131,6 +133,7 @@ export const UploadReferenceVideoScreen: React.FC = () => {
           personaName: personaName.trim() || undefined,
           language,
           audienceTag: audienceTag || undefined,
+          type: videoType,
           storagePath: videoUrl.trim(),
           publicUrl: videoUrl.trim(),
         });
@@ -191,6 +194,16 @@ export const UploadReferenceVideoScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <Text style={styles.label}>Video Tipi *</Text>
+        <View style={styles.segmentRow}>
+          <TouchableOpacity style={[styles.segment, videoType === 'reference' && styles.segmentActive]} onPress={() => setVideoType('reference')}>
+            <Text style={[styles.segmentText, videoType === 'reference' && styles.segmentTextActive]}>Referans (Avatar)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.segment, videoType === 'brainrot' && styles.segmentActive]} onPress={() => setVideoType('brainrot')}>
+            <Text style={[styles.segmentText, videoType === 'brainrot' && styles.segmentTextActive]}>Brainrot (Oyun)</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Upload mode toggle */}

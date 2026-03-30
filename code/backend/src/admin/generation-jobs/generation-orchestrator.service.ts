@@ -5,6 +5,7 @@ import { ScriptGenerationService } from '../ai/script-generation.service';
 import { TtsService } from '../ai/tts.service';
 import { LipsyncService } from '../ai/lipsync.service';
 import { ThumbnailService } from '../ai/thumbnail.service';
+import { VideoCompositionService } from '../ai/video-composition.service';
 import { GeneratedVideosService } from '../generated-videos/generated-videos.service';
 import { FeedPublishingService } from '../feeds/feed-publishing.service';
 import { JobLogsService } from '../logs/job-logs.service';
@@ -17,6 +18,7 @@ interface JobState {
   narration: string;
   audioUrl: string;
   videoUrl: string;
+  composedVideoUrl: string;
   thumbnailUrl: string;
 }
 
@@ -37,6 +39,7 @@ export class GenerationOrchestratorService {
     private readonly ttsService: TtsService,
     private readonly lipsyncService: LipsyncService,
     private readonly thumbnailService: ThumbnailService,
+    private readonly videoCompositionService: VideoCompositionService,
     private readonly generatedVideosService: GeneratedVideosService,
     private readonly feedService: FeedPublishingService,
     private readonly logsService: JobLogsService,
@@ -106,9 +109,21 @@ export class GenerationOrchestratorService {
       await this.jobsService.updateStatus(jobId, { finalVideoUrl, finalVideoProvider: 'veed' });
       await this.logsService.log(jobId, JobStep.GENERATING_LIPSYNC, 'success', `Lipsync video: ${finalVideoUrl}`);
 
+      // Step 6.5: Compose split-screen video (if brainrot video is configured)
+      let canonicalVideoUrl = finalVideoUrl;
+      if (job.brainrot_video_id) {
+        await this.advanceStep(jobId, JobStep.COMPOSING_VIDEO, 'Composing split-screen video');
+        const brainrotVideo = await this.referenceVideosService.findOne(job.brainrot_video_id);
+        const brainrotVideoUrl = brainrotVideo.public_url || brainrotVideo.storage_path;
+        if (!brainrotVideoUrl) throw new Error('Brainrot video has no accessible URL');
+        canonicalVideoUrl = await this.videoCompositionService.compose(finalVideoUrl, brainrotVideoUrl, jobId);
+        await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+        await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Composed video: ${canonicalVideoUrl}`);
+      }
+
       // Step 7: Extract thumbnail from first frame
       await this.advanceStep(jobId, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail from video');
-      const thumbnailUrl = await this.thumbnailService.generate(finalVideoUrl, jobId);
+      const thumbnailUrl = await this.thumbnailService.generate(canonicalVideoUrl, jobId);
       await this.jobsService.updateStatus(jobId, { thumbnailUrl });
       await this.logsService.log(jobId, JobStep.GENERATING_THUMBNAIL, 'success', `Thumbnail: ${thumbnailUrl}`);
 
@@ -124,7 +139,7 @@ export class GenerationOrchestratorService {
         difficulty: job.difficulty || null,
         script: narration,
         audioUrl,
-        videoUrl: finalVideoUrl,
+        videoUrl: canonicalVideoUrl,
         thumbnailUrl,
         referenceVideoId: job.reference_video_id,
       });
@@ -250,9 +265,21 @@ export class GenerationOrchestratorService {
       await this.jobsService.updateStatus(jobId, { finalVideoUrl, finalVideoProvider: 'veed' });
       await this.logsService.log(jobId, JobStep.GENERATING_LIPSYNC, 'success', `Lipsync video: ${finalVideoUrl}`);
 
+      // Compose split-screen video (if brainrot video is configured)
+      let canonicalVideoUrl = finalVideoUrl;
+      if (job.brainrot_video_id) {
+        await this.advanceStep(jobId, JobStep.COMPOSING_VIDEO, 'Composing split-screen video');
+        const brainrotVideo = await this.referenceVideosService.findOne(job.brainrot_video_id);
+        const brainrotVideoUrl = brainrotVideo.public_url || brainrotVideo.storage_path;
+        if (!brainrotVideoUrl) throw new Error('Brainrot video has no accessible URL');
+        canonicalVideoUrl = await this.videoCompositionService.compose(finalVideoUrl, brainrotVideoUrl, jobId);
+        await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+        await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Composed video: ${canonicalVideoUrl}`);
+      }
+
       // Thumbnail
       await this.advanceStep(jobId, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail from video');
-      const thumbnailUrl = await this.thumbnailService.generate(finalVideoUrl, jobId);
+      const thumbnailUrl = await this.thumbnailService.generate(canonicalVideoUrl, jobId);
       await this.jobsService.updateStatus(jobId, { thumbnailUrl });
       await this.logsService.log(jobId, JobStep.GENERATING_THUMBNAIL, 'success', `Thumbnail: ${thumbnailUrl}`);
 
@@ -268,7 +295,7 @@ export class GenerationOrchestratorService {
         difficulty: job.difficulty || null,
         script: narration,
         audioUrl,
-        videoUrl: finalVideoUrl,
+        videoUrl: canonicalVideoUrl,
         thumbnailUrl,
         referenceVideoId: job.reference_video_id,
       });
@@ -332,6 +359,7 @@ export class GenerationOrchestratorService {
         narration: '',
         audioUrl: '',
         videoUrl: '',
+        composedVideoUrl: '',
         thumbnailUrl: '',
       }));
 
@@ -382,10 +410,29 @@ export class GenerationOrchestratorService {
       });
       if (alive.length === 0) return;
 
+      // ── 3.5. Compose split-screen videos in parallel (if brainrot configured) ─
+      if (firstJob.brainrot_video_id) {
+        const brainrotVideo = await this.referenceVideosService.findOne(firstJob.brainrot_video_id);
+        const brainrotVideoUrl = brainrotVideo.public_url || brainrotVideo.storage_path;
+        if (!brainrotVideoUrl) throw new Error('Brainrot video has no accessible URL');
+
+        await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.COMPOSING_VIDEO, 'Composing split-screen')));
+        const composeResults = await Promise.allSettled(
+          alive.map((s) => this.videoCompositionService.compose(s.videoUrl, brainrotVideoUrl, s.job.id)),
+        );
+        alive = await this.filterSettled(alive, composeResults, JobStep.COMPOSING_VIDEO, async (s, composedUrl) => {
+          s.composedVideoUrl = composedUrl;
+          await this.jobsService.updateStatus(s.job.id, { composedVideoUrl: composedUrl });
+        });
+        if (alive.length === 0) return;
+      } else {
+        alive.forEach((s) => { s.composedVideoUrl = s.videoUrl; });
+      }
+
       // ── 4. Extract thumbnails from first frame of all videos in parallel ───
       await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail')));
       const thumbResults = await Promise.allSettled(
-        alive.map((s) => this.thumbnailService.generate(s.videoUrl, s.job.id)),
+        alive.map((s) => this.thumbnailService.generate(s.composedVideoUrl, s.job.id)),
       );
       alive = await this.filterSettled(alive, thumbResults, JobStep.GENERATING_THUMBNAIL, async (s, thumbnailUrl) => {
         s.thumbnailUrl = thumbnailUrl;
@@ -407,7 +454,7 @@ export class GenerationOrchestratorService {
             difficulty: s.job.difficulty || null,
             script: s.narration,
             audioUrl: s.audioUrl,
-            videoUrl: s.videoUrl,
+            videoUrl: s.composedVideoUrl,
             thumbnailUrl: s.thumbnailUrl,
             referenceVideoId: s.job.reference_video_id,
           }),

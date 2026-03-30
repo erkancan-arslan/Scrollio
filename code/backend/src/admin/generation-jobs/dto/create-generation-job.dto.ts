@@ -64,4 +64,9 @@ export class CreateGenerationJobDto {
   @ApiProperty({ description: 'UUID of the reference video to use for lipsync' })
   @IsUUID()
   referenceVideoId: string;
+
+  @ApiPropertyOptional({ description: 'UUID of the brainrot background video for split-screen composition' })
+  @IsOptional()
+  @IsUUID()
+  brainrotVideoId?: string;
 }

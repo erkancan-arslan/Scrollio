@@ -49,4 +49,9 @@ export class CreateBatchJobDto {
   @ApiProperty({ description: 'UUID of the reference video to use for lipsync on all 15 jobs' })
   @IsUUID()
   referenceVideoId: string;
+
+  @ApiPropertyOptional({ description: 'UUID of the brainrot background video for split-screen composition' })
+  @IsOptional()
+  @IsUUID()
+  brainrotVideoId?: string;
 }

@@ -23,6 +23,7 @@ export class GenerationJobsService {
       difficulty: dto.difficulty || null,
       custom_prompt: dto.customPrompt || null,
       reference_video_id: dto.referenceVideoId,
+      brainrot_video_id: dto.brainrotVideoId || null,
       status: JobStatus.DRAFT,
       progress_percent: 0,
       created_by: userId,
@@ -92,6 +93,8 @@ export class GenerationJobsService {
       finalVideoProvider?: string;
       referenceVideoUrlSnapshot?: string;
       thumbnailUrl?: string;
+      composedVideoUrl?: string;
+      brainrotVideoId?: string;
     },
   ) {
     const admin = this.supabaseService.getAdminClient();
@@ -108,6 +111,8 @@ export class GenerationJobsService {
     if (updates.finalVideoProvider !== undefined) fields.final_video_provider = updates.finalVideoProvider;
     if (updates.referenceVideoUrlSnapshot !== undefined) fields.reference_video_url_snapshot = updates.referenceVideoUrlSnapshot;
     if (updates.thumbnailUrl !== undefined) fields.thumbnail_url = updates.thumbnailUrl;
+    if (updates.composedVideoUrl !== undefined) fields.composed_video_url = updates.composedVideoUrl;
+    if (updates.brainrotVideoId !== undefined) fields.brainrot_video_id = updates.brainrotVideoId;
 
     const { data, error } = await admin
       .from('generated_video_jobs')

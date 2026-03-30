@@ -31,11 +31,16 @@ export const CreateBatchJobScreen: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [referenceVideoId, setReferenceVideoId] = useState(preselectedRefId || '');
   const [refVideos, setRefVideos] = useState<ReferenceVideo[]>([]);
+  const [brainrotVideoId, setBrainrotVideoId] = useState('');
+  const [brainrotVideos, setBrainrotVideos] = useState<ReferenceVideo[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    adminApi.listReferenceVideos({ limit: 100 }).then((res) => {
+    adminApi.listReferenceVideos({ type: 'reference', limit: 100 }).then((res) => {
       if (res.data) setRefVideos(res.data.data);
+    });
+    adminApi.listReferenceVideos({ type: 'brainrot', limit: 100 }).then((res) => {
+      if (res.data) setBrainrotVideos(res.data.data);
     });
   }, []);
 
@@ -58,6 +63,7 @@ export const CreateBatchJobScreen: React.FC = () => {
         tone,
         customPrompt: customPrompt.trim() || undefined,
         referenceVideoId,
+        brainrotVideoId: brainrotVideoId || undefined,
       });
 
       setLoading(false);
@@ -197,6 +203,35 @@ export const CreateBatchJobScreen: React.FC = () => {
           </ScrollView>
         )}
 
+        <Text style={styles.label}>Brainrot Video (split-screen background)</Text>
+        <Text style={styles.hintText}>
+          Select a gameplay video to show in the bottom half of the screen. Leave as "None" to skip split-screen.
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.refScroll}>
+          <TouchableOpacity
+            style={[styles.refChip, !brainrotVideoId && styles.refChipActive]}
+            onPress={() => setBrainrotVideoId('')}
+          >
+            <Text style={[styles.refChipText, !brainrotVideoId && styles.refChipTextActive]}>
+              None
+            </Text>
+          </TouchableOpacity>
+          {brainrotVideos.map((bv) => (
+            <TouchableOpacity
+              key={bv.id}
+              style={[styles.refChip, brainrotVideoId === bv.id && styles.refChipActive]}
+              onPress={() => setBrainrotVideoId(bv.id)}
+            >
+              <Text
+                style={[styles.refChipText, brainrotVideoId === bv.id && styles.refChipTextActive]}
+                numberOfLines={1}
+              >
+                {bv.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <TouchableOpacity
           style={[styles.createBtn, loading && styles.createBtnDisabled]}
           onPress={handleCreate}
@@ -279,6 +314,12 @@ const styles = StyleSheet.create({
   refChipActive: { backgroundColor: adminColors.primary, borderColor: adminColors.primary },
   refChipText: { fontSize: typography.fontSize.sm, color: colors.text.secondary },
   refChipTextActive: { color: colors.text.inverse },
+  hintText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginBottom: spacing.xs,
+    lineHeight: 18,
+  },
   emptyText: { color: colors.text.tertiary, paddingVertical: spacing.sm },
   createBtn: {
     backgroundColor: adminColors.primary,

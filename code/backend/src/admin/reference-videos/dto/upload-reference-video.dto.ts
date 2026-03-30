@@ -25,4 +25,9 @@ export class UploadReferenceVideoDto {
   @IsOptional()
   @IsString()
   audienceTag?: string;
+
+  @ApiPropertyOptional({ example: 'brainrot', enum: ['reference', 'brainrot'] })
+  @IsOptional()
+  @IsString()
+  type?: string;
 }
