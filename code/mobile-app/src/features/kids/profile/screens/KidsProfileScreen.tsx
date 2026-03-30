@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { KidsTabCompositeNavigation } from '../../../../navigation/KidsNavigator';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import {
   fetchProfileThunk,
@@ -30,8 +32,9 @@ const AVATAR_EMOJIS: Record<string, string> = {
 };
 
 export const KidsProfileScreen: React.FC = () => {
+  const navigation = useNavigation<KidsTabCompositeNavigation>();
   const dispatch = useAppDispatch();
-  const { childProfile } = useActiveChild();
+  const { childProfile, childId } = useActiveChild();
   const { profile, metrics, selectedTopics, isLoading, error } = useAppSelector(
     (s) => s.kidsProfile,
   );
@@ -92,6 +95,16 @@ export const KidsProfileScreen: React.FC = () => {
         <Text style={styles.levelBadge}>Level {level}</Text>
       </View>
 
+      <TouchableOpacity
+        style={styles.mascotRow}
+        onPress={() => navigation.navigate('KidsYourMascot')}
+        accessibilityRole="button"
+        accessibilityLabel="Your mascot"
+      >
+        <Text style={styles.mascotRowLabel}>Your Mascot</Text>
+        <Text style={styles.mascotRowChevron}>›</Text>
+      </TouchableOpacity>
+
       {/* XP Progress Bar */}
       <View style={styles.xpSection}>
         <View style={styles.xpBarBg}>
@@ -112,7 +125,16 @@ export const KidsProfileScreen: React.FC = () => {
 
       {/* Selected Topics */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>My Topics</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>My Topics</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('KidsTopicPreferences')}
+            accessibilityRole="button"
+            accessibilityLabel="Edit topics"
+          >
+            <Text style={styles.editLink}>Edit</Text>
+          </TouchableOpacity>
+        </View>
         {selectedTopics.length > 0 ? (
           <View style={styles.topicsList}>
             {selectedTopics.map((topic) => (
@@ -126,6 +148,18 @@ export const KidsProfileScreen: React.FC = () => {
             No topics selected yet. Choose topics to personalize your feed!
           </Text>
         )}
+        <TouchableOpacity
+          style={styles.secondaryAction}
+          onPress={() => {
+            if (!childId) return;
+            navigation.navigate('KidsCharacterSelect', { childId, afterSave: 'go-back' });
+          }}
+          disabled={!childId}
+          accessibilityRole="button"
+          accessibilityLabel="Change mascot friend"
+        >
+          <Text style={styles.secondaryActionText}>Change my friend (mascot)</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -176,6 +210,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  mascotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 24,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: kidsColors.border,
+  },
+  mascotRowLabel: {
+    ...kidsTypography.body,
+    color: kidsColors.text.primary,
+    fontWeight: '700',
+  },
+  mascotRowChevron: {
+    fontSize: 22,
+    color: kidsColors.primary,
+    fontWeight: '600',
+  },
   xpSection: { paddingHorizontal: 24, marginTop: 12, marginBottom: 24 },
   xpBarBg: {
     height: 10,
@@ -218,7 +276,29 @@ const styles = StyleSheet.create({
   metricValue: { ...kidsTypography.heading2, color: kidsColors.text.primary },
   metricLabel: { ...kidsTypography.caption, color: kidsColors.text.muted },
   section: { paddingHorizontal: 24, marginBottom: 24 },
-  sectionTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 12 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 0 },
+  editLink: {
+    ...kidsTypography.bodySmall,
+    color: kidsColors.primary,
+    fontWeight: '700',
+  },
+  secondaryAction: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  secondaryActionText: {
+    ...kidsTypography.bodySmall,
+    color: kidsColors.primary,
+    fontWeight: '600',
+  },
   topicsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   topicChip: {
     backgroundColor: kidsColors.primaryLight + '30',

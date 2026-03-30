@@ -1,5 +1,6 @@
-import { IsString, IsOptional, MinLength, MaxLength, IsObject } from 'class-validator';
+import { IsString, IsOptional, MinLength, MaxLength, IsObject, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { KIDS_MASCOT_CHARACTER_IDS } from '../../constants/kids-mascots';
 
 export class CreateChildProfileDto {
   @ApiProperty({ description: 'Display name for the child' })
@@ -18,9 +19,13 @@ export class CreateChildProfileDto {
   @IsObject()
   avatarConfig?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Selected monster character id (e.g. monster_1..monster_6)' })
+  @ApiPropertyOptional({
+    description: 'Kids mascot id: bird | cat | dragon (must match reference_videos.character_id)',
+    enum: KIDS_MASCOT_CHARACTER_IDS,
+  })
   @IsOptional()
   @IsString()
+  @IsIn([...KIDS_MASCOT_CHARACTER_IDS])
   @MaxLength(32)
   selectedCharacterId?: string;
 }

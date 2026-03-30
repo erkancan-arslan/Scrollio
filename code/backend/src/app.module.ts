@@ -13,6 +13,7 @@ import { KidsModule } from './kids/kids.module';
 import { DuelModule } from './duel/duel.module';
 import { ClassroomModule } from './classroom/classroom.module';
 import { AdminModule } from './admin/admin.module';
+import { AdminKidsModule } from './admin-kids/admin-kids.module';
 import { TeacherModule } from './teacher/teacher.module';
 import { BilVeFethetModule } from './bil-ve-fethet/bil-ve-fethet.module';
 import { HealthController } from './health/health.controller';
@@ -36,6 +37,7 @@ import { HealthController } from './health/health.controller';
     DuelModule,
     ClassroomModule,
     AdminModule,
+    AdminKidsModule,
     TeacherModule,
     BilVeFethetModule,
   ],

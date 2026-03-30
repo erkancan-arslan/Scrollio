@@ -8,6 +8,7 @@ import kidsCanvasReducer from '../features/kids/playground/store/canvasSlice';
 import kidsProgressionReducer from '../features/kids/playground/store/progressionSlice';
 import kidsProfileReducer from '../features/kids/profile/store/profileSlice';
 import kidsParentalReducer from '../features/kids/parental/store/parentalSlice';
+import kidsMascotReducer from '../features/kids/mascot/store/mascotSlice';
 // Wire up the Kids API client (breaks circular dep: api → store → slices → api)
 import { setStoreRef } from '../features/kids/shared/utils/api';
 
@@ -22,6 +23,7 @@ export const store = configureStore({
         kidsProgression: kidsProgressionReducer,
         kidsProfile: kidsProfileReducer,
         kidsParental: kidsParentalReducer,
+        kidsMascot: kidsMascotReducer,
     },
 });
 

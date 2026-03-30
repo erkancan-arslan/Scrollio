@@ -19,10 +19,12 @@ import { ProgressCard } from '../components/ProgressCard';
 import { LogsViewer } from '../components/LogsViewer';
 import { GenerationJob, JobLog } from '../types/admin.types';
 import * as adminApi from '../services/adminApi';
+import * as kidsAdminApi from '../services/kidsAdminApi';
 
 export const GenerationJobDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const jobId: string = route.params?.jobId;
+  const useKidsApi = route.params?.kidsApi === true;
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [logs, setLogs] = useState<JobLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,14 +33,14 @@ export const GenerationJobDetailScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     const [jobRes, logsRes] = await Promise.all([
-      adminApi.getGenerationJob(jobId),
-      adminApi.getJobLogs(jobId),
+      useKidsApi ? kidsAdminApi.getKidsGenerationJob(jobId) : adminApi.getGenerationJob(jobId),
+      useKidsApi ? kidsAdminApi.getKidsJobLogs(jobId) : adminApi.getJobLogs(jobId),
     ]);
     if (jobRes.data) setJob(jobRes.data);
     if (logsRes.data) setLogs(logsRes.data);
     setLoading(false);
     setRefreshing(false);
-  }, [jobId]);
+  }, [jobId, useKidsApi]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -50,7 +52,7 @@ export const GenerationJobDetailScreen: React.FC = () => {
 
   const handleStart = async () => {
     setActionLoading(true);
-    const res = await adminApi.startGenerationJob(jobId);
+    const res = useKidsApi ? await kidsAdminApi.startKidsGenerationJob(jobId) : await adminApi.startGenerationJob(jobId);
     setActionLoading(false);
     if (res.error) {
       Alert.alert('Error', res.error);
@@ -61,7 +63,7 @@ export const GenerationJobDetailScreen: React.FC = () => {
 
   const handleRetry = async () => {
     setActionLoading(true);
-    const res = await adminApi.retryGenerationJob(jobId);
+    const res = useKidsApi ? await kidsAdminApi.retryKidsGenerationJob(jobId) : await adminApi.retryGenerationJob(jobId);
     setActionLoading(false);
     if (res.error) {
       Alert.alert('Error', res.error);

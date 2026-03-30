@@ -21,7 +21,14 @@ export function resolveExpoPublicApiBaseUrl(): string {
     return 'https://api.scrollio.app/api/v1';
   }
   const fromEnv = normalizeEnvUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
-  if (fromEnv) return fromEnv;
+  if (fromEnv) {
+    const trimmed = fromEnv.replace(/\/$/, '');
+    // Common mistake: host:port without /api/v1 — would call /kids/feed on the wrong path.
+    if (!/\/api\/v\d+/i.test(trimmed)) {
+      return `${trimmed}/api/v1`;
+    }
+    return trimmed;
+  }
 
   const isWeb =
     typeof window !== 'undefined' && typeof window.location?.hostname === 'string';

@@ -14,7 +14,8 @@ export interface KidsContent {
   topicName: string;
   ageGroupMin: number;
   ageGroupMax: number;
-  difficultyLevel: 'easy' | 'medium' | 'hard';
+  /** Null when content has no difficulty tier (e.g. admin-generated kids videos). */
+  difficultyLevel: 'easy' | 'medium' | 'hard' | null;
   tags: string[];
   viewCount: number;
   likeCount: number;

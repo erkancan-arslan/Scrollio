@@ -13,6 +13,7 @@ import { CreateBatchJobScreen } from '../features/admin/screens/CreateBatchJobSc
 import { BatchJobDetailScreen } from '../features/admin/screens/BatchJobDetailScreen';
 import { ReviewTopicsScreen } from '../features/admin/screens/ReviewTopicsScreen';
 import { ReviewScriptsScreen } from '../features/admin/screens/ReviewScriptsScreen';
+import { KidsModuleVideoCreationScreen } from '../features/admin/screens/KidsModuleVideoCreationScreen';
 
 export type AdminStackParamList = {
   AdminSignIn: undefined;
@@ -22,12 +23,13 @@ export type AdminStackParamList = {
   AdminReferenceVideoDetail: { videoId: string };
   AdminCreateJob: { referenceVideoId?: string } | undefined;
   AdminJobsList: undefined;
-  AdminJobDetail: { jobId: string };
+  AdminJobDetail: { jobId: string; kidsApi?: boolean };
   AdminGeneratedVideos: undefined;
   AdminCreateBatch: { referenceVideoId?: string } | undefined;
-  AdminBatchDetail: { batchId: string };
+  AdminBatchDetail: { batchId: string; kidsApi?: boolean };
   AdminReviewTopics: { batchId: string; jobs: any[] };
   AdminReviewScripts: { batchId: string };
+  AdminKidsModuleVideoCreation: undefined;
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -51,6 +53,7 @@ export const AdminNavigator: React.FC = () => {
       <Stack.Screen name="AdminBatchDetail" component={BatchJobDetailScreen} />
       <Stack.Screen name="AdminReviewTopics" component={ReviewTopicsScreen} />
       <Stack.Screen name="AdminReviewScripts" component={ReviewScriptsScreen} />
+      <Stack.Screen name="AdminKidsModuleVideoCreation" component={KidsModuleVideoCreationScreen} />
     </Stack.Navigator>
   );
 };

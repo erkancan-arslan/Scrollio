@@ -35,8 +35,8 @@ export class ScriptGenerationService {
   }
 
   async generate(input: ScriptGenerationInput): Promise<string> {
-    const durationSeconds = input.durationTargetSeconds || 60;
-    const maxWords = this.estimateWordCount(durationSeconds, input.language);
+    const durationSeconds = this.resolveDurationSeconds(input);
+    const maxWords = this.estimateWordCount(durationSeconds, input.language, input.contentTarget);
     const prompt = this.buildPrompt(input, durationSeconds, maxWords);
 
     this.logger.log(
@@ -68,10 +68,18 @@ export class ScriptGenerationService {
       throw new Error('LLM returned empty or invalid output');
     }
 
-    // Hard-truncate if the model still exceeded the limit by more than 20%
-    const truncated = this.truncateToWordLimit(output.trim(), Math.ceil(maxWords * 1.2));
+    // Kids: hard cap at maxWords (TTS often runs longer than 2.5 w/s). Non-kids: allow small slack.
+    const slack = input.contentTarget === 'kids' ? 1 : 1.2;
+    const truncated = this.truncateToWordLimit(output.trim(), Math.ceil(maxWords * slack));
     this.logger.log(`Script generated: ${this.countWords(truncated)} words (limit ${maxWords})`);
     return truncated;
+  }
+
+  private resolveDurationSeconds(input: ScriptGenerationInput): number {
+    if (input.durationTargetSeconds != null && input.durationTargetSeconds > 0) {
+      return input.contentTarget === 'kids' ? Math.min(input.durationTargetSeconds, 30) : input.durationTargetSeconds;
+    }
+    return input.contentTarget === 'kids' ? 30 : 60;
   }
 
   // ── Prompt builder ────────────────────────────────────────────────────────
@@ -92,6 +100,7 @@ export class ScriptGenerationService {
       lines.push(
         'You are a friendly educational content writer for children aged 7-12.',
         'Write in simple, clear language. Be enthusiastic and encouraging.',
+        `The narration must be speakable within about ${durationSeconds} seconds when read aloud — stay UNDER the word limit so the voice does not run longer than the base video.`,
         'FORBIDDEN openings: "Ever wondered", "Have you ever", "Did you know", "Imagine if".',
         `Opening instruction: ${openingStyle}`,
         '',
@@ -185,8 +194,13 @@ export class ScriptGenerationService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private estimateWordCount(durationSeconds: number, language: string): number {
-    // Turkish natural speech is slightly slower than English
+  private estimateWordCount(durationSeconds: number, language: string, contentTarget?: string): number {
+    const isKids = contentTarget === 'kids';
+    // Non-kids: planning rate. Kids: conservative — TTS + expressive delivery often reads slower than 2.5 w/s.
+    if (isKids) {
+      const wordsPerSecond = language === 'tr' ? 1.55 : 1.75;
+      return Math.max(20, Math.round(durationSeconds * wordsPerSecond));
+    }
     const wordsPerSecond = language === 'tr' ? 2.2 : 2.5;
     return Math.round(durationSeconds * wordsPerSecond);
   }
