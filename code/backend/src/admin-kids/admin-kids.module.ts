@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from '../supabase/supabase.module';
+import { BunnyCdnModule } from '../bunnycdn/bunnycdn.module';
 
 import { ScriptGenerationService } from '../admin/ai/script-generation.service';
 import { TtsService } from '../admin/ai/tts.service';
@@ -26,7 +27,7 @@ import { KidsTopicsAdminService } from './kids-topics/kids-topics-admin.service'
  * Reuses AI + storage services from admin (separate Nest provider instances).
  */
 @Module({
-  imports: [SupabaseModule, ConfigModule],
+  imports: [SupabaseModule, ConfigModule, BunnyCdnModule],
   controllers: [KidsGenerationJobsController, KidsBatchJobsController, KidsTopicsAdminController],
   providers: [
     ScriptGenerationService,

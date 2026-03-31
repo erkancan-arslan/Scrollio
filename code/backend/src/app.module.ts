@@ -17,6 +17,7 @@ import { AdminKidsModule } from './admin-kids/admin-kids.module';
 import { TeacherModule } from './teacher/teacher.module';
 import { BilVeFethetModule } from './bil-ve-fethet/bil-ve-fethet.module';
 import { HealthController } from './health/health.controller';
+import { BunnyCdnModule } from './bunnycdn/bunnycdn.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { HealthController } from './health/health.controller';
     AdminKidsModule,
     TeacherModule,
     BilVeFethetModule,
+    BunnyCdnModule,
   ],
   controllers: [HealthController],
   providers: [],

@@ -10,6 +10,7 @@ import { GeneratedVideosService } from '../generated-videos/generated-videos.ser
 import { FeedPublishingService } from '../feeds/feed-publishing.service';
 import { JobLogsService } from '../logs/job-logs.service';
 import { JobStatus, JobStep, STEP_PROGRESS } from '../types/admin.types';
+import { BunnyCdnService } from '../../bunnycdn/bunnycdn.service';
 
 // ─── Types used by the batch pipeline ────────────────────────────────────────
 
@@ -43,6 +44,7 @@ export class GenerationOrchestratorService {
     private readonly generatedVideosService: GeneratedVideosService,
     private readonly feedService: FeedPublishingService,
     private readonly logsService: JobLogsService,
+    private readonly bunnyCdnService: BunnyCdnService,
   ) {}
 
   // ── Single-job pipeline ────────────────────────────────────────────────────
@@ -119,6 +121,11 @@ export class GenerationOrchestratorService {
         canonicalVideoUrl = await this.videoCompositionService.compose(finalVideoUrl, brainrotVideoUrl, jobId);
         await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
         await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Composed video: ${canonicalVideoUrl}`);
+      } else {
+        await this.advanceStep(jobId, JobStep.COMPOSING_VIDEO, 'Uploading directly to BunnyCDN');
+        canonicalVideoUrl = await this.bunnyCdnService.uploadFromUrl(finalVideoUrl, `generated-videos/${jobId}.mp4`);
+        await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+        await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Uploaded to BunnyCDN: ${canonicalVideoUrl}`);
       }
 
       // Step 7: Extract thumbnail from first frame
@@ -275,6 +282,11 @@ export class GenerationOrchestratorService {
         canonicalVideoUrl = await this.videoCompositionService.compose(finalVideoUrl, brainrotVideoUrl, jobId);
         await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
         await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Composed video: ${canonicalVideoUrl}`);
+      } else {
+        await this.advanceStep(jobId, JobStep.COMPOSING_VIDEO, 'Uploading directly to BunnyCDN');
+        canonicalVideoUrl = await this.bunnyCdnService.uploadFromUrl(finalVideoUrl, `generated-videos/${jobId}.mp4`);
+        await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+        await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Uploaded to BunnyCDN: ${canonicalVideoUrl}`);
       }
 
       // Thumbnail
@@ -426,7 +438,15 @@ export class GenerationOrchestratorService {
         });
         if (alive.length === 0) return;
       } else {
-        alive.forEach((s) => { s.composedVideoUrl = s.videoUrl; });
+        await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.COMPOSING_VIDEO, 'Uploading to BunnyCDN')));
+        const uploadResults = await Promise.allSettled(
+          alive.map((s) => this.bunnyCdnService.uploadFromUrl(s.videoUrl, `generated-videos/${s.job.id}.mp4`)),
+        );
+        alive = await this.filterSettled(alive, uploadResults, JobStep.COMPOSING_VIDEO, async (s, cdnUrl) => {
+          s.composedVideoUrl = cdnUrl;
+          await this.jobsService.updateStatus(s.job.id, { composedVideoUrl: cdnUrl });
+        });
+        if (alive.length === 0) return;
       }
 
       // ── 4. Extract thumbnails from first frame of all videos in parallel ───

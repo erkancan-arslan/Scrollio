@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../supabase/supabase.service';
+import { BunnyCdnService } from '../../bunnycdn/bunnycdn.service';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -13,7 +13,7 @@ const ffmpegStaticPath: string = require('ffmpeg-static');
 
 ffmpeg.setFfmpegPath(ffmpegStaticPath);
 
-const BUCKET = 'kids-generated-videos';
+// Removed BUCKET constant
 
 /**
  * Muxes TTS onto a base animation: output length = min(audio, video).
@@ -24,7 +24,7 @@ const BUCKET = 'kids-generated-videos';
 export class AudioVideoMergeService {
   private readonly logger = new Logger(AudioVideoMergeService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly bunnyCdnService: BunnyCdnService) {}
 
   /**
    * Muxes narration onto generated video. `narrationUrl` may be a pure audio file or a **video
@@ -43,7 +43,7 @@ export class AudioVideoMergeService {
 
       await this.runFfmpegWithAlignedDuration(videoUrl, narrationAudioPath, outFile);
       const buffer = fs.readFileSync(outFile);
-      return await this.uploadAndGetPublicUrl(buffer, `${storageKeyPrefix}/${id}.mp4`);
+      return await this.bunnyCdnService.uploadBuffer(buffer, `${storageKeyPrefix}/${id}.mp4`);
     } finally {
       if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
       if (narrationAudioPath && fs.existsSync(narrationAudioPath)) {
@@ -190,19 +190,5 @@ export class AudioVideoMergeService {
     });
   }
 
-  private async uploadAndGetPublicUrl(buffer: Buffer, storagePath: string): Promise<string> {
-    const admin = this.supabaseService.getAdminClient();
-    const { error } = await admin.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, { contentType: 'video/mp4', upsert: true });
-
-    if (error) {
-      this.logger.error('Upload merged video failed', error);
-      throw error;
-    }
-
-    const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
-    this.logger.log(`Merged video uploaded: ${urlData.publicUrl}`);
-    return urlData.publicUrl;
-  }
+  // Helper upload function removed as we now use BunnyCdnService directly
 }

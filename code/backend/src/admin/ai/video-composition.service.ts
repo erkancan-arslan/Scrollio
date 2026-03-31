@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../supabase/supabase.service';
+import { BunnyCdnService } from '../../bunnycdn/bunnycdn.service';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -13,13 +13,13 @@ const ffmpegStaticPath: string = require('ffmpeg-static');
 
 ffmpeg.setFfmpegPath(ffmpegStaticPath);
 
-const BUCKET = 'composed-videos';
+// Removed BUCKET constant
 
 @Injectable()
 export class VideoCompositionService {
   private readonly logger = new Logger(VideoCompositionService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly bunnyCdnService: BunnyCdnService) {}
 
   /**
    * Composes a split-screen vertical (1080×1920) video:
@@ -42,7 +42,7 @@ export class VideoCompositionService {
     try {
       await this.runComposition(lipsyncVideoUrl, brainrotVideoUrl, tmpOutput);
       const buffer = fs.readFileSync(tmpOutput);
-      return await this.uploadBuffer(buffer, jobId);
+      return await this.bunnyCdnService.uploadBuffer(buffer, `composed-videos/${jobId}/composed.mp4`);
     } finally {
       if (fs.existsSync(tmpOutput)) {
         fs.unlinkSync(tmpOutput);
@@ -91,21 +91,5 @@ export class VideoCompositionService {
     });
   }
 
-  private async uploadBuffer(buffer: Buffer, jobId: string): Promise<string> {
-    const storagePath = `${jobId}/composed.mp4`;
-    const admin = this.supabaseService.getAdminClient();
-
-    const { error } = await admin.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, { contentType: 'video/mp4', upsert: true });
-
-    if (error) {
-      this.logger.error('Failed to upload composed video to Supabase', error);
-      throw error;
-    }
-
-    const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
-    this.logger.log(`Composed video uploaded: ${urlData.publicUrl}`);
-    return urlData.publicUrl;
-  }
+  // Upload logic removed as we now use BunnyCdnService directly
 }

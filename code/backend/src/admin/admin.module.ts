@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from '../supabase/supabase.module';
+import { BunnyCdnModule } from '../bunnycdn/bunnycdn.module';
 
 import { ReferenceVideosController } from './reference-videos/reference-videos.controller';
 import { ReferenceVideosService } from './reference-videos/reference-videos.service';
@@ -27,7 +28,7 @@ import { BatchJobsController } from './batch-jobs/batch-jobs.controller';
 import { BatchJobsService } from './batch-jobs/batch-jobs.service';
 
 @Module({
-  imports: [SupabaseModule, ConfigModule],
+  imports: [SupabaseModule, ConfigModule, BunnyCdnModule],
   controllers: [
     ReferenceVideosController,
     GenerationJobsController,
