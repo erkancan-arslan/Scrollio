@@ -1,12 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import {
-    Animated,
-    Image,
-    ImageBackground,
-    StyleSheet,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Animated, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { DESKS, Desk } from '../data/classroom';
 import { ProvinceOwnership, PlayerId, PLAYER_COLORS } from '../../../games/bil_ve_fethet/types';
 
@@ -14,8 +8,6 @@ const CLASS_BG = require('../../../../../../assets/class.png');
 const DESK_IMG = require('../../../../../../assets/desk.png');
 
 // Classroom image native size: 1536 × 2752
-// Desk grid starts roughly at 33% from top, occupies ~53% of height
-// Left/right margins: ~10%
 const GRID_TOP = '33%';
 const GRID_BOTTOM = '14%';
 const GRID_LEFT = '9%';
@@ -24,6 +16,14 @@ const GRID_RIGHT = '9%';
 const ROWS = 3;
 const COLS = 5;
 
+// Emoji icons for each player — shown as a floating badge on the desk
+const PLAYER_ICON: Record<PlayerId | 'neutral', string> = {
+    player: '🧑',
+    bot1:   '🤖',
+    bot2:   '👾',
+    neutral: '',
+};
+
 interface ClassroomMapProps {
     ownership: ProvinceOwnership;
     selectableIds: string[];
@@ -31,7 +31,7 @@ interface ClassroomMapProps {
     phase: string;
 }
 
-// Animated contour border around owned / selectable desks
+// Animated border — pulses for selectable desks, static glow for owned
 const ContourBorder: React.FC<{ color: string; pulse: boolean }> = ({ color, pulse }) => {
     const anim = useRef(new Animated.Value(1)).current;
 
@@ -43,8 +43,8 @@ const ContourBorder: React.FC<{ color: string; pulse: boolean }> = ({ color, pul
         }
         const loop = Animated.loop(
             Animated.sequence([
-                Animated.timing(anim, { toValue: 0.35, duration: 550, useNativeDriver: true }),
-                Animated.timing(anim, { toValue: 1, duration: 550, useNativeDriver: true }),
+                Animated.timing(anim, { toValue: 0.15, duration: 500, useNativeDriver: true }),
+                Animated.timing(anim, { toValue: 1,    duration: 500, useNativeDriver: true }),
             ])
         );
         loop.start();
@@ -57,15 +57,30 @@ const ContourBorder: React.FC<{ color: string; pulse: boolean }> = ({ color, pul
             style={[
                 StyleSheet.absoluteFillObject,
                 {
-                    borderRadius: 7,
-                    borderWidth: 3,
+                    borderRadius: 12,
+                    borderWidth: pulse ? 4 : 3,
                     borderColor: color,
                     opacity: anim,
+                    shadowColor: color,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: pulse ? 1 : 0.7,
+                    shadowRadius: pulse ? 10 : 6,
+                    elevation: pulse ? 10 : 4,
                 },
             ]}
         />
     );
 };
+
+// Small floating ownership badge shown below/on top of the desk image
+const OwnerBadge: React.FC<{ owner: PlayerId; color: string }> = ({ owner, color }) => (
+    <View
+        pointerEvents="none"
+        style={[styles.ownerBadge, { backgroundColor: color, borderColor: color + 'AA' }]}
+    >
+        <Text style={styles.ownerBadgeIcon}>{PLAYER_ICON[owner]}</Text>
+    </View>
+);
 
 const DeskCell: React.FC<{
     desk: Desk;
@@ -75,21 +90,36 @@ const DeskCell: React.FC<{
 }> = ({ desk, owner, selectable, onPress }) => {
     const isNeutral = owner === 'neutral';
     const ownerColor = isNeutral ? null : PLAYER_COLORS[owner];
-    // Selectable desks pulse in player color; owned desks show a static contour
     const borderColor = selectable ? PLAYER_COLORS.player : ownerColor;
+    const isOwnedByPlayer = owner === 'player';
 
     return (
         <TouchableOpacity
-            style={styles.deskCell}
-            onPress={onPress}
-            activeOpacity={selectable ? 0.75 : 0.95}
+            style={[
+                styles.deskCell,
+                selectable && { transform: [{ scale: 1.09 }], zIndex: 10 },
+            ]}
+            onPress={() => {
+                if (selectable) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                } else if (isOwnedByPlayer) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+                onPress();
+            }}
+            activeOpacity={selectable ? 0.55 : 0.95}
         >
-            {/* Pixel art desk — untouched, no overlay */}
+            {/* Pixel-art desk — completely untouched */}
             <Image source={DESK_IMG} style={styles.deskImage} resizeMode="contain" />
 
-            {/* Colored contour: owned desks get static, selectable desks pulse */}
+            {/* Glowing border — pulses when selectable, static glow when owned */}
             {borderColor && (
                 <ContourBorder color={borderColor} pulse={selectable} />
+            )}
+
+            {/* Small owner emoji badge floating at top-right corner of the desk */}
+            {!isNeutral && (
+                <OwnerBadge owner={owner as PlayerId} color={PLAYER_COLORS[owner as PlayerId]} />
             )}
         </TouchableOpacity>
     );
@@ -165,5 +195,25 @@ const styles = StyleSheet.create({
     deskImage: {
         width: '100%',
         height: '100%',
+    },
+    // Small badge shown in the top-right corner of owned desks
+    ownerBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.35,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    ownerBadgeIcon: {
+        fontSize: 11,
     },
 });

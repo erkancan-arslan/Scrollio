@@ -37,19 +37,22 @@ export const resolveGuessingRound = (
     const playerDistance = Math.abs(playerGuess - correctAnswer);
     const botDistance = Math.abs(botGuess - correctAnswer);
 
-    // Perfect answer always wins unconditionally — no tie penalty
+    // Perfect answer by the PLAYER always means PLAYER wins, regardless of role.
+    // If player is attacking: they conquer. If player is defending: they hold.
     if (playerDistance === 0) {
-        return { conquered: attackerId === 'player', tie: false, playerDistance, botDistance };
+        const conquered = attackerId === 'player'; // attacker wins only if player is attacking
+        return { conquered, tie: false, playerDistance, botDistance };
     }
 
     const tie = playerDistance === botDistance;
 
     let attackerWon: boolean;
     if (tie) {
-        attackerWon = false; // defender wins ties (for imperfect guesses)
+        attackerWon = false; // defender wins ties
     } else if (attackerId === 'player') {
         attackerWon = playerDistance < botDistance;
     } else {
+        // Bot is attacking — player wins (defends) if player is closer
         attackerWon = botDistance < playerDistance;
     }
 

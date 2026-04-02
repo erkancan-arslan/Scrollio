@@ -165,7 +165,10 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
             timerFiredRef.current = true;
             timerBarAnim.stopAnimation();
         }
-        const guess = parseInt(inputValue, 10) || 0;
+        // If no input was provided (timer ran out or empty submit), use a very large
+        // penalty value so the player doesn't accidentally win by submitting nothing.
+        const parsed = parseInt(inputValue, 10);
+        const guess = !isNaN(parsed) && inputValue.trim() !== '' ? parsed : Number.MAX_SAFE_INTEGER;
         onSubmit(guess);
         // displayPhase transitions via the guessingResult useEffect above
     };
