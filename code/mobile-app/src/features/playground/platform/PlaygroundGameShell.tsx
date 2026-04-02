@@ -24,6 +24,7 @@ interface PlaygroundGameShellProps {
     route?: RouteProp<GameShellParams, 'GameShell'>;
     gameId?: GameId;
     config?: any;
+    onExit?: () => void;
 }
 
 export const PlaygroundGameShell: React.FC<PlaygroundGameShellProps> = (props) => {
@@ -76,7 +77,11 @@ export const PlaygroundGameShell: React.FC<PlaygroundGameShellProps> = (props) =
 
     const handleExit = () => {
         dispatch(resetCurrentSession());
-        navigation.goBack();
+        if (props.onExit) {
+            props.onExit();
+        } else {
+            navigation.goBack();
+        }
     };
 
     const handleGameOver = (result: GameResult) => {

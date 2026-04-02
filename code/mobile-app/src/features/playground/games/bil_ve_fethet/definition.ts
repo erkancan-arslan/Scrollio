@@ -10,7 +10,7 @@ export const BilVeFethetGame: GameDefinition<BilVeFethetRegistryState> & { icon:
     title: 'Bil ve Fethet',
     description: 'Türkiye haritasını fethet! Soruları doğru yanıtla, 81 ili ele geçir.',
     icon: '🗺️',
-    categories: ['logic', 'challenges'],
+    categories: ['logic', 'challenges', 'core'],
     modes: ['single'],
     minPlayers: 1,
     maxPlayers: 1,

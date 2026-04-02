@@ -23,7 +23,7 @@ export type MainTabParamList = {
   Search: undefined;
   Friends: undefined;
   Messages: undefined;
-  Playground: undefined;
+  Playground: { category?: string };
   Profile: undefined;
 };
 

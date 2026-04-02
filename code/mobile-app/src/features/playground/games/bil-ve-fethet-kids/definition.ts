@@ -9,7 +9,7 @@ export const BilVeFethetKidsGame: GameDefinition<KidsRegistryState> & { icon: st
     title: 'Sınıfı Fethet!',
     description: 'Sınıftaki sıraları fethet! Soruları doğru yanıtla, 15 sıranın tamamını ele geçir.',
     icon: '🏫',
-    categories: ['logic', 'challenges'],
+    categories: ['logic', 'challenges', 'kids'],
     modes: ['single'],
     minPlayers: 1,
     maxPlayers: 1,

@@ -9,10 +9,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-// Real feature screens
 import { KidsFeedScreen } from '../features/kids/feed/screens/KidsFeedScreen';
 import { KidsClassroomScreen } from '../features/kids/classroom/screens/KidsClassroomScreen';
-import { KidsPlaygroundScreen } from '../features/kids/playground/screens/KidsPlaygroundScreen';
+import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { KidsProfileScreen } from '../features/kids/profile/screens/KidsProfileScreen';
 import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettingsScreen';
 
@@ -21,7 +20,7 @@ import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettin
 export type KidsMainTabParamList = {
   KidsFeed: undefined;
   KidsClassroom: undefined;
-  KidsPlayground: undefined;
+  KidsPlayground: { category?: string };
   KidsProfile: undefined;
   KidsSettings: undefined;
 };
@@ -84,7 +83,8 @@ export const KidsMainTabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="KidsPlayground"
-        component={KidsPlaygroundScreen}
+        component={PlaygroundScreen}
+        initialParams={{ category: 'kids' }}
         options={{
           tabBarLabel: 'Playground',
           tabBarIcon: ({ focused, color }) => (

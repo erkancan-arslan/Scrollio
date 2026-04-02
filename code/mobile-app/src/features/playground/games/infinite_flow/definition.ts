@@ -7,7 +7,7 @@ export const InfiniteFlowGame: GameDefinition<InfiniteFlowState> = {
     id: 'infinite_flow',
     title: 'Infinite Flow',
     description: 'Tinder-style rapid fire knowledge.',
-    categories: ['infinite'],
+    categories: ['infinite', 'core', 'kids'],
     modes: ['single'],
     minPlayers: 1,
     maxPlayers: 1,

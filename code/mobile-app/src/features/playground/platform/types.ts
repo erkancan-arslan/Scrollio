@@ -8,7 +8,9 @@ import { ReactNode } from 'react';
 export type GameId =
     | 'infinite_flow'
     | 'bil_ve_fethet_classroom'
-    | 'bil_ve_fethet';
+    | 'bil_ve_fethet'
+    | 'bil_ve_fethet_kids'
+    | 'space_repair_kids';
 
 
 export type GameMode = 'single' | 'hotseat' | 'multiplayer';
@@ -44,7 +46,7 @@ export interface GameDefinition<TState, TConfig = GameConfig> {
     id: GameId;
     title: string;
     description: string;
-    categories: ('infinite' | 'logic' | 'visual' | 'challenges')[];
+    categories: ('infinite' | 'logic' | 'visual' | 'challenges' | 'kids' | 'core')[];
     modes: GameMode[];
     minPlayers: number;
     maxPlayers: number;
