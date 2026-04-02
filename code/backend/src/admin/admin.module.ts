@@ -19,6 +19,7 @@ import { LipsyncService } from './ai/lipsync.service';
 import { ThumbnailService } from './ai/thumbnail.service';
 import { VideoCompositionService } from './ai/video-composition.service';
 import { TopicSuggestionService } from './ai/topic-suggestion.service';
+import { SubtitleService } from './ai/subtitle.service';
 
 import { FeedPublishingService } from './feeds/feed-publishing.service';
 import { JobLogsService } from './logs/job-logs.service';
@@ -46,6 +47,7 @@ import { BatchJobsService } from './batch-jobs/batch-jobs.service';
     ThumbnailService,
     VideoCompositionService,
     TopicSuggestionService,
+    SubtitleService,
     FeedPublishingService,
     JobLogsService,
     AdminStorageService,
@@ -56,6 +58,7 @@ import { BatchJobsService } from './batch-jobs/batch-jobs.service';
     GenerationJobsService,
     GeneratedVideosService,
     FeedPublishingService,
+    SubtitleService,
   ],
 })
 export class AdminModule {}

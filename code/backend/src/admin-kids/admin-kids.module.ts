@@ -7,6 +7,7 @@ import { ScriptGenerationService } from '../admin/ai/script-generation.service';
 import { TtsService } from '../admin/ai/tts.service';
 import { ThumbnailService } from '../admin/ai/thumbnail.service';
 import { TopicSuggestionService } from '../admin/ai/topic-suggestion.service';
+import { SubtitleService } from '../admin/ai/subtitle.service';
 import { ReferenceVideosService } from '../admin/reference-videos/reference-videos.service';
 import { GeneratedVideosService } from '../admin/generated-videos/generated-videos.service';
 import { FeedPublishingService } from '../admin/feeds/feed-publishing.service';
@@ -44,6 +45,7 @@ import { KidsTopicsAdminService } from './kids-topics/kids-topics-admin.service'
     AudioVideoMergeService,
     KidsVoiceService,
     KidsTopicsAdminService,
+    SubtitleService,
   ],
 })
 export class AdminKidsModule {}

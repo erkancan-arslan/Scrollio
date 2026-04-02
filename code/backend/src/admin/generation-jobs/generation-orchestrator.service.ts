@@ -11,6 +11,7 @@ import { FeedPublishingService } from '../feeds/feed-publishing.service';
 import { JobLogsService } from '../logs/job-logs.service';
 import { JobStatus, JobStep, STEP_PROGRESS } from '../types/admin.types';
 import { BunnyCdnService } from '../../bunnycdn/bunnycdn.service';
+import { SubtitleService } from '../ai/subtitle.service';
 
 // ─── Types used by the batch pipeline ────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export class GenerationOrchestratorService {
     private readonly feedService: FeedPublishingService,
     private readonly logsService: JobLogsService,
     private readonly bunnyCdnService: BunnyCdnService,
+    private readonly subtitleService: SubtitleService,
   ) {}
 
   // ── Single-job pipeline ────────────────────────────────────────────────────
@@ -128,13 +130,19 @@ export class GenerationOrchestratorService {
         await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Uploaded to BunnyCDN: ${canonicalVideoUrl}`);
       }
 
-      // Step 7: Extract thumbnail from first frame
+      // Step 7: Burn subtitles into video
+      await this.advanceStep(jobId, JobStep.BURNING_SUBTITLES, 'Burning subtitles into video');
+      canonicalVideoUrl = await this.subtitleService.burnIntoVideo(canonicalVideoUrl, narration, audioUrl, jobId);
+      await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+      await this.logsService.log(jobId, JobStep.BURNING_SUBTITLES, 'success', `Subtitled video: ${canonicalVideoUrl}`);
+
+      // Step 8: Extract thumbnail from first frame
       await this.advanceStep(jobId, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail from video');
       const thumbnailUrl = await this.thumbnailService.generate(canonicalVideoUrl, jobId);
       await this.jobsService.updateStatus(jobId, { thumbnailUrl });
       await this.logsService.log(jobId, JobStep.GENERATING_THUMBNAIL, 'success', `Thumbnail: ${thumbnailUrl}`);
 
-      // Step 8: Create generated video record
+      // Step 9: Create generated video record
       await this.advanceStep(jobId, JobStep.CREATING_GENERATED_VIDEO, 'Creating generated video record');
       const generatedVideo = await this.generatedVideosService.createFromJob({
         jobId,
@@ -152,7 +160,7 @@ export class GenerationOrchestratorService {
       });
       await this.logsService.log(jobId, JobStep.CREATING_GENERATED_VIDEO, 'success', `Generated video: ${generatedVideo.id}`);
 
-      // Step 9: Publish to feed
+      // Step 10: Publish to feed
       await this.advanceStep(jobId, JobStep.PUBLISHING_TO_FEED, 'Publishing to feed');
       await this.feedService.publish(generatedVideo.id, job.content_target);
       await this.logsService.log(jobId, JobStep.PUBLISHING_TO_FEED, 'success', `Published to ${job.content_target} feed`);
@@ -288,6 +296,12 @@ export class GenerationOrchestratorService {
         await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
         await this.logsService.log(jobId, JobStep.COMPOSING_VIDEO, 'success', `Uploaded to BunnyCDN: ${canonicalVideoUrl}`);
       }
+
+      // Burn subtitles
+      await this.advanceStep(jobId, JobStep.BURNING_SUBTITLES, 'Burning subtitles into video');
+      canonicalVideoUrl = await this.subtitleService.burnIntoVideo(canonicalVideoUrl, narration, audioUrl, jobId);
+      await this.jobsService.updateStatus(jobId, { composedVideoUrl: canonicalVideoUrl });
+      await this.logsService.log(jobId, JobStep.BURNING_SUBTITLES, 'success', `Subtitled video: ${canonicalVideoUrl}`);
 
       // Thumbnail
       await this.advanceStep(jobId, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail from video');
@@ -448,6 +462,17 @@ export class GenerationOrchestratorService {
         });
         if (alive.length === 0) return;
       }
+
+      // ── 3.6. Burn subtitles into all videos in parallel ──────────────────
+      await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.BURNING_SUBTITLES, 'Burning subtitles')));
+      const subtitleResults = await Promise.allSettled(
+        alive.map((s) => this.subtitleService.burnIntoVideo(s.composedVideoUrl, s.narration, s.audioUrl, s.job.id)),
+      );
+      alive = await this.filterSettled(alive, subtitleResults, JobStep.BURNING_SUBTITLES, async (s, subtitledUrl) => {
+        s.composedVideoUrl = subtitledUrl;
+        await this.jobsService.updateStatus(s.job.id, { composedVideoUrl: subtitledUrl });
+      });
+      if (alive.length === 0) return;
 
       // ── 4. Extract thumbnails from first frame of all videos in parallel ───
       await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail')));

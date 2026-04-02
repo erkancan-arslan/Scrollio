@@ -10,6 +10,7 @@ import { GeneratedVideosService } from '../../admin/generated-videos/generated-v
 import { FeedPublishingService } from '../../admin/feeds/feed-publishing.service';
 import { JobLogsService } from '../../admin/logs/job-logs.service';
 import { JobStatus, JobStep, STEP_PROGRESS } from '../../admin/types/admin.types';
+import { SubtitleService } from '../../admin/ai/subtitle.service';
 
 interface JobState {
   job: Record<string, any>;
@@ -44,6 +45,7 @@ export class KidsGenerationOrchestratorService {
     private readonly generatedVideosService: GeneratedVideosService,
     private readonly feedService: FeedPublishingService,
     private readonly logsService: JobLogsService,
+    private readonly subtitleService: SubtitleService,
   ) {}
 
   /** Single job: script → TTS (mascot voice) → ffmpeg merge → thumbnail → publish (kids_content + feed_items). */
@@ -320,6 +322,17 @@ export class KidsGenerationOrchestratorService {
       alive = mergedStates;
       if (alive.length === 0) return;
 
+      // Burn subtitles into all videos in parallel
+      await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.BURNING_SUBTITLES, 'Burning subtitles')));
+      const subtitleResults = await Promise.allSettled(
+        alive.map((s) => this.subtitleService.burnIntoVideo(s.videoUrl, s.narration, s.audioUrl, s.job.id)),
+      );
+      alive = await this.filterSettled(alive, subtitleResults, JobStep.BURNING_SUBTITLES, async (s, subtitledUrl) => {
+        s.videoUrl = subtitledUrl;
+        await this.jobsService.updateStatus(s.job.id, { finalVideoUrl: subtitledUrl });
+      });
+      if (alive.length === 0) return;
+
       await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail')));
       const thumbResults = await Promise.allSettled(
         alive.map((s) => this.thumbnailService.generate(s.videoUrl, s.job.id)),
@@ -401,9 +414,14 @@ export class KidsGenerationOrchestratorService {
 
     await this.advanceStep(jobId, JobStep.GENERATING_LIPSYNC, 'Merging audio with base animation');
     await this.ensureReferenceHeadOk(referenceVideoUrl);
-    const finalVideoUrl = await this.mergeService.mergeToStorage(referenceVideoUrl, audioUrl, `kids/jobs/${jobId}`);
+    let finalVideoUrl = await this.mergeService.mergeToStorage(referenceVideoUrl, audioUrl, `kids/jobs/${jobId}`);
     await this.jobsService.updateStatus(jobId, { finalVideoUrl, finalVideoProvider: 'ffmpeg_merge' });
     await this.logsService.log(jobId, JobStep.GENERATING_LIPSYNC, 'success', `Merged video: ${finalVideoUrl}`);
+
+    await this.advanceStep(jobId, JobStep.BURNING_SUBTITLES, 'Burning subtitles into video');
+    finalVideoUrl = await this.subtitleService.burnIntoVideo(finalVideoUrl, narration, audioUrl, jobId);
+    await this.jobsService.updateStatus(jobId, { finalVideoUrl });
+    await this.logsService.log(jobId, JobStep.BURNING_SUBTITLES, 'success', `Subtitled video: ${finalVideoUrl}`);
 
     await this.advanceStep(jobId, JobStep.GENERATING_THUMBNAIL, 'Extracting thumbnail from video');
     const thumbnailUrl = await this.thumbnailService.generate(finalVideoUrl, jobId);
