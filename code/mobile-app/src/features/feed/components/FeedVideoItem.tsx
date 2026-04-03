@@ -11,10 +11,12 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Animated,
+  Text,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { Video } from '../types';
 import { VideoActions } from './VideoActions';
 import { VideoInfo } from './VideoInfo';
@@ -59,6 +61,10 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
   const [isBuffering, setIsBuffering] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
   const [showUI, setShowUI] = useState(true);
+  const [showFloatingHeart, setShowFloatingHeart] = useState(false);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const heartY = useRef(new Animated.Value(0)).current;
   
   // Animation value for UI fade
   const uiOpacity = useRef(new Animated.Value(1)).current;
@@ -210,9 +216,26 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
     if (!video.isLiked) {
       onLike(video.id);
     }
+    // Haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Floating heart animation
+    heartScale.setValue(0);
+    heartOpacity.setValue(1);
+    heartY.setValue(0);
+    setShowFloatingHeart(true);
+    Animated.parallel([
+      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 12 }),
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.parallel([
+          Animated.timing(heartOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+          Animated.timing(heartY, { toValue: -80, duration: 500, useNativeDriver: true }),
+        ]),
+      ]),
+    ]).start(() => setShowFloatingHeart(false));
     // Show UI briefly when liking
     revealUI();
-  }, [video.id, video.isLiked, onLike, revealUI]);
+  }, [video.id, video.isLiked, onLike, revealUI, heartScale, heartOpacity, heartY]);
 
   // Single tap behavior
   const handleSingleTap = useCallback(() => {
@@ -308,6 +331,22 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
             </View>
           )}
 
+          {/* Floating Heart on double-tap */}
+          {showFloatingHeart && (
+            <Animated.View
+              style={[
+                styles.floatingHeart,
+                {
+                  opacity: heartOpacity,
+                  transform: [{ scale: heartScale }, { translateY: heartY }],
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <Text style={styles.floatingHeartText}>❤️</Text>
+            </Animated.View>
+          )}
+
           {/* Gradient Overlay for better text visibility - animated with UI */}
           <Animated.View style={{ opacity: uiOpacity }}>
             <LinearGradient
@@ -401,6 +440,15 @@ const styles = StyleSheet.create({
     height: 30,
     backgroundColor: '#FFFFFF',
     borderRadius: 2,
+  },
+  floatingHeart: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '40%',
+    zIndex: 20,
+  },
+  floatingHeartText: {
+    fontSize: 80,
   },
   gradientOverlay: {
     position: 'absolute',

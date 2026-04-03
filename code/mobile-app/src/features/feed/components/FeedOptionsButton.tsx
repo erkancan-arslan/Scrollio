@@ -3,7 +3,7 @@
  * Floating options button with mute and auto-advance toggles
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,9 +11,11 @@ import {
   Text,
   Modal,
   Pressable,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Haptics from 'expo-haptics';
 
 interface FeedOptionsButtonProps {
   isMuted: boolean;
@@ -21,6 +23,30 @@ interface FeedOptionsButtonProps {
   onToggleMute: () => void;
   onToggleAutoAdvance: () => void;
 }
+
+const TOGGLE_WIDTH = 52;
+const TOGGLE_DOT_SIZE = 24;
+const TOGGLE_PADDING = 2;
+const TOGGLE_DOT_TRAVEL = TOGGLE_WIDTH - TOGGLE_DOT_SIZE - TOGGLE_PADDING * 2;
+
+const AnimatedToggle: React.FC<{ isActive: boolean }> = ({ isActive }) => {
+  const translateX = useRef(new Animated.Value(isActive ? TOGGLE_DOT_TRAVEL : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(translateX, {
+      toValue: isActive ? TOGGLE_DOT_TRAVEL : 0,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
+  }, [isActive, translateX]);
+
+  return (
+    <View style={[styles.toggle, isActive && styles.toggleActive]}>
+      <Animated.View style={[styles.toggleDot, { transform: [{ translateX }] }]} />
+    </View>
+  );
+};
 
 export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
   isMuted,
@@ -31,12 +57,25 @@ export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
   const insets = useSafeAreaInsets();
   const [showOptions, setShowOptions] = useState(false);
 
+  const handleToggleMute = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onToggleMute();
+  };
+
+  const handleToggleAutoAdvance = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onToggleAutoAdvance();
+  };
+
   return (
     <>
       {/* Floating Options Button */}
       <TouchableOpacity
         style={[styles.optionsButton, { top: insets.top + 12 }]}
-        onPress={() => setShowOptions(true)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowOptions(true);
+        }}
         activeOpacity={0.8}
       >
         <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
@@ -60,7 +99,7 @@ export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
       <Modal
         visible={showOptions}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowOptions(false)}
       >
         <Pressable
@@ -68,19 +107,20 @@ export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
           onPress={() => setShowOptions(false)}
         >
           <View style={styles.optionsContainer}>
+            {/* Drag handle */}
+            <View style={styles.dragHandle} />
+
             <View style={styles.optionsHeader}>
               <Text style={styles.optionsTitle}>Playback Options</Text>
-              <TouchableOpacity onPress={() => setShowOptions(false)}>
-                <Ionicons name="close" size={24} color="#FFFFFF" />
+              <TouchableOpacity onPress={() => setShowOptions(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
             {/* Mute Toggle */}
             <TouchableOpacity
               style={styles.optionRow}
-              onPress={() => {
-                onToggleMute();
-              }}
+              onPress={handleToggleMute}
               activeOpacity={0.7}
             >
               <View style={styles.optionLeft}>
@@ -100,19 +140,13 @@ export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
                   </Text>
                 </View>
               </View>
-              <View style={[styles.toggle, isMuted && styles.toggleActive]}>
-                <View
-                  style={[styles.toggleDot, isMuted && styles.toggleDotActive]}
-                />
-              </View>
+              <AnimatedToggle isActive={isMuted} />
             </TouchableOpacity>
 
             {/* Auto-Advance Toggle */}
             <TouchableOpacity
               style={styles.optionRow}
-              onPress={() => {
-                onToggleAutoAdvance();
-              }}
+              onPress={handleToggleAutoAdvance}
               activeOpacity={0.7}
             >
               <View style={styles.optionLeft}>
@@ -132,14 +166,7 @@ export const FeedOptionsButton: React.FC<FeedOptionsButtonProps> = ({
                   </Text>
                 </View>
               </View>
-              <View style={[styles.toggle, autoAdvance && styles.toggleActive]}>
-                <View
-                  style={[
-                    styles.toggleDot,
-                    autoAdvance && styles.toggleDotActive,
-                  ]}
-                />
-              </View>
+              <AnimatedToggle isActive={autoAdvance} />
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -182,10 +209,18 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 48,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   optionsHeader: {
     flexDirection: 'row',
@@ -197,6 +232,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   optionRow: {
     flexDirection: 'row',
@@ -245,9 +288,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
-  },
-  toggleDotActive: {
-    alignSelf: 'flex-end',
   },
 });
 

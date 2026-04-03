@@ -14,6 +14,7 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -51,6 +52,7 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const handleConversationPress = (conversation: Conversation) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate('Chat' as any, {
       conversationId: conversation.conversation_id,
       otherUserId: conversation.other_user_id,
@@ -78,6 +80,7 @@ export const ChatListScreen: React.FC = () => {
     <TouchableOpacity
       style={styles.conversationItem}
       onPress={() => handleConversationPress(item)}
+      activeOpacity={0.7}
     >
       <View style={styles.conversationContent}>
         {item.other_user_avatar_url ? (
@@ -133,7 +136,8 @@ export const ChatListScreen: React.FC = () => {
       </Text>
       <TouchableOpacity
         style={styles.startChatButton}
-        onPress={() => navigation.navigate('Social' as any)}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate('Social' as any); }}
+        activeOpacity={0.85}
       >
         <Ionicons name="person-add" size={20} color="#FFF" />
         <Text style={styles.startChatText}>Go to Friends</Text>

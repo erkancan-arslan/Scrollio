@@ -3,15 +3,17 @@
  * Right-side action buttons (like, comment, bookmark, share) for feed videos
  */
 
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
   Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { VideoStats, VideoCreator } from '../types';
 import { formatCount } from '../data/mockVideos';
 
@@ -38,10 +40,42 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
   onShare,
   onCreatorPress,
 }) => {
+  const likeScale = useRef(new Animated.Value(1)).current;
+  const bookmarkScale = useRef(new Animated.Value(1)).current;
+
+  const animateBounce = useCallback((anim: Animated.Value) => {
+    Animated.sequence([
+      Animated.spring(anim, { toValue: 1.3, useNativeDriver: true, speed: 50, bounciness: 10 }),
+      Animated.spring(anim, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 8 }),
+    ]).start();
+  }, []);
+
+  const handleLike = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    animateBounce(likeScale);
+    onLike();
+  }, [onLike, animateBounce, likeScale]);
+
+  const handleBookmark = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    animateBounce(bookmarkScale);
+    onBookmark();
+  }, [onBookmark, animateBounce, bookmarkScale]);
+
+  const handleShare = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onShare();
+  }, [onShare]);
+
+  const handleComment = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onComment();
+  }, [onComment]);
+
   return (
     <View style={styles.container}>
       {/* Creator Avatar */}
-      <TouchableOpacity style={styles.avatarContainer} onPress={onCreatorPress}>
+      <TouchableOpacity style={styles.avatarContainer} onPress={onCreatorPress} activeOpacity={0.8}>
         <Image source={{ uri: creator.avatarUrl }} style={styles.avatar} />
         <View style={styles.followBadge}>
           <Text style={styles.followBadgeText}>+</Text>
@@ -49,19 +83,19 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
       </TouchableOpacity>
 
       {/* Like Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={onLike}>
-        <View style={[styles.iconContainer, isLiked && styles.iconContainerLiked]}>
+      <TouchableOpacity style={styles.actionButton} onPress={handleLike} activeOpacity={0.9}>
+        <Animated.View style={[styles.iconContainer, isLiked && styles.iconContainerLiked, { transform: [{ scale: likeScale }] }]}>
           <Ionicons
             name={isLiked ? 'heart' : 'heart-outline'}
             size={26}
             color={isLiked ? '#FF4D67' : '#FFFFFF'}
           />
-        </View>
+        </Animated.View>
         <Text style={styles.actionCount}>{formatCount(stats.likes)}</Text>
       </TouchableOpacity>
 
       {/* Comment Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={onComment}>
+      <TouchableOpacity style={styles.actionButton} onPress={handleComment} activeOpacity={0.8}>
         <View style={styles.iconContainer}>
           <Ionicons name="chatbubble-outline" size={24} color="#FFFFFF" />
         </View>
@@ -69,19 +103,19 @@ export const VideoActions: React.FC<VideoActionsProps> = ({
       </TouchableOpacity>
 
       {/* Bookmark Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={onBookmark}>
-        <View style={[styles.iconContainer, isBookmarked && styles.iconContainerBookmarked]}>
+      <TouchableOpacity style={styles.actionButton} onPress={handleBookmark} activeOpacity={0.9}>
+        <Animated.View style={[styles.iconContainer, isBookmarked && styles.iconContainerBookmarked, { transform: [{ scale: bookmarkScale }] }]}>
           <Ionicons
             name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
             size={24}
             color={isBookmarked ? '#FFD700' : '#FFFFFF'}
           />
-        </View>
+        </Animated.View>
         <Text style={styles.actionCount}>{formatCount(stats.bookmarks)}</Text>
       </TouchableOpacity>
 
       {/* Share Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={onShare}>
+      <TouchableOpacity style={styles.actionButton} onPress={handleShare} activeOpacity={0.8}>
         <View style={styles.iconContainer}>
           <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
         </View>

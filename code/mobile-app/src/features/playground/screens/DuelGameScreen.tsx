@@ -17,6 +17,7 @@ import {
     Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import {
@@ -317,8 +318,7 @@ export const DuelGameScreen: React.FC = () => {
     // ===================================================
     const handleJoker = useCallback(async (type: string) => {
         console.log(`[DuelGameScreen] Attempting to use joker: ${type} for match ${matchId}`);
-        // Optimistic check? 
-        // Better to just call server.
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             const snapshot = await duelService.useJoker(matchId, type);
             console.log(`[DuelGameScreen] Joker ${type} used successfully.`);
@@ -482,6 +482,7 @@ export const DuelGameScreen: React.FC = () => {
         }
 
         const answer = direction === 'right'; // Right = True, Left = False
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setIsSubmitting(true);
         setIAmAnswered(true);
 
@@ -608,7 +609,7 @@ export const DuelGameScreen: React.FC = () => {
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.exitBtn} onPress={handleExit}>
+                    <TouchableOpacity style={styles.exitBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleExit(); }} activeOpacity={0.85}>
                         <Text style={styles.exitBtnText}>Back to Friends</Text>
                     </TouchableOpacity>
                 </View>

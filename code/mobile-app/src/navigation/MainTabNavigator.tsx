@@ -8,6 +8,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { FeedScreen } from '../features/feed';
 import { ProfileScreen } from '../features/profile';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
@@ -32,6 +33,11 @@ export const MainTabNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: [

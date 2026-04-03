@@ -137,8 +137,9 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
                 const pDist = guessingResult.playerDistance;
                 const bDist = guessingResult.botDistance;
                 const maxDist = Math.max(pDist, bDist, 1);
-                const pFrac = pDist / maxDist;
-                const bFrac = bDist / maxDist;
+                // Closer guess → larger bar (invert the fraction)
+                const pFrac = 1 - pDist / maxDist;
+                const bFrac = 1 - bDist / maxDist;
 
                 playerBarWidth.setValue(0);
                 botBarWidth.setValue(0);
@@ -173,9 +174,17 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
         // displayPhase transitions via the guessingResult useEffect above
     };
 
-    const attackerColor = PLAYER_COLORS[attackerId];
-    const defenderColor = defenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[defenderId as PlayerId];
-    const defenderLabel = defenderId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(defenderId as PlayerId, lang);
+    // Use attackerId/defenderId from the result object when available.
+    // The parent clears activeBattle before showing 'guessing_result', so the props
+    // can fall back to stale defaults ('player'/'neutral'). The result always has
+    // the correct values set atomically by the reducer.
+    const r = guessingResult;
+    const effectiveAttackerId = r ? r.attackerId : attackerId;
+    const effectiveDefenderId = r ? r.defenderId : defenderId;
+
+    const attackerColor = PLAYER_COLORS[effectiveAttackerId];
+    const defenderColor = effectiveDefenderId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[effectiveDefenderId as PlayerId];
+    const defenderLabel = effectiveDefenderId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(effectiveDefenderId as PlayerId, lang);
     const timerColor = timeLeft <= 3 ? '#FF3B30' : timeLeft <= 5 ? '#FF9500' : '#34C759';
     const timerBarColor: [string, string] = timeLeft <= 3
         ? ['#FF3B30', '#FF6B60']
@@ -184,8 +193,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
             : ['#34C759', '#30D158'];
 
     // Result derived values
-    const r = guessingResult;
-    const isPlayerAttacking = attackerId === 'player';
+    const isPlayerAttacking = effectiveAttackerId === 'player';
     const playerWon = r ? (r.tie ? !isPlayerAttacking : (isPlayerAttacking ? r.conquered : !r.conquered)) : false;
     const winnerLabel = r?.tie
         ? t(lang, 'tieBanner')
@@ -195,7 +203,7 @@ export const GuessingModal: React.FC<GuessingModalProps> = ({
     const winnerColor = r?.tie ? '#FF9500' : playerWon ? '#34C759' : '#FF3B30';
 
     // Opponent color in result
-    const opponentId = isPlayerAttacking ? defenderId : attackerId;
+    const opponentId = isPlayerAttacking ? effectiveDefenderId : effectiveAttackerId;
     const opponentColor = opponentId === 'neutral' ? NEUTRAL_COLOR : PLAYER_COLORS[opponentId as PlayerId];
     const opponentLabel = opponentId === 'neutral' ? getNeutralLabel(lang) : getPlayerLabel(opponentId as PlayerId, lang);
 

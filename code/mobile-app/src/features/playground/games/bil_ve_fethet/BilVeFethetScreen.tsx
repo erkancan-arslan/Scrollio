@@ -419,15 +419,15 @@ export const BilVeFethetScreen: React.FC<BilVeFethetScreenProps> = ({ onExit }) 
             {/* Guessing Modal */}
             <GuessingModal
                 visible={state.phase === 'guessing' || state.phase === 'guessing_result'}
-                attackerId={state.activeBattle?.attackerId ?? 'player'}
-                defenderId={state.activeBattle?.defenderId ?? 'neutral'}
+                attackerId={state.activeBattle?.attackerId ?? state.lastGuessingResult?.attackerId ?? 'player'}
+                defenderId={state.activeBattle?.defenderId ?? state.lastGuessingResult?.defenderId ?? 'neutral'}
                 targetProvinceName={targetRegion?.name ?? ''}
                 question={state.guessingQuestion}
                 botGuess={state.botGuess}
                 guessingResult={state.lastGuessingResult}
                 onSubmit={handleGuessingSubmit}
                 onContinue={handleGuessingContinue}
-                isDefending={state.activeBattle?.defenderId === 'player'}
+                isDefending={state.activeBattle?.defenderId === 'player' || state.lastGuessingResult?.defenderId === 'player'}
                 lang={lang}
             />
 
