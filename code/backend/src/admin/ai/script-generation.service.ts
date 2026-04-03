@@ -163,32 +163,40 @@ export class ScriptGenerationService {
   // ── Difficulty doctrine ───────────────────────────────────────────────────
 
   private buildDifficultyDoctrine(difficulty?: string): string {
+    const sharedPreamble = [
+      'The audience is ALWAYS a curious everyday adult with no prior expertise.',
+      'Every tier must be fully understandable in one listen — no jargon without a one-phrase explanation.',
+      'Think of the three tiers as three different practical angles on the same topic, not three different audiences.',
+      '',
+    ].join('\n');
+
     switch (difficulty) {
       case 'beginner':
-        return [
-          'BEGINNER: Cover what things ARE at their most fundamental level.',
-          'Focus on definitions, basic terminology, and why this topic matters to a complete newcomer.',
-          'Assume zero prior knowledge. No jargon without an immediate plain-language explanation.',
+        return sharedPreamble + [
+          'BEGINNER TIER: Cover the single most practical, real-world angle that makes the topic click for a newcomer.',
+          'Answer: "What is this, and why does it affect my everyday life?"',
+          'Use concrete, relatable examples (salary, shopping, rent, savings). Avoid abstraction.',
+          'This is not a dictionary definition — it should feel like a useful insight, not a textbook intro.',
         ].join('\n');
 
       case 'intermediate':
-        return [
-          'INTERMEDIATE: Cover HOW things work mechanically.',
-          'Go beyond definitions into strategies, positions, and instruments a practitioner would use.',
-          'Assume the listener already knows the basics. Do NOT explain entry-level concepts.',
-          'Introduce meaningful complexity: trade-offs, mechanics, cause-and-effect relationships.',
+        return sharedPreamble + [
+          'INTERMEDIATE TIER: Go one layer deeper into HOW this works in practice.',
+          'Answer: "How does this actually function, and what drives it?"',
+          'Cover one clear mechanism, cause-and-effect, or decision a real person might face.',
+          'Still fully accessible — no formulas, no professional jargon. Think "smart friend explaining at dinner".',
         ].join('\n');
 
       case 'advanced':
-        return [
-          'ADVANCED: Cover sophisticated mechanisms, edge cases, and professional-grade strategies.',
-          'Assume solid intermediate knowledge. Speak to someone who already operates in this space.',
-          'Focus on nuance: risk management, complex instruments, second-order effects, expert debates.',
-          'Do not simplify. Precision and density are appropriate here.',
+        return sharedPreamble + [
+          'ADVANCED TIER: Cover one nuanced, counterintuitive, or often-misunderstood angle of this topic.',
+          'Answer: "What do most people get wrong, or what interesting consequence do they overlook?"',
+          'This is NOT academic or technical complexity — it is a sharper, more interesting practical insight.',
+          'Still zero assumed expertise. The "advanced" quality comes from the depth of the idea, not the vocabulary.',
         ].join('\n');
 
       default:
-        return 'Cover this topic in a clear, engaging way appropriate for a general audience.';
+        return 'Cover this topic in a clear, engaging way appropriate for a general curious adult audience.';
     }
   }
 

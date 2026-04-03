@@ -18,22 +18,30 @@ export interface PreviousLevelTopic {
   subTopic: string;
 }
 
+// All three tiers target the same audience: a curious everyday adult with no prior expertise.
+// "Difficulty" picks a progressively deeper practical angle — NOT a higher academic register.
+// Even "advanced" must be fully understandable in one listen with no assumed background.
 const DIFFICULTY_DOCTRINE: Record<Difficulty, string> = {
   beginner: [
-    'Cover what things ARE at their most fundamental level.',
-    'Focus on definitions, basic terminology, and why this topic matters to a complete newcomer.',
-    'Assume zero prior knowledge. No jargon without a plain-language explanation.',
+    'The audience is a curious adult with zero prior knowledge.',
+    'Cover the single most practical, real-world angle that makes the topic immediately click.',
+    'Answer: "What is this, and why does it affect my everyday life?"',
+    'Use concrete relatable examples (salary, rent, shopping, savings). No abstraction.',
+    'This is NOT a textbook definition — it should feel like a useful insight.',
   ].join(' '),
   intermediate: [
-    'Cover HOW things work mechanically.',
-    'Go beyond definitions into strategies, instruments, and cause-and-effect relationships.',
-    'Assume the listener already knows the basics — do NOT repeat beginner-level concepts.',
+    'The audience is a curious adult — still no assumed expertise.',
+    'Go one layer deeper into HOW this works in practice.',
+    'Answer: "How does this actually function, and what drives it?"',
+    'Cover one clear mechanism or cause-and-effect a real person might encounter.',
+    'Think "smart friend explaining at dinner" — no formulas, no jargon.',
   ].join(' '),
   advanced: [
-    'Cover sophisticated mechanisms, edge cases, and professional-grade strategies.',
-    'Assume solid intermediate knowledge. Speak to someone who already operates in this space.',
-    'Focus on nuance: risk management, complex instruments, second-order effects.',
-    'Do not simplify. Precision and density are appropriate here.',
+    'The audience is a curious adult — still zero assumed expertise.',
+    'Cover one nuanced, counterintuitive, or commonly-misunderstood angle.',
+    'Answer: "What do most people get wrong, or what consequence do they overlook?"',
+    'NOT academic or technical complexity — the depth comes from the sharpness of the idea, not the vocabulary.',
+    'Must be fully understandable in one listen without any background knowledge.',
   ].join(' '),
 };
 
