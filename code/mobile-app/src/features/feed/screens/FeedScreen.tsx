@@ -23,6 +23,7 @@ import { mockVideos } from '../data/mockVideos';
 import { feedService } from '../../../services';
 import { colors } from '../../../theme';
 
+
 export const FeedScreen: React.FC = () => {
   const { height: windowHeight } = Dimensions.get('window');
   const tabBarHeight = useBottomTabBarHeight();
@@ -62,26 +63,33 @@ export const FeedScreen: React.FC = () => {
   const fetchFeed = useCallback(async (refresh = false) => {
     if (refresh) {
       setFeedState((prev) => ({ ...prev, refreshing: true }));
-    } else if (!feedState.hasMore || isLoadingMore.current) {
+    } else if (!feedState.hasMore) {
       return;
     }
+
+    isLoadingMore.current = true;
 
     try {
       const cursor = refresh ? undefined : feedState.nextCursor || undefined;
       const response = await feedService.getFeed({ limit: 10, cursor });
 
       if (response.data) {
-        setFeedState((prev) => ({
-          ...prev,
-          videos: refresh
-            ? response.data!.videos
-            : [...prev.videos, ...response.data!.videos],
-          nextCursor: response.data!.nextCursor,
-          hasMore: response.data!.hasMore,
-          loading: false,
-          refreshing: false,
-          error: null,
-        }));
+        const newVideos = response.data.videos;
+        setFeedState((prev) => {
+          const existingIds = new Set(prev.videos.map((v) => v.id));
+          const uniqueNew = refresh
+            ? newVideos
+            : newVideos.filter((v) => !existingIds.has(v.id));
+          return {
+            ...prev,
+            videos: refresh ? uniqueNew : [...prev.videos, ...uniqueNew],
+            nextCursor: response.data!.nextCursor,
+            hasMore: response.data!.hasMore,
+            loading: false,
+            refreshing: false,
+            error: null,
+          };
+        });
       } else {
         // Fallback to mock data if API fails
         console.log('API failed, using mock data:', response.error);
@@ -115,6 +123,13 @@ export const FeedScreen: React.FC = () => {
     fetchFeed(true);
   }, []);
 
+  // Record view for a video that is leaving the viewport
+  const recordVideoView = useCallback((videoId: string, startTime: number) => {
+    const watchDuration = Math.round((Date.now() - startTime) / 1000);
+    // Fire-and-forget — do not block UI
+    feedService.recordView(videoId, watchDuration, false).catch(() => {});
+  }, []);
+
   // Record view when navigating away from the feed tab
   useEffect(() => {
     if (!isFocused && activeVideoId.current && activeVideoStartTime.current !== null) {
@@ -133,7 +148,6 @@ export const FeedScreen: React.FC = () => {
   // Handle load more when reaching end
   const handleEndReached = useCallback(() => {
     if (!isLoadingMore.current && feedState.hasMore && !feedState.loading) {
-      isLoadingMore.current = true;
       fetchFeed(false);
     }
   }, [fetchFeed, feedState.hasMore, feedState.loading]);
@@ -293,12 +307,6 @@ export const FeedScreen: React.FC = () => {
     }
   }, [autoAdvance, currentIndex, feedState.videos.length]);
 
-  // Record view for a video that is leaving the viewport
-  const recordVideoView = useCallback((videoId: string, startTime: number) => {
-    const watchDuration = Math.round((Date.now() - startTime) / 1000);
-    // Fire-and-forget — do not block UI
-    feedService.recordView(videoId, watchDuration, false).catch(() => {});
-  }, []);
 
   // Track viewable items for auto-play and watch time recording
   const onViewableItemsChanged = useCallback(
@@ -426,7 +434,6 @@ export const FeedScreen: React.FC = () => {
         data={feedState.videos}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={itemHeight}
         snapToAlignment="start"
@@ -436,8 +443,8 @@ export const FeedScreen: React.FC = () => {
         viewabilityConfig={viewabilityConfig}
         getItemLayout={getItemLayout}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={2}
-        windowSize={3}
+        maxToRenderPerBatch={3}
+        windowSize={5}
         initialNumToRender={1}
         bounces={false}
         overScrollMode="never"

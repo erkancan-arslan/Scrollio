@@ -548,7 +548,7 @@ export const DuelGameScreen: React.FC = () => {
         if (navigation.canGoBack()) {
             navigation.goBack();
         } else {
-            navigation.navigate('Friends'); // Fallback
+            navigation.navigate('Social' as any); // Fallback
         }
     }, [dispatch, navigation]);
 

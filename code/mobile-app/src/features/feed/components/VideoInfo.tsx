@@ -25,21 +25,24 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const maxDescriptionLength = 80;
-  const shouldTruncate = video.description.length > maxDescriptionLength;
+  const description = video.description || '';
+  const shouldTruncate = description.length > maxDescriptionLength;
 
   const displayDescription = isExpanded
-    ? video.description
+    ? description
     : shouldTruncate
-    ? `${video.description.slice(0, maxDescriptionLength)}...`
-    : video.description;
+    ? `${description.slice(0, maxDescriptionLength)}...`
+    : description;
 
   return (
     <View style={styles.container}>
       {/* Creator Username */}
       <TouchableOpacity onPress={onCreatorPress}>
         <View style={styles.creatorRow}>
-          <Text style={styles.username}>@{video.creator.username}</Text>
-          {video.creator.isVerified && (
+          <Text style={styles.username}>
+            @{video.creator?.username && video.creator.username !== 'unknown' ? video.creator.username : 'scrollio_team'}
+          </Text>
+          {(video.creator?.isVerified || !video.creator?.username || video.creator.username === 'unknown') && (
             <View style={styles.verifiedBadge}>
               <Text style={styles.verifiedIcon}>✓</Text>
             </View>

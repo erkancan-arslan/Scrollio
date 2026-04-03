@@ -133,7 +133,7 @@ export const ChatListScreen: React.FC = () => {
       </Text>
       <TouchableOpacity
         style={styles.startChatButton}
-        onPress={() => navigation.navigate('Friends' as any)}
+        onPress={() => navigation.navigate('Social' as any)}
       >
         <Ionicons name="person-add" size={20} color="#FFF" />
         <Text style={styles.startChatText}>Go to Friends</Text>

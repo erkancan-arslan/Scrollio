@@ -61,6 +61,16 @@ export class FeedService {
     return data.signedUrl;
   }
 
+  /** Fisher-Yates shuffle — returns a new shuffled array */
+  private shuffleArray<T>(arr: T[]): T[] {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
   /**
    * Get personalized feed for a user
    */
@@ -68,7 +78,32 @@ export class FeedService {
     const supabase = this.supabaseService.getAdminClient();
     const limit = query.limit || 10;
 
-    // Build query
+    // Step 1: count eligible videos so we can pick a random starting offset
+    let countQuery = supabase
+      .from('videos')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_published', true)
+      .eq('moderation_status', 'approved');
+
+    if (query.topicId) countQuery = countQuery.eq('topic_id', query.topicId);
+    if (query.difficulty) countQuery = countQuery.eq('difficulty_level', query.difficulty);
+
+    const { count, error: countError } = await countQuery;
+    if (countError) {
+      this.logger.error('Error counting videos:', countError);
+      throw countError;
+    }
+
+    const totalCount = count ?? 0;
+    if (totalCount === 0) {
+      return { videos: [], nextCursor: null, hasMore: false };
+    }
+
+    // Step 2: pick a random offset so a different slice is returned every call
+    const maxOffset = Math.max(0, totalCount - limit);
+    const randomOffset = Math.floor(Math.random() * (maxOffset + 1));
+
+    // Step 3: fetch `limit` videos from that random position (ORDER BY id for stable range)
     let dbQuery = supabase
       .from('videos')
       .select(`
@@ -78,32 +113,11 @@ export class FeedService {
       `)
       .eq('is_published', true)
       .eq('moderation_status', 'approved')
-      .order('created_at', { ascending: false })
-      .limit(limit + 1); // Fetch one extra to check if there are more
+      .order('id')
+      .range(randomOffset, randomOffset + limit - 1);
 
-    // Filter by topic if specified
-    if (query.topicId) {
-      dbQuery = dbQuery.eq('topic_id', query.topicId);
-    }
-
-    // Filter by difficulty if specified
-    if (query.difficulty) {
-      dbQuery = dbQuery.eq('difficulty_level', query.difficulty);
-    }
-
-    // Cursor-based pagination
-    if (query.cursor) {
-      // Get the created_at of the cursor video
-      const { data: cursorVideo } = await supabase
-        .from('videos')
-        .select('created_at')
-        .eq('id', query.cursor)
-        .single();
-
-      if (cursorVideo) {
-        dbQuery = dbQuery.lt('created_at', cursorVideo.created_at);
-      }
-    }
+    if (query.topicId) dbQuery = dbQuery.eq('topic_id', query.topicId);
+    if (query.difficulty) dbQuery = dbQuery.eq('difficulty_level', query.difficulty);
 
     const { data: videos, error } = await dbQuery;
 
@@ -112,9 +126,8 @@ export class FeedService {
       throw error;
     }
 
-    // Check if there are more videos
-    const hasMore = videos && videos.length > limit;
-    const videosToReturn = hasMore ? videos.slice(0, limit) : videos || [];
+    // Shuffle the fetched slice so even the within-page order is random
+    const videosToReturn = this.shuffleArray(videos ?? []);
 
     // Get user's likes and bookmarks if authenticated
     let userLikes = new Set<string>();
@@ -157,10 +170,10 @@ export class FeedService {
 
     return {
       videos: videosDtos,
-      nextCursor: hasMore && videosToReturn.length > 0
-        ? videosToReturn[videosToReturn.length - 1].id
-        : null,
-      hasMore,
+      // nextCursor is null — each load is an independent random pick.
+      // hasMore stays true as long as there are enough videos to keep scrolling.
+      nextCursor: null,
+      hasMore: totalCount > limit,
     };
   }
 
@@ -710,21 +723,28 @@ export class FeedService {
       videoUrl: resolvedVideoUrl ?? video.video_url,
       thumbnailUrl: video.thumbnail_url,
       duration: video.duration,
-      creator: video.creator
-        ? {
-          id: video.creator.id,
-          username: video.creator.username,
-          displayName: video.creator.display_name,
-          avatarUrl: video.creator.avatar_url,
-          isVerified: video.creator.is_verified,
+      creator: (() => {
+        const validUsername =
+          video.creator?.username && video.creator.username !== 'unknown'
+            ? video.creator.username
+            : null;
+        if (video.creator && validUsername) {
+          return {
+            id: video.creator.id,
+            username: validUsername,
+            displayName: video.creator.display_name || validUsername,
+            avatarUrl: video.creator.avatar_url,
+            isVerified: video.creator.is_verified ?? false,
+          };
         }
-        : {
-          id: 'unknown',
-          username: 'unknown',
-          displayName: 'Unknown Creator',
+        return {
+          id: 'scrollio_team',
+          username: 'scrollio_team',
+          displayName: 'Scrollio Team',
           avatarUrl: null,
-          isVerified: false,
-        },
+          isVerified: true,
+        };
+      })(),
       stats: {
         views: video.view_count || 0,
         likes: video.like_count || 0,

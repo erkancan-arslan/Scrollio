@@ -12,8 +12,7 @@ import { FeedScreen } from '../features/feed';
 import { ProfileScreen } from '../features/profile';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { SearchScreen } from '../features/search';
-import { FriendsScreen } from '../features/friends';
-import { ChatListScreen } from '../features/chat';
+import { SocialScreen } from '../features/social/screens/SocialScreen';
 
 // Scrollio brand orange color
 const SCROLLIO_ORANGE = '#FF8C42';
@@ -21,8 +20,7 @@ const SCROLLIO_ORANGE = '#FF8C42';
 export type MainTabParamList = {
   Feed: undefined;
   Search: undefined;
-  Friends: undefined;
-  Messages: undefined;
+  Social: undefined;
   Playground: { category?: string };
   Profile: undefined;
 };
@@ -82,30 +80,14 @@ export const MainTabNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Friends"
-        component={FriendsScreen}
+        name="Social"
+        component={SocialScreen}
         options={{
-          tabBarLabel: 'Friends',
+          tabBarLabel: 'Social',
           tabBarIcon: ({ focused, color }) => (
             <View style={styles.iconContainer}>
               <Ionicons
                 name={focused ? 'people' : 'people-outline'}
-                size={24}
-                color={color}
-              />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={ChatListScreen}
-        options={{
-          tabBarLabel: 'Messages',
-          tabBarIcon: ({ focused, color }) => (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
                 size={24}
                 color={color}
               />
