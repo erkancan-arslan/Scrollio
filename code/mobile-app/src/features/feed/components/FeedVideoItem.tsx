@@ -70,6 +70,9 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wasPlayingRef = useRef(false);
+  // Ref mirror of isActive — always current inside native event listeners,
+  // avoids stale closure issues when expo-video fires events asynchronously.
+  const isActiveRef = useRef(isActive);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pauseIconTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -107,6 +110,11 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
     }).start();
     startHideTimer();
   }, [uiOpacity, startHideTimer]);
+
+  // Keep the ref in sync so native event listeners always see the current value
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // Start timer when video becomes active
   useEffect(() => {
@@ -179,16 +187,27 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
         setIsBuffering(true);
       } else if (status.status === 'readyToPlay') {
         setIsBuffering(false);
+        // Prevent the native layer from auto-starting when a non-active
+        // video finishes buffering/loading (expo-video race condition).
+        if (!isActiveRef.current) {
+          player.pause();
+        }
       }
     });
 
-    const playingSubscription = player.addListener('playingChange', (isPlaying) => {
-      if (isActive && wasPlayingRef.current && !isPlaying.isPlaying && !player.currentTime) {
+    const playingSubscription = player.addListener('playingChange', (event) => {
+      // If the native layer started playback but this item is not active,
+      // force-pause immediately. Handles all expo-video auto-start races.
+      if (event.isPlaying && !isActiveRef.current) {
+        player.pause();
+        return;
+      }
+      if (isActiveRef.current && wasPlayingRef.current && !event.isPlaying && !player.currentTime) {
         setIsBuffering(true);
-      } else if (isPlaying.isPlaying) {
+      } else if (event.isPlaying) {
         setIsBuffering(false);
       }
-      wasPlayingRef.current = isPlaying.isPlaying;
+      wasPlayingRef.current = event.isPlaying;
     });
 
     return () => {
