@@ -5,6 +5,7 @@ import { LessonService } from './lesson.service';
 import { TeacherProfileService } from './teacher-profile.service';
 import { TtsService } from '../admin/ai/tts.service';
 import { LipsyncService } from '../admin/ai/lipsync.service';
+import { BunnyCdnService } from '../bunnycdn/bunnycdn.service';
 
 interface Slide {
   index: number;
@@ -31,6 +32,7 @@ export class LessonOrchestratorService {
     private readonly profileService: TeacherProfileService,
     private readonly ttsService: TtsService,
     private readonly lipsyncService: LipsyncService,
+    private readonly bunnyCdnService: BunnyCdnService,
   ) {
     this.falKey = this.configService.get<string>('FAL_KEY') || '';
   }
@@ -57,11 +59,23 @@ export class LessonOrchestratorService {
       // 2) TTS for each slide
       for (let i = 0; i < slides.length; i++) {
         try {
-          slides[i].audioUrl = await this.ttsService.generateSpeech(
+          const rawAudioUrl = await this.ttsService.generateSpeech(
             slides[i].narrationText,
             undefined,
             lesson.language || 'tr',
           );
+          // Upload TTS audio to BunnyCDN for stable, long-lived URLs
+          try {
+            slides[i].audioUrl = await this.bunnyCdnService.uploadFromUrl(
+              rawAudioUrl,
+              `classroom-lessons/${lessonId}/audio-slide-${i}.mp4`,
+              'audio/mp4',
+            );
+            this.logger.log(`Slide ${i} TTS uploaded to BunnyCDN: ${slides[i].audioUrl}`);
+          } catch (cdnErr) {
+            this.logger.warn(`BunnyCDN audio upload failed for slide ${i}, using raw URL: ${cdnErr}`);
+            slides[i].audioUrl = rawAudioUrl;
+          }
         } catch (err) {
           this.logger.warn(`TTS failed for slide ${i}: ${err}`);
           slides[i].audioUrl = undefined;
@@ -85,10 +99,21 @@ export class LessonOrchestratorService {
         for (let i = 0; i < slides.length; i++) {
           if (!slides[i].audioUrl) continue;
           try {
-            slides[i].videoUrl = await this.lipsyncService.generate(
+            const rawVideoUrl = await this.lipsyncService.generate(
               refVideoUrl,
               slides[i].audioUrl!,
             );
+            // Upload lipsync video to BunnyCDN for stable, long-lived URLs
+            try {
+              slides[i].videoUrl = await this.bunnyCdnService.uploadFromUrl(
+                rawVideoUrl,
+                `classroom-lessons/${lessonId}/video-slide-${i}.mp4`,
+              );
+              this.logger.log(`Slide ${i} lipsync video uploaded to BunnyCDN: ${slides[i].videoUrl}`);
+            } catch (cdnErr) {
+              this.logger.warn(`BunnyCDN video upload failed for slide ${i}, using raw URL: ${cdnErr}`);
+              slides[i].videoUrl = rawVideoUrl;
+            }
           } catch (err) {
             this.logger.warn(`Lipsync failed for slide ${i}: ${err}`);
             slides[i].videoUrl = undefined;

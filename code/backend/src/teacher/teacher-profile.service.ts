@@ -1,13 +1,16 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { BunnyCdnService } from '../bunnycdn/bunnycdn.service';
 import { UpdateTeacherProfileDto } from './dto';
 
 @Injectable()
 export class TeacherProfileService {
   private readonly logger = new Logger(TeacherProfileService.name);
-  private readonly bucket = 'reference-videos';
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly bunnyCdnService: BunnyCdnService,
+  ) {}
 
   async getProfile(teacherId: string) {
     const admin = this.supabaseService.getAdminClient();
@@ -46,23 +49,22 @@ export class TeacherProfileService {
     const admin = this.supabaseService.getAdminClient();
     const storagePath = `teachers/${teacherId}/${Date.now()}-${filename}`;
 
-    const { error: uploadError } = await admin.storage
-      .from(this.bucket)
-      .upload(storagePath, file, { contentType, upsert: false });
-
-    if (uploadError) {
+    let publicUrl: string;
+    try {
+      publicUrl = await this.bunnyCdnService.uploadBuffer(
+        file,
+        storagePath,
+        contentType,
+      );
+    } catch (uploadError) {
       this.logger.error('Reference video upload failed', uploadError);
       throw uploadError;
     }
 
-    const { data: urlData } = admin.storage
-      .from(this.bucket)
-      .getPublicUrl(storagePath);
-
     const { data, error } = await admin
       .from('teacher_profiles')
       .update({
-        reference_video_url: urlData.publicUrl,
+        reference_video_url: publicUrl,
         reference_video_storage_path: storagePath,
         reference_video_status: 'ready',
         updated_at: new Date().toISOString(),

@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_PROD_URL": "https://YOUR_RAILWAY_URL.railway.app/api/v1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://karwgjlvkxqdzozazygd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imthcndnamx2a3hxZHpvemF6eWdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTgxOTMsImV4cCI6MjA4MDQzNDE5M30.ZrG4iB2ZcRdGEsYWWqbdRKhEn8r0YpaeUtxRaZbrbYk"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_PROD_URL": "https://scrollio-production.up.railway.app/api/v1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://karwgjlvkxqdzozazygd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imthcndnamx2a3hxZHpvemF6eWdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTgxOTMsImV4cCI6MjA4MDQzNDE5M30.ZrG4iB2ZcRdGEsYWWqbdRKhEn8r0YpaeUtxRaZbrbYk"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

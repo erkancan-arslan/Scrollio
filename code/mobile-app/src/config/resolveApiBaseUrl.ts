@@ -18,8 +18,15 @@ function normalizeEnvUrl(raw: string | undefined | null): string | null {
 
 export function resolveExpoPublicApiBaseUrl(): string {
   if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    // Production build — use the Railway / hosted backend URL set at build time
+    const prodUrl = normalizeEnvUrl(process.env.EXPO_PUBLIC_API_PROD_URL);
+    if (prodUrl) {
+      return /\/api\/v\d+/i.test(prodUrl) ? prodUrl : `${prodUrl}/api/v1`;
+    }
+    // Fallback to legacy hardcoded value (update EXPO_PUBLIC_API_PROD_URL to override)
     return 'https://api.scrollio.app/api/v1';
   }
+
   const fromEnv = normalizeEnvUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
   if (fromEnv) {
     const trimmed = fromEnv.replace(/\/$/, '');

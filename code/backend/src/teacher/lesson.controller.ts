@@ -13,6 +13,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { LessonService } from './lesson.service';
 import { LessonOrchestratorService } from './lesson-orchestrator.service';
+import { LessonCdnMigrationService } from './lesson-cdn-migration.service';
 import { CreateLessonDto } from './dto';
 
 @ApiTags('teacher-lessons')
@@ -23,6 +24,7 @@ export class LessonController {
   constructor(
     private readonly lessonService: LessonService,
     private readonly orchestrator: LessonOrchestratorService,
+    private readonly cdnMigration: LessonCdnMigrationService,
   ) {}
 
   @Post()
@@ -50,5 +52,31 @@ export class LessonController {
     const lesson = await this.lessonService.getById(id, req.user.id);
     this.orchestrator.run(lesson).catch(() => {});
     return { message: 'Lesson generation started', lessonId: id };
+  }
+
+  /**
+   * Migrate all published lessons — re-uploads any non-BunnyCDN slide media to CDN.
+   * Safe to call multiple times; already-migrated slides are skipped automatically.
+   */
+  @Post('migrate-cdn')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Migrate all lesson slide media to BunnyCDN' })
+  async migrateAllToCdn() {
+    return this.cdnMigration.migrateAllLessons();
+  }
+
+  /**
+   * Migrate a single lesson's slide media to BunnyCDN.
+   */
+  @Post(':id/migrate-cdn')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Migrate single lesson slide media to BunnyCDN' })
+  async migrateSingleToCdn(@Param('id') id: string, @Req() req: any) {
+    const lesson = await this.lessonService.getById(id, req.user.id);
+    return this.cdnMigration.migrateSingleLesson(
+      lesson.id,
+      lesson.title,
+      lesson.slides_data ?? [],
+    );
   }
 }

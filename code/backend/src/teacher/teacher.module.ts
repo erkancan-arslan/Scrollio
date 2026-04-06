@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from '../supabase/supabase.module';
 import { AdminModule } from '../admin/admin.module';
+import { BunnyCdnModule } from '../bunnycdn/bunnycdn.module';
 
 import { TeacherAuthController } from './teacher-auth.controller';
 import { TeacherAuthService } from './teacher-auth.service';
@@ -15,6 +16,7 @@ import { ClassroomTeacherService } from './classroom.service';
 import { LessonController } from './lesson.controller';
 import { LessonService } from './lesson.service';
 import { LessonOrchestratorService } from './lesson-orchestrator.service';
+import { LessonCdnMigrationService } from './lesson-cdn-migration.service';
 
 import { KidsClassroomController } from './kids-classroom.controller';
 
@@ -22,7 +24,7 @@ import { TtsService } from '../admin/ai/tts.service';
 import { LipsyncService } from '../admin/ai/lipsync.service';
 
 @Module({
-  imports: [SupabaseModule, ConfigModule],
+  imports: [SupabaseModule, ConfigModule, BunnyCdnModule],
   controllers: [
     TeacherAuthController,
     TeacherProfileController,
@@ -36,6 +38,7 @@ import { LipsyncService } from '../admin/ai/lipsync.service';
     ClassroomTeacherService,
     LessonService,
     LessonOrchestratorService,
+    LessonCdnMigrationService,
     TtsService,
     LipsyncService,
   ],
