@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { json } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -40,6 +41,9 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Raise body size limit to support base64 image uploads (mascot drawing pipeline)
+  app.use(json({ limit: '15mb' }));
 
   // API prefix
   app.setGlobalPrefix('api/v1');

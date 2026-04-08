@@ -148,7 +148,17 @@ export class KidsCustomMascotPipelineService {
 
   private async falVideoStep(endpoint: string, input: Record<string, unknown>): Promise<string> {
     this.logger.log(`Fal image_to_video → ${endpoint}`);
-    const result = await fal.subscribe(endpoint, { input });
+    const result = await fal.subscribe(endpoint, {
+      input,
+      timeout: 10 * 60 * 1000, // 10 minutes hard cap
+      onQueueUpdate: (update) => {
+        if (update.status === 'IN_QUEUE') {
+          this.logger.log(`Fal i2v queued — position ${(update as { queue_position?: number }).queue_position ?? '?'}`);
+        } else if (update.status === 'IN_PROGRESS') {
+          this.logger.log('Fal i2v in progress…');
+        }
+      },
+    });
     const videoUrl = extractVideoUrl(result.data);
     if (!videoUrl) {
       this.logger.error(`Fal i2v raw data: ${JSON.stringify(result.data)?.slice(0, 500)}`);

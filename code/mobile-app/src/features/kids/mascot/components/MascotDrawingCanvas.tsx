@@ -37,9 +37,11 @@ function strokeToPathD(points: Point[]): string {
 export type MascotDrawingCanvasProps = {
   /** Called with data:image/png;base64,... */
   onCapture: (dataUrl: string) => void;
+  /** When true, locks the drawing surface and shows a loading indicator on the submit button. */
+  disabled?: boolean;
 };
 
-export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapture }) => {
+export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapture, disabled = false }) => {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [current, setCurrent] = useState<Stroke | null>(null);
   const [brushColor, setBrushColor] = useState('#000000');
@@ -111,12 +113,13 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
   };
 
   const handleCreateMascot = async () => {
+    if (disabled) return;
     const dataUrl = await captureDataUrl();
     onCapture(dataUrl);
   };
 
   const allPaths = [...strokes, ...(current ? [current] : [])];
-  const canSubmit = strokes.length > 0 || (current !== null && (current?.points.length ?? 0) > 0);
+  const canSubmit = !disabled && (strokes.length > 0 || (current !== null && (current?.points.length ?? 0) > 0));
 
   return (
     <View style={styles.wrap}>
@@ -155,11 +158,11 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
       </View>
 
       <View style={styles.rowBetween}>
-        <Pressable onPress={handleUndo} disabled={strokes.length === 0} style={styles.smallBtn}>
-          <Text style={[styles.smallBtnText, strokes.length === 0 && styles.disabled]}>Undo</Text>
+        <Pressable onPress={handleUndo} disabled={strokes.length === 0 || disabled} style={styles.smallBtn}>
+          <Text style={[styles.smallBtnText, (strokes.length === 0 || disabled) && styles.disabled]}>Undo</Text>
         </Pressable>
-        <Pressable onPress={clearCanvas} style={styles.smallBtn}>
-          <Text style={styles.smallBtnText}>Clear</Text>
+        <Pressable onPress={clearCanvas} disabled={disabled} style={styles.smallBtn}>
+          <Text style={[styles.smallBtnText, disabled && styles.disabled]}>Clear</Text>
         </Pressable>
       </View>
 
@@ -195,7 +198,9 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
         disabled={!canSubmit}
         style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
       >
-        <Text style={styles.primaryBtnText}>Create mascot</Text>
+        <Text style={styles.primaryBtnText}>
+          {disabled ? 'Uploading…' : 'Create mascot'}
+        </Text>
       </Pressable>
     </View>
   );
