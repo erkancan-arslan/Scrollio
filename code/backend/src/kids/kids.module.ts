@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { KidsFeedModule } from './feed/kids-feed.module';
 import { KidsQuizModule } from './quiz/kids-quiz.module';
 import { KidsBookmarkModule } from './bookmark/kids-bookmark.module';
+import { KidsLikeModule } from './like/kids-like.module';
 import { KidsCurationModule } from './curation/kids-curation.module';
 import { KidsPlaygroundModule } from './playground/kids-playground.module';
 import { KidsProgressionModule } from './progression/kids-progression.module';
@@ -21,6 +22,7 @@ import { KidsCustomMascotModule } from './custom-mascot/kids-custom-mascot.modul
     KidsFeedModule,
     KidsQuizModule,
     KidsBookmarkModule,
+    KidsLikeModule,
     KidsCurationModule,
     KidsPlaygroundModule,
     KidsProgressionModule,

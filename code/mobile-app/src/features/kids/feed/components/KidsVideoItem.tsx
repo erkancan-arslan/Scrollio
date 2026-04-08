@@ -319,7 +319,7 @@ export const KidsVideoItem = React.memo<KidsVideoItemProps>(function KidsVideoIt
           )}
 
           {/* Gradient Overlay - animated with UI */}
-          <Animated.View style={{ opacity: uiOpacity }}>
+          <Animated.View style={{ opacity: uiOpacity }} pointerEvents="none">
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
               locations={[0, 0.5, 1]}

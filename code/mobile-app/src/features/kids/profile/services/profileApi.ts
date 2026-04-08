@@ -42,3 +42,13 @@ export const getMetrics = async (): Promise<
 > => {
   return kidsApi.get('/kids/profile/metrics');
 };
+
+/** GET /api/v1/kids/like */
+export const getLikedContent = async (): Promise<KidsApiResponse<{ data: unknown[] }>> => {
+  return kidsApi.get('/kids/like');
+};
+
+/** GET /api/v1/kids/bookmark */
+export const getBookmarkedContent = async (): Promise<KidsApiResponse<{ data: unknown[] }>> => {
+  return kidsApi.get('/kids/bookmark');
+};

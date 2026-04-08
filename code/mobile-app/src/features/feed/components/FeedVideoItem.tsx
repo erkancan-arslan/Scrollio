@@ -367,7 +367,7 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
           )}
 
           {/* Gradient Overlay for better text visibility - animated with UI */}
-          <Animated.View style={{ opacity: uiOpacity }}>
+          <Animated.View style={{ opacity: uiOpacity }} pointerEvents="none">
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
               locations={[0, 0.5, 1]}

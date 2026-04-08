@@ -124,19 +124,30 @@ export class KidsFeedService {
       this.logger.error(`getFeed error: ${error.message}`);
     }
 
-    // 4. Check which items are bookmarked by this child
+    // 4. Check which items are bookmarked / liked by this child
     const contentIds = (items ?? []).map((i: { id: string }) => i.id);
     let bookmarkedSet = new Set<string>();
+    let likedSet = new Set<string>();
 
     if (contentIds.length > 0) {
-      const { data: bookmarks } = await admin
-        .from('kids_bookmarks')
-        .select('content_id')
-        .eq('child_profile_id', childId)
-        .in('content_id', contentIds);
+      const [bookmarksRes, likesRes] = await Promise.all([
+        admin
+          .from('kids_bookmarks')
+          .select('content_id')
+          .eq('child_profile_id', childId)
+          .in('content_id', contentIds),
+        admin
+          .from('kids_likes')
+          .select('content_id')
+          .eq('child_profile_id', childId)
+          .in('content_id', contentIds),
+      ]);
 
       bookmarkedSet = new Set(
-        (bookmarks ?? []).map((b: { content_id: string }) => b.content_id),
+        (bookmarksRes.data ?? []).map((b: { content_id: string }) => b.content_id),
+      );
+      likedSet = new Set(
+        (likesRes.data ?? []).map((l: { content_id: string }) => l.content_id),
       );
     }
 
@@ -156,6 +167,7 @@ export class KidsFeedService {
 
     const feedItems = (items ?? []).map((item: Record<string, unknown>) => ({
       ...item,
+      isLiked: likedSet.has(item.id as string),
       isBookmarked: bookmarkedSet.has(item.id as string),
       hasQuiz: quizContentSet.has(item.id as string),
     }));
