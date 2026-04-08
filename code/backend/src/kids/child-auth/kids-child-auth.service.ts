@@ -258,21 +258,7 @@ export class KidsChildAuthService {
       preferences: { push: true, email: false, daily_reminder: true },
     });
 
-    // Assign top 5 popular topics (by id order if available)
-    const { data: topics } = await admin
-      .from('kids_topics')
-      .select('id')
-      .eq('is_active', true)
-      .limit(5);
-
-    if (topics && topics.length > 0) {
-      await admin.from('kids_child_topics').insert(
-        topics.map((t: { id: string }) => ({
-          child_profile_id: child.id,
-          topic_id: t.id,
-        })),
-      );
-    }
+    // Topics are chosen in-app during Kids topic onboarding (min 3), not auto-assigned.
 
     return child;
   }

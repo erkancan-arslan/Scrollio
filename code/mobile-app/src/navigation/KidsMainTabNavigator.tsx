@@ -3,16 +3,22 @@
  * Three tabs: Feed, Playground, Profile.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-// Real feature screens
+import { useAppDispatch } from '../store/hooks';
+import { store } from '../store/store';
+import { fetchChildrenThunk } from '../features/kids/auth/store/authSlice';
+import { childNeedsTopicOnboarding } from '../features/kids/shared/utils/childTopicOnboarding';
+
 import { KidsFeedScreen } from '../features/kids/feed/screens/KidsFeedScreen';
 import { KidsClassroomScreen } from '../features/kids/classroom/screens/KidsClassroomScreen';
 import { KidsPlaygroundScreen } from '../features/kids/playground/screens/KidsPlaygroundScreen';
+import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { KidsProfileScreen } from '../features/kids/profile/screens/KidsProfileScreen';
 import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettingsScreen';
 
@@ -21,7 +27,7 @@ import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettin
 export type KidsMainTabParamList = {
   KidsFeed: undefined;
   KidsClassroom: undefined;
-  KidsPlayground: undefined;
+  KidsPlayground: { category?: string };
   KidsProfile: undefined;
   KidsSettings: undefined;
 };
@@ -32,6 +38,41 @@ const KIDS_ORANGE = '#FF6B35';
 
 export const KidsMainTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const dispatch = useAppDispatch();
+  const topicGateDone = useRef(false);
+
+  useEffect(() => {
+    if (topicGateDone.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await dispatch(fetchChildrenThunk()).unwrap();
+      } catch {
+        return;
+      }
+      if (cancelled) return;
+      topicGateDone.current = true;
+      const { childProfiles, activeChildProfileId } = store.getState().kidsAuth;
+      const child = childProfiles.find((c) => c.id === activeChildProfileId);
+      if (
+        child &&
+        child.selectedCharacterId &&
+        childNeedsTopicOnboarding(child)
+      ) {
+        const parent = navigation.getParent();
+        parent?.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'KidsOnboardingTopics' }],
+          }),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, navigation]);
 
   return (
     <Tab.Navigator

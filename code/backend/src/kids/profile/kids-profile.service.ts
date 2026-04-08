@@ -254,6 +254,17 @@ export class KidsProfileService {
       metadata: { topic_ids: dto.topicIds, count: dto.topicIds.length },
     });
 
+    // Mark topic onboarding complete once the child has at least 3 interests (Core parity).
+    if (dto.topicIds.length >= 3) {
+      await admin
+        .from('kids_child_profiles')
+        .update({
+          topic_onboarding_completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', childId);
+    }
+
     return this.getSelectedTopics(childId);
   }
 }

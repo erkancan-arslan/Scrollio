@@ -8,7 +8,7 @@
  *   4. PIN not verified → PinEntryScreen
  *   5. No children → CreateChildScreen
  *   6. No active child → ChildSelectorScreen
- *   7. → MainTabs (feed, playground, profile) + Parental stack
+ *   7. → Topic onboarding (≥3 interests) when not completed, then MainTabs
  *
  * All screens are always registered; gating is achieved via initialRouteName
  * and imperative navigation from each gate screen.
@@ -34,6 +34,7 @@ import { KidsChildSelectorScreen } from '../features/kids/auth/screens/ChildSele
 import { KidsCharacterSelectScreen } from '../features/kids/auth/screens/CharacterSelectScreen';
 import { KidsCreateChildScreen } from '../features/kids/auth/screens/CreateChildScreen';
 import { KidsRoleBlockedScreen } from '../features/kids/auth/screens/RoleBlockedScreen';
+import { KidsOnboardingTopicsScreen } from '../features/kids/auth/screens/KidsOnboardingTopicsScreen';
 
 // Main tabs
 import { KidsMainTabNavigator, KidsMainTabParamList } from './KidsMainTabNavigator';
@@ -67,6 +68,9 @@ export type KidsStackParamList = {
   KidsChildSelector: undefined;
   KidsCreateChild: undefined;
   KidsCharacterSelect: { childId: string; afterSave?: 'reset-to-tabs' | 'go-back' };
+
+  /** First-time topic interests (min 3) before main tabs */
+  KidsOnboardingTopics: undefined;
 
   // Main app
   KidsMainTabs: NavigatorScreenParams<KidsMainTabParamList>;
@@ -177,6 +181,17 @@ export const KidsNavigator: React.FC = () => {
           headerTitle: 'Your friend',
           headerTintColor: KIDS_ORANGE,
           headerStyle: { backgroundColor: KIDS_BG },
+        }}
+      />
+      <Stack.Screen
+        name="KidsOnboardingTopics"
+        component={KidsOnboardingTopicsScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Your interests',
+          headerTintColor: KIDS_ORANGE,
+          headerStyle: { backgroundColor: KIDS_BG },
+          gestureEnabled: false,
         }}
       />
       <Stack.Screen

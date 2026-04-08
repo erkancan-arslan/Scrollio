@@ -10,3 +10,4 @@ export {
   isValidDateOfBirth,
   getAge,
 } from './validators';
+export { childNeedsTopicOnboarding } from './childTopicOnboarding';

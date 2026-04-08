@@ -334,6 +334,8 @@ const authSlice = createSlice({
             createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
             updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
             selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+            topicOnboardingCompletedAt: (raw.topic_onboarding_completed_at ??
+              raw.topicOnboardingCompletedAt) as string | undefined,
           };
         });
       })
@@ -361,6 +363,8 @@ const authSlice = createSlice({
           createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
           updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
           selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+          topicOnboardingCompletedAt: (raw.topic_onboarding_completed_at ??
+            raw.topicOnboardingCompletedAt) as string | undefined,
         };
         state.childProfiles.push(newChild);
       })
@@ -389,10 +393,23 @@ const authSlice = createSlice({
         state.characterSelectChildId = null;
         const raw = action.payload as unknown as Record<string, unknown>;
         const updatedId = (raw.id ?? '') as string;
-        const selectedCharacterId = (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined;
         const idx = state.childProfiles.findIndex((p) => p.id === updatedId);
         if (idx !== -1) {
-          state.childProfiles[idx] = { ...state.childProfiles[idx], selectedCharacterId };
+          const prev = state.childProfiles[idx];
+          state.childProfiles[idx] = {
+            id: updatedId,
+            parentId: ((raw.parent_id ?? raw.parentId) ?? prev.parentId) as string,
+            displayName: ((raw.display_name ?? raw.displayName) ?? prev.displayName) as string,
+            avatarConfig: ((raw.avatar_config ?? raw.avatarConfig) ?? prev.avatarConfig) as Record<string, unknown>,
+            dateOfBirth: (raw.date_of_birth ?? raw.dateOfBirth ?? prev.dateOfBirth) as string | undefined,
+            isActive: ((raw.is_active ?? raw.isActive) ?? prev.isActive) as boolean,
+            createdAt: ((raw.created_at ?? raw.createdAt) ?? prev.createdAt) as string,
+            updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? prev.updatedAt) as string,
+            selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+            topicOnboardingCompletedAt: (raw.topic_onboarding_completed_at ??
+              raw.topicOnboardingCompletedAt ??
+              prev.topicOnboardingCompletedAt) as string | undefined,
+          };
         }
       })
       .addCase(updateChildThunk.rejected, (state, action) => {

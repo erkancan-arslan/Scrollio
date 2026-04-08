@@ -17,6 +17,8 @@ import { kidsTypography } from '../../shared/constants/typography';
 import { KIDS_CHARACTERS } from '../../shared/constants/characters';
 import type { KidsCharacter } from '../../shared/constants/characters';
 import type { KidsStackParamList } from '../../../../navigation/KidsNavigator';
+import { childNeedsTopicOnboarding } from '../../shared/utils/childTopicOnboarding';
+import type { ChildProfile } from '../../shared/types';
 
 export const KidsCharacterSelectScreen: React.FC = () => {
   const nav = useNavigation();
@@ -55,7 +57,7 @@ export const KidsCharacterSelectScreen: React.FC = () => {
         return;
       }
       try {
-        await dispatch(
+        const updated = await dispatch(
           updateChildThunk({
             childId: id,
             data: { selectedCharacterId: character.id },
@@ -66,6 +68,26 @@ export const KidsCharacterSelectScreen: React.FC = () => {
         const afterSave = paramsRef.current?.afterSave ?? 'reset-to-tabs';
         if (afterSave === 'go-back' && nav.canGoBack()) {
           nav.goBack();
+          return;
+        }
+        const raw = updated as unknown as Record<string, unknown>;
+        const mapped: ChildProfile = {
+          id: (raw.id ?? id) as string,
+          parentId: ((raw.parent_id ?? raw.parentId) ?? '') as string,
+          displayName: ((raw.display_name ?? raw.displayName) ?? '') as string,
+          avatarConfig: ((raw.avatar_config ?? raw.avatarConfig) ?? {}) as Record<string, unknown>,
+          dateOfBirth: (raw.date_of_birth ?? raw.dateOfBirth) as string | undefined,
+          isActive: ((raw.is_active ?? raw.isActive) ?? true) as boolean,
+          createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
+          updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
+          selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+          topicOnboardingCompletedAt: (raw.topic_onboarding_completed_at ??
+            raw.topicOnboardingCompletedAt) as string | undefined,
+        };
+        if (childNeedsTopicOnboarding(mapped) && mapped.selectedCharacterId) {
+          nav.dispatch(
+            CommonActions.reset({ index: 0, routes: [{ name: 'KidsOnboardingTopics' }] }),
+          );
         } else {
           nav.dispatch(
             CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),

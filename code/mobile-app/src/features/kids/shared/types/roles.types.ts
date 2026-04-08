@@ -15,4 +15,6 @@ export interface ChildProfile {
   createdAt: string;
   updatedAt: string;
   selectedCharacterId?: string | null;
+  /** ISO timestamp when child saved ≥3 topics; null/undefined → show topic onboarding */
+  topicOnboardingCompletedAt?: string | null;
 }

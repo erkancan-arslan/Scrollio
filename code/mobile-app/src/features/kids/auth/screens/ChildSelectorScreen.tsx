@@ -8,12 +8,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { KidsStackParamList } from '../../../../navigation/KidsNavigator';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { switchChildThunk, fetchChildrenThunk, setCharacterSelectChildId } from '../store/authSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
 import type { ChildProfile } from '../../shared/types';
+import { childNeedsTopicOnboarding } from '../../shared/utils/childTopicOnboarding';
 
 const AVATAR_EMOJIS = ['🦊', '🐼', '🦄', '🐸', '🦁', '🐰', '🐧', '🦋', '🐱', '🐶'];
 
@@ -24,7 +27,7 @@ interface Props {
 }
 
 export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
-  const nav = useNavigation();
+  const nav = useNavigation<StackNavigationProp<KidsStackParamList>>();
   const dispatch = useAppDispatch();
   const { childProfiles, isLoading } = useAppSelector((s) => s.kidsAuth);
 
@@ -38,7 +41,11 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await dispatch(switchChildThunk(child.id)).unwrap();
       if (child.selectedCharacterId) {
-        nav.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }));
+        if (childNeedsTopicOnboarding(child)) {
+          nav.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'KidsOnboardingTopics' }] }));
+        } else {
+          nav.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }));
+        }
       } else {
         const id = child?.id;
         if (id) {
