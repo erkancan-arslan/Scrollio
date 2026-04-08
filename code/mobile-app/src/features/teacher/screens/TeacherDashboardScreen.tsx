@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { TeacherStackParamList } from '../../../navigation/TeacherNavigator';
 import { spacing } from '../../../theme';
@@ -18,13 +19,19 @@ export const TeacherDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      const res = await apiClient.get<any>('/teacher/profile');
-      if (res.data) setProfile(res.data);
-      setLoading(false);
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        const res = await apiClient.get<any>('/teacher/profile');
+        if (active) {
+          if (res.data) setProfile(res.data);
+          setLoading(false);
+        }
+      })();
+      return () => { active = false; };
+    }, []),
+  );
 
   if (loading) {
     return (
