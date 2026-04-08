@@ -247,6 +247,17 @@ export class KidsProfileService {
       );
     }
 
+    // Mark onboarding completion when at least 3 topics are explicitly selected.
+    if (dto.topicIds.length >= 3) {
+      await admin
+        .from('kids_child_profiles')
+        .update({
+          topic_onboarding_completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', childId);
+    }
+
     // Log activity
     await admin.from('kids_activity_logs').insert({
       child_profile_id: childId,

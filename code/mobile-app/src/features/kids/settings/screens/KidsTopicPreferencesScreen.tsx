@@ -12,7 +12,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  CommonActions,
+} from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import {
   fetchAllTopicsThunk,
@@ -22,11 +27,16 @@ import {
 import { resetFeed, fetchFeedThunk } from '../../feed/store/feedSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
+import type { KidsStackParamList } from '../../../../navigation/KidsNavigator';
+
+const MIN_ONBOARDING_TOPICS = 3;
 
 export const KidsTopicPreferencesScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<KidsStackParamList, 'KidsTopicPreferences'>>();
   const dispatch = useAppDispatch();
   const { allTopics, selectedTopics, error } = useAppSelector((s) => s.kidsProfile);
+  const isOnboarding = route.params?.mode === 'onboarding';
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -73,8 +83,14 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
 
   const handleSave = async () => {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) {
-      Alert.alert('Pick at least one', 'Choose one or more topics so your feed can show matching videos.');
+    const minRequired = isOnboarding ? MIN_ONBOARDING_TOPICS : 1;
+    if (ids.length < minRequired) {
+      Alert.alert(
+        isOnboarding ? 'Pick at least 3 topics' : 'Pick at least one',
+        isOnboarding
+          ? 'Choose at least 3 topics to complete onboarding.'
+          : 'Choose one or more topics so your feed can show matching videos.',
+      );
       return;
     }
     setSaving(true);
@@ -82,7 +98,13 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
       await dispatch(selectTopicsThunk(ids)).unwrap();
       dispatch(resetFeed());
       dispatch(fetchFeedThunk({ page: 1, limit: 10 }));
-      navigation.goBack();
+      if (isOnboarding) {
+        navigation.dispatch(
+          CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),
+        );
+      } else {
+        navigation.goBack();
+      }
     } catch (e) {
       Alert.alert('Could not save', typeof e === 'string' ? e : 'Try again.');
     } finally {
@@ -93,8 +115,16 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.hint}>
-        Videos in your feed use these topic names. Pick what you like — you can change them anytime.
+        {isOnboarding
+          ? `Pick at least ${MIN_ONBOARDING_TOPICS} topics to personalize your first feed.`
+          : 'Videos in your feed use these topic names. Pick what you like — you can change them anytime.'}
       </Text>
+
+      {isOnboarding ? (
+        <Text style={styles.counter}>
+          {selectedIds.size} selected{selectedIds.size >= MIN_ONBOARDING_TOPICS ? ' ✓' : ` / ${MIN_ONBOARDING_TOPICS} min`}
+        </Text>
+      ) : null}
 
       {error && !bootLoading ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -134,7 +164,9 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
         {saving ? (
           <ActivityIndicator color="#FFF" />
         ) : (
-          <Text style={styles.saveBtnText}>Save</Text>
+          <Text style={styles.saveBtnText}>
+            {isOnboarding ? 'Continue' : 'Save'}
+          </Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -148,6 +180,12 @@ const styles = StyleSheet.create({
     ...kidsTypography.bodySmall,
     color: kidsColors.text.secondary,
     marginBottom: 16,
+  },
+  counter: {
+    ...kidsTypography.bodySmall,
+    color: kidsColors.text.secondary,
+    marginBottom: 8,
+    fontWeight: '600',
   },
   errorText: { ...kidsTypography.bodySmall, color: kidsColors.error, marginBottom: 8 },
   spinner: { marginVertical: 24 },

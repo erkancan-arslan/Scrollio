@@ -334,6 +334,11 @@ const authSlice = createSlice({
             createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
             updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
             selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+            topicOnboardingCompletedAt:
+              (raw.topic_onboarding_completed_at ?? raw.topicOnboardingCompletedAt) as
+                | string
+                | null
+                | undefined,
           };
         });
       })
@@ -361,6 +366,11 @@ const authSlice = createSlice({
           createdAt: ((raw.created_at ?? raw.createdAt) ?? '') as string,
           updatedAt: ((raw.updated_at ?? raw.updatedAt) ?? '') as string,
           selectedCharacterId: (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined,
+          topicOnboardingCompletedAt:
+            (raw.topic_onboarding_completed_at ?? raw.topicOnboardingCompletedAt) as
+              | string
+              | null
+              | undefined,
         };
         state.childProfiles.push(newChild);
       })
@@ -390,9 +400,18 @@ const authSlice = createSlice({
         const raw = action.payload as unknown as Record<string, unknown>;
         const updatedId = (raw.id ?? '') as string;
         const selectedCharacterId = (raw.selected_character_id ?? raw.selectedCharacterId) as string | undefined;
+        const topicOnboardingCompletedAt =
+          (raw.topic_onboarding_completed_at ?? raw.topicOnboardingCompletedAt) as
+            | string
+            | null
+            | undefined;
         const idx = state.childProfiles.findIndex((p) => p.id === updatedId);
         if (idx !== -1) {
-          state.childProfiles[idx] = { ...state.childProfiles[idx], selectedCharacterId };
+          state.childProfiles[idx] = {
+            ...state.childProfiles[idx],
+            selectedCharacterId,
+            topicOnboardingCompletedAt,
+          };
         }
       })
       .addCase(updateChildThunk.rejected, (state, action) => {

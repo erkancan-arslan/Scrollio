@@ -71,8 +71,8 @@ export type KidsStackParamList = {
   // Main app
   KidsMainTabs: NavigatorScreenParams<KidsMainTabParamList>;
 
-  /** Topic checkboxes for the active child (from Settings). */
-  KidsTopicPreferences: undefined;
+  /** Topic checkboxes for the active child (settings or onboarding). */
+  KidsTopicPreferences: { mode?: 'settings' | 'onboarding' } | undefined;
 
   /** Custom drawn mascot demo (2D → pipeline → video). */
   KidsYourMascot: undefined;
