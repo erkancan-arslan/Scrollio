@@ -2,7 +2,7 @@
  * KidsProfileScreen — Child profile with avatar, metrics, topics, and history
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  FlatList,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { KidsTabCompositeNavigation } from '../../../../navigation/KidsNavigator';
@@ -24,12 +27,24 @@ import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
 import { ErrorScreen } from '../../shared/components/ErrorScreen';
+import * as profileApi from '../services/profileApi';
 
 const AVATAR_EMOJIS: Record<string, string> = {
   fox: '🦊', panda: '🐼', unicorn: '🦄', frog: '🐸',
   lion: '🦁', bunny: '🐰', penguin: '🐧', butterfly: '🦋',
   cat: '🐱', dog: '🐶', dragon: '🐉', octopus: '🐙',
 };
+
+type ContentTab = 'topics' | 'liked' | 'bookmarked';
+
+interface ContentItem {
+  id: string;
+  kids_content?: {
+    id: string;
+    title: string;
+    thumbnail_url?: string | null;
+  } | null;
+}
 
 export const KidsProfileScreen: React.FC = () => {
   const navigation = useNavigation<KidsTabCompositeNavigation>();
@@ -39,6 +54,10 @@ export const KidsProfileScreen: React.FC = () => {
     (s) => s.kidsProfile,
   );
   const [refreshing, setRefreshing] = React.useState(false);
+  const [activeTab, setActiveTab] = useState<ContentTab>('topics');
+  const [likedItems, setLikedItems] = useState<ContentItem[]>([]);
+  const [bookmarkedItems, setBookmarkedItems] = useState<ContentItem[]>([]);
+  const [tabLoading, setTabLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -50,6 +69,24 @@ export const KidsProfileScreen: React.FC = () => {
     dispatch(fetchSelectedTopicsThunk());
   };
 
+  const fetchTabContent = useCallback(async (tab: ContentTab) => {
+    if (tab === 'topics') return;
+    setTabLoading(true);
+    if (tab === 'liked') {
+      const res = await profileApi.getLikedContent();
+      setLikedItems((res.data?.data as ContentItem[]) ?? []);
+    } else {
+      const res = await profileApi.getBookmarkedContent();
+      setBookmarkedItems((res.data?.data as ContentItem[]) ?? []);
+    }
+    setTabLoading(false);
+  }, []);
+
+  const handleTabChange = useCallback((tab: ContentTab) => {
+    setActiveTab(tab);
+    fetchTabContent(tab);
+  }, [fetchTabContent]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -57,6 +94,7 @@ export const KidsProfileScreen: React.FC = () => {
       dispatch(fetchMetricsThunk()),
       dispatch(fetchSelectedTopicsThunk()),
     ]);
+    fetchTabContent(activeTab);
     setRefreshing(false);
   };
 
@@ -123,44 +161,95 @@ export const KidsProfileScreen: React.FC = () => {
         <MetricCard icon="🏆" label="Rewards" value={metrics?.totalRewards ?? 0} />
       </View>
 
-      {/* Selected Topics */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>My Topics</Text>
+      {/* Content Tabs */}
+      <View style={styles.tabBar}>
+        {(['topics', 'liked', 'bookmarked'] as ContentTab[]).map((tab) => (
           <TouchableOpacity
-            onPress={() => navigation.navigate('KidsTopicPreferences')}
-            accessibilityRole="button"
-            accessibilityLabel="Edit topics"
+            key={tab}
+            style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+            onPress={() => handleTabChange(tab)}
           >
-            <Text style={styles.editLink}>Edit</Text>
+            <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
+              {tab === 'topics' ? '📚 Topics' : tab === 'liked' ? '❤️ Liked' : '🔖 Saved'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Topics Tab */}
+      {activeTab === 'topics' && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>My Topics</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('KidsTopicPreferences')}
+              accessibilityRole="button"
+              accessibilityLabel="Edit topics"
+            >
+              <Text style={styles.editLink}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          {selectedTopics.length > 0 ? (
+            <View style={styles.topicsList}>
+              {selectedTopics.map((topic) => (
+                <View key={topic.id} style={styles.topicChip}>
+                  <Text style={styles.topicChipText}>{topic.name}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>
+              No topics selected yet. Choose topics to personalize your feed!
+            </Text>
+          )}
+          <TouchableOpacity
+            style={styles.secondaryAction}
+            onPress={() => {
+              if (!childId) return;
+              navigation.navigate('KidsCharacterSelect', { childId, afterSave: 'go-back' });
+            }}
+            disabled={!childId}
+            accessibilityRole="button"
+            accessibilityLabel="Change mascot friend"
+          >
+            <Text style={styles.secondaryActionText}>Change my friend (mascot)</Text>
           </TouchableOpacity>
         </View>
-        {selectedTopics.length > 0 ? (
-          <View style={styles.topicsList}>
-            {selectedTopics.map((topic) => (
-              <View key={topic.id} style={styles.topicChip}>
-                <Text style={styles.topicChipText}>{topic.name}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyText}>
-            No topics selected yet. Choose topics to personalize your feed!
-          </Text>
-        )}
-        <TouchableOpacity
-          style={styles.secondaryAction}
-          onPress={() => {
-            if (!childId) return;
-            navigation.navigate('KidsCharacterSelect', { childId, afterSave: 'go-back' });
-          }}
-          disabled={!childId}
-          accessibilityRole="button"
-          accessibilityLabel="Change mascot friend"
-        >
-          <Text style={styles.secondaryActionText}>Change my friend (mascot)</Text>
-        </TouchableOpacity>
-      </View>
+      )}
+
+      {/* Liked Tab */}
+      {activeTab === 'liked' && (
+        <View style={styles.section}>
+          {tabLoading ? (
+            <ActivityIndicator size="small" color={kidsColors.primary} style={{ marginTop: 24 }} />
+          ) : likedItems.length > 0 ? (
+            <View style={styles.contentGrid}>
+              {likedItems.map((item) => (
+                <ContentCard key={item.id} item={item} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>No liked videos yet. Tap the heart on videos you enjoy!</Text>
+          )}
+        </View>
+      )}
+
+      {/* Bookmarked Tab */}
+      {activeTab === 'bookmarked' && (
+        <View style={styles.section}>
+          {tabLoading ? (
+            <ActivityIndicator size="small" color={kidsColors.primary} style={{ marginTop: 24 }} />
+          ) : bookmarkedItems.length > 0 ? (
+            <View style={styles.contentGrid}>
+              {bookmarkedItems.map((item) => (
+                <ContentCard key={item.id} item={item} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>No saved videos yet. Tap the bookmark to save videos!</Text>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -178,6 +267,27 @@ const MetricCard: React.FC<{
     <Text style={styles.metricLabel}>{label}</Text>
   </View>
 );
+
+// ── ContentCard Component ──
+
+const ContentCard: React.FC<{ item: ContentItem }> = ({ item }) => {
+  const content = item.kids_content;
+  const thumbnailUri = content?.thumbnail_url;
+  return (
+    <View style={styles.contentCard}>
+      {thumbnailUri ? (
+        <Image source={{ uri: thumbnailUri }} style={styles.contentThumb} />
+      ) : (
+        <View style={[styles.contentThumb, styles.contentThumbPlaceholder]}>
+          <Text style={{ fontSize: 28 }}>📺</Text>
+        </View>
+      )}
+      <Text style={styles.contentCardTitle} numberOfLines={2}>
+        {content?.title ?? 'Untitled'}
+      </Text>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: kidsColors.background },
@@ -308,4 +418,66 @@ const styles = StyleSheet.create({
   },
   topicChipText: { ...kidsTypography.bodySmall, color: kidsColors.primary, fontWeight: '600' },
   emptyText: { ...kidsTypography.body, color: kidsColors.text.muted, fontStyle: 'italic' },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  tabItemActive: {
+    backgroundColor: kidsColors.primaryLight + '30',
+  },
+  tabLabel: {
+    ...kidsTypography.bodySmall,
+    color: kidsColors.text.muted,
+    fontWeight: '600',
+  },
+  tabLabelActive: {
+    color: kidsColors.primary,
+    fontWeight: '700',
+  },
+  contentGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  contentCard: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  contentThumb: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#F0F0F0',
+  },
+  contentThumbPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contentCardTitle: {
+    ...kidsTypography.bodySmall,
+    color: kidsColors.text.primary,
+    fontWeight: '600',
+    padding: 8,
+  },
 });

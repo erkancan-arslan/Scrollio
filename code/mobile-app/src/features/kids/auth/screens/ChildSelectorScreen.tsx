@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { switchChildThunk, fetchChildrenThunk, setCharacterSelectChildId } from '../store/authSlice';
+import { fetchSelectedTopicsThunk } from '../../profile/store/profileSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
@@ -38,6 +39,28 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await dispatch(switchChildThunk(child.id)).unwrap();
       if (child.selectedCharacterId) {
+        // Enforce onboarding topic selection based on DB-backed completion state.
+        if (!child.topicOnboardingCompletedAt) {
+          nav.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'KidsTopicPreferences', params: { mode: 'onboarding' } }],
+            }),
+          );
+          return;
+        }
+        // Fallback safety: if onboarding was marked done but selected topics are missing,
+        // force topic onboarding again.
+        const selectedTopics = await dispatch(fetchSelectedTopicsThunk()).unwrap();
+        if (!selectedTopics || selectedTopics.length === 0) {
+          nav.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'KidsTopicPreferences', params: { mode: 'onboarding' } }],
+            }),
+          );
+          return;
+        }
         nav.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }));
       } else {
         const id = child?.id;

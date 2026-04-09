@@ -68,7 +68,10 @@ export const KidsCharacterSelectScreen: React.FC = () => {
           nav.goBack();
         } else {
           nav.dispatch(
-            CommonActions.reset({ index: 0, routes: [{ name: 'KidsMainTabs' }] }),
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'KidsTopicPreferences', params: { mode: 'onboarding' } }],
+            }),
           );
         }
       } catch {

@@ -15,4 +15,5 @@ export interface ChildProfile {
   createdAt: string;
   updatedAt: string;
   selectedCharacterId?: string | null;
+  topicOnboardingCompletedAt?: string | null;
 }

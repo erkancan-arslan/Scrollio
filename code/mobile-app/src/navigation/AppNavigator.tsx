@@ -17,6 +17,8 @@ import { DuelGameScreen } from '../features/playground/screens/DuelGameScreen';
 import { DuelRequestModal } from '../features/playground/components/DuelRequestModal';
 import { AdminNavigator } from './AdminNavigator';
 import { TeacherNavigator } from './TeacherNavigator';
+import { ClassroomLobbyScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomLobbyScreen';
+import { ClassroomGameScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomGameScreen';
 
 export type RootStackParamList = {
     AppLanding: undefined;
@@ -61,6 +63,8 @@ export type RootStackParamList = {
 
     Admin: undefined;
     Teacher: undefined;
+    ClassroomLobby: { roomCode: string; isHost: boolean };
+    ClassroomGame: { matchId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -165,6 +169,18 @@ export const AppNavigator = () => {
                     name="Teacher"
                     component={TeacherNavigator}
                     options={{ headerShown: false }}
+                />
+
+                {/* Classroom Game Screens */}
+                <Stack.Screen
+                    name="ClassroomLobby"
+                    component={ClassroomLobbyScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                    name="ClassroomGame"
+                    component={ClassroomGameScreen}
+                    options={{ headerShown: false, gestureEnabled: false }}
                 />
             </Stack.Navigator>
 

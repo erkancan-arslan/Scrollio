@@ -38,19 +38,22 @@ export function buildUpscalerInput(imageUrl: string): Record<string, unknown> {
   };
 }
 
-/** Step 4: `fal-ai/ltx-video-13b-distilled/image-to-video` */
+/** Step 4: `fal-ai/ltx-video-13b-distilled/image-to-video`
+ * 65 frames @ 24fps ≈ 2.7s — sufficient for mascot intro, generates ~2× faster than 121 frames.
+ * Keep resolution at 480p to avoid GPU OOM and long queue times on Fal.
+ */
 export function buildImageToVideoInput(imageUrl: string): Record<string, unknown> {
   return {
     loras: [],
     prompt: LTX_IMAGE_TO_VIDEO_PROMPT,
     image_url: imageUrl,
-    frame_rate: 30,
-    resolution: '720p',
+    frame_rate: 24,
+    resolution: '480p',
     aspect_ratio: '9:16',
     expand_prompt: false,
     reverse_video: false,
     negative_prompt: 'worst quality, inconsistent motion, blurry, jittery, distorted',
-    number_of_frames: 121,
+    number_of_frames: 65,
     constant_rate_factor: 35,
     enable_safety_checker: true,
     first_pass_number_of_steps: 8,

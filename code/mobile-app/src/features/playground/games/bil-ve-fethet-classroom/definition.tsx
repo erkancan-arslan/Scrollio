@@ -28,7 +28,7 @@ export const BilVeFethetClassroomGame: GameDefinition<ClassroomClientState> = {
     id: 'bil_ve_fethet_classroom',
     title: 'Bil ve Fethet: Sınıf',
     description: 'Sınıf oturma düzeninde strateji ve bilgi yarışması! 3×8 koltuk düzeninde sırayla fethet.',
-    categories: ['challenges'],
+    categories: ['challenges', 'core'],
     modes: ['multiplayer'],
     minPlayers: 2,
     maxPlayers: 4,

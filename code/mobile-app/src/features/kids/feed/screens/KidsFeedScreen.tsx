@@ -147,47 +147,29 @@ export const KidsFeedScreen: React.FC = () => {
   }, [dispatch, hasMore, isLoading, page]);
 
   // Handle like action with optimistic update
-  // TEMPORARY: Uses main feed like endpoints while kids DB is empty
   const handleLike = useCallback(
     async (contentId: string) => {
-      const item = items.find((i) => i.contentId === contentId || i.id === contentId);
-      const wasLiked = item?.isLiked ?? false;
-
-      // Optimistic update
       dispatch(toggleLikeLocal(contentId));
 
-      // API call – main feed uses separate POST/DELETE endpoints
-      const res = wasLiked
-        ? await kidsApi.delete(`/feed/videos/${contentId}/like`)
-        : await kidsApi.post(`/feed/videos/${contentId}/like`);
+      const res = await kidsApi.post(`/kids/like/toggle`, { contentId });
       if (res.error) {
-        // Revert on failure
         dispatch(toggleLikeLocal(contentId));
       }
     },
-    [dispatch, items],
+    [dispatch],
   );
 
   // Handle bookmark action with optimistic update
-  // TEMPORARY: Uses main feed bookmark endpoints while kids DB is empty
   const handleBookmark = useCallback(
     async (contentId: string) => {
-      const item = items.find((i) => i.contentId === contentId || i.id === contentId);
-      const wasBookmarked = item?.isBookmarked ?? false;
-
-      // Optimistic update
       dispatch(toggleBookmarkLocal(contentId));
 
-      // API call – main feed uses separate POST/DELETE endpoints
-      const res = wasBookmarked
-        ? await kidsApi.delete(`/feed/videos/${contentId}/bookmark`)
-        : await kidsApi.post(`/feed/videos/${contentId}/bookmark`);
+      const res = await kidsApi.post(`/kids/bookmark/toggle`, { contentId });
       if (res.error) {
-        // Revert on failure
         dispatch(toggleBookmarkLocal(contentId));
       }
     },
-    [dispatch, items],
+    [dispatch],
   );
 
   // Handle share action (placeholder)

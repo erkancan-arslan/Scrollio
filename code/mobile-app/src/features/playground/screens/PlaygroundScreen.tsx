@@ -13,6 +13,7 @@ import { GameId } from '../platform/types';
 import { BilVeFethetMenuScreen } from '../games/bil_ve_fethet/BilVeFethetMenuScreen';
 import { BilVeFethetKidsScreen } from '../games/bil-ve-fethet-kids/BilVeFethetKidsScreen';
 import { SpaceRepairLobbyScreen } from '../games/space-repair-kids/SpaceRepairLobbyScreen';
+import { ClassroomMenuScreen } from '../games/bil-ve-fethet-classroom/ClassroomMenuScreen';
 
 // Ensure games are registered
 initializeGameRegistry();
@@ -24,6 +25,7 @@ type PlaygroundRouteProp = RouteProp<Record<string, { category?: string }>, stri
 const STANDALONE_GAMES: Record<string, boolean> = {
     'bil_ve_fethet': true,
     'bil_ve_fethet_kids': true,
+    'bil_ve_fethet_classroom': true,
     'space_repair_kids': true,
 };
 
@@ -95,6 +97,15 @@ export const PlaygroundScreen: React.FC = () => {
     if (selectedGameId === 'bil_ve_fethet_kids') {
         return (
             <BilVeFethetKidsScreen
+                onExit={() => setSelectedGameId(null)}
+            />
+        );
+    }
+
+    // Standalone: Bil ve Fethet: Sınıf (Classroom)
+    if (selectedGameId === 'bil_ve_fethet_classroom') {
+        return (
+            <ClassroomMenuScreen
                 onExit={() => setSelectedGameId(null)}
             />
         );
