@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    ActivityIndicator,
     Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { spacing, typography } from '../../../theme';
-import { TOPICS } from '../constants/topics';
+import { feedService } from '../../../services/feed/feedService';
+import { profileService } from '../../../services/profile/profileService';
 
 type Props = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'OnboardingInterests'>;
@@ -18,26 +21,94 @@ type Props = {
 
 const MIN_SELECTIONS = 3;
 
-export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
-    const [selected, setSelected] = useState<Set<string>>(new Set());
+/** Maps known topic names to emojis for display. Falls back to 📚. */
+const TOPIC_EMOJI: Record<string, string> = {
+    'Financial Markets':   '📈',
+    'Personal Finance':    '💰',
+    'Economics':           '📊',
+    'Investing':           '💎',
+    'Computer Networks':   '🌐',
+    'Discrete Mathematics':'🔢',
+    'Mathematics':         '📐',
+    'History':             '📜',
+    'Chess':               '♟️',
+    'Backgammon':          '🎲',
+    'Colors':              '🎨',
+    'Science':             '🔬',
+    'Technology':          '💻',
+    'Psychology':          '🧠',
+    'Health':              '💪',
+    'Music':               '🎵',
+    'Art':                 '🖼️',
+    'Space':               '🌌',
+    'Philosophy':          '🤔',
+    'Literature':          '📚',
+    'Politics':            '🗳️',
+    'Sports':              '⚽',
+    'Food':                '🍳',
+    'Travel':              '✈️',
+    'Environment':         '🌱',
+    'Film':                '🎬',
+};
 
-    const toggleTopic = (id: string) => {
+const getEmoji = (topic: string) => TOPIC_EMOJI[topic] ?? '📚';
+
+export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
+    const [topics, setTopics]       = useState<string[]>([]);
+    const [loadingTopics, setLoadingTopics] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    const [selected, setSelected]   = useState<Set<string>>(new Set());
+    const [saving, setSaving]       = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const result = await feedService.getVideoTopics();
+            if (cancelled) return;
+            if (result.data && result.data.topics.length > 0) {
+                setTopics(result.data.topics);
+            } else {
+                setLoadError('Could not load topics. Please try again.');
+            }
+            setLoadingTopics(false);
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    const toggleTopic = (topic: string) => {
         setSelected((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
+            if (next.has(topic)) next.delete(topic);
+            else next.add(topic);
             return next;
         });
     };
 
     const canContinue = selected.size >= MIN_SELECTIONS;
 
-    const handleNext = () => {
-        if (!canContinue) return;
-        navigation.navigate('OnboardingDifficulty', { topics: Array.from(selected) });
+    const handleFinish = async () => {
+        if (!canContinue || saving) return;
+        setSaving(true);
+        setSaveError(null);
+
+        const result = await profileService.updateProfile({
+            preferences: {
+                preferredTopics: Array.from(selected),
+            },
+        });
+
+        setSaving(false);
+
+        if (result.error) {
+            setSaveError('Something went wrong. Please try again.');
+            return;
+        }
+
+        navigation.dispatch(
+            CommonActions.reset({ index: 0, routes: [{ name: 'MainTabs' }] }),
+        );
     };
 
     return (
@@ -51,10 +122,8 @@ export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
                     <View style={[styles.stepDot, styles.stepDotDone]} />
                     <View style={[styles.stepLine, styles.stepLineDone]} />
                     <View style={[styles.stepDot, styles.stepDotActive]} />
-                    <View style={styles.stepLine} />
-                    <View style={styles.stepDot} />
                 </View>
-                <Text style={styles.stepLabel}>Step 2 of 3</Text>
+                <Text style={styles.stepLabel}>Step 2 of 2</Text>
 
                 <Text style={styles.emoji}>🎯</Text>
                 <Text style={styles.title}>What interests you?</Text>
@@ -67,46 +136,69 @@ export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
                         {selected.size} selected{canContinue ? ' ✓' : ` / ${MIN_SELECTIONS} min`}
                     </Text>
                 </View>
+
+                {saveError && (
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{saveError}</Text>
+                    </View>
+                )}
             </View>
 
-            {/* Scrollable grid */}
-            <ScrollView
-                contentContainerStyle={styles.grid}
-                showsVerticalScrollIndicator={false}
-            >
-                {TOPICS.map((topic) => {
-                    const isSelected = selected.has(topic.id);
-                    return (
-                        <TouchableOpacity
-                            key={topic.id}
-                            style={[styles.tile, isSelected && styles.tileSelected]}
-                            onPress={() => toggleTopic(topic.id)}
-                            activeOpacity={0.75}
-                        >
-                            <Text style={styles.tileEmoji}>{topic.emoji}</Text>
-                            <Text style={[styles.tileLabel, isSelected && styles.tileLabelSelected]}>
-                                {topic.label}
-                            </Text>
-                            {isSelected && (
-                                <View style={styles.checkBadge}>
-                                    <Text style={styles.checkBadgeText}>✓</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    );
-                })}
-                <View style={{ height: 100 }} />
-            </ScrollView>
+            {/* Topic grid */}
+            {loadingTopics ? (
+                <View style={styles.loadingBox}>
+                    <ActivityIndicator size="large" color={ACCENT} />
+                </View>
+            ) : loadError ? (
+                <View style={styles.loadingBox}>
+                    <Text style={styles.errorText}>{loadError}</Text>
+                </View>
+            ) : (
+                <ScrollView
+                    contentContainerStyle={styles.grid}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {topics.map((topic) => {
+                        const isSelected = selected.has(topic);
+                        return (
+                            <TouchableOpacity
+                                key={topic}
+                                style={[styles.tile, isSelected && styles.tileSelected]}
+                                onPress={() => toggleTopic(topic)}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={styles.tileEmoji}>{getEmoji(topic)}</Text>
+                                <Text
+                                    style={[styles.tileLabel, isSelected && styles.tileLabelSelected]}
+                                    numberOfLines={2}
+                                >
+                                    {topic}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <Text style={styles.checkBadgeText}>✓</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                    <View style={{ height: 100 }} />
+                </ScrollView>
+            )}
 
-            {/* Sticky next button */}
+            {/* Sticky finish button */}
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.button, !canContinue && styles.buttonDisabled]}
-                    onPress={handleNext}
-                    disabled={!canContinue}
+                    style={[styles.button, (!canContinue || saving) && styles.buttonDisabled]}
+                    onPress={handleFinish}
+                    disabled={!canContinue || saving}
                     activeOpacity={0.85}
                 >
-                    <Text style={styles.buttonText}>Next →</Text>
+                    {saving ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                        <Text style={styles.buttonText}>Finish & Explore 🎉</Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </View>
@@ -147,9 +239,15 @@ const styles = StyleSheet.create({
         fontSize: typography.fontSize.md, color: '#666666',
         textAlign: 'center', lineHeight: 22, marginBottom: spacing.md,
     },
-    counterRow: { marginBottom: spacing.sm },
+    counterRow: { marginBottom: spacing.xs },
     counter: { fontSize: 13, color: '#999999', fontWeight: '600' },
     counterReady: { color: '#34C759' },
+    errorContainer: {
+        backgroundColor: '#FFEBEE', borderRadius: 10,
+        paddingVertical: spacing.xs, paddingHorizontal: spacing.md, marginTop: spacing.xs,
+    },
+    errorText: { color: '#D32F2F', fontSize: typography.fontSize.sm, textAlign: 'center' },
+    loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',

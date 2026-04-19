@@ -75,6 +75,13 @@ class FeedService {
   }
 
   /**
+   * Get distinct topic strings from published videos (used for onboarding)
+   */
+  async getVideoTopics(): Promise<ApiResponse<{ topics: string[] }>> {
+    return apiClient.get<{ topics: string[] }>('/feed/video-topics', false);
+  }
+
+  /**
    * Get a single video by ID
    */
   async getVideo(videoId: string): Promise<ApiResponse<Video>> {
