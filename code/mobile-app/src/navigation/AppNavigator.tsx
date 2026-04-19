@@ -9,6 +9,7 @@ import { OnboardingInterestsScreen } from '../features/auth/screens/OnboardingIn
 import { OnboardingDifficultyScreen } from '../features/auth/screens/OnboardingDifficultyScreen';
 import { MainTabNavigator, MainTabParamList } from './MainTabNavigator';
 import { ChatScreen } from '../features/chat';
+import { VideoPlayerScreen } from '../features/feed';
 import { KidsNavigator } from './KidsNavigator';
 import { PlaygroundGameShell } from '../features/playground/platform/PlaygroundGameShell';
 import { GameId } from '../features/playground/platform/types';
@@ -36,6 +37,7 @@ export type RootStackParamList = {
         otherUserName: string;
         otherUserAvatar?: string;
     };
+    VideoPlayer: { videoId: string };
     Playground: undefined;
 
     // Generic Game Shell Route
@@ -135,6 +137,16 @@ export const AppNavigator = () => {
                         headerShown: true,
                         headerTitle: 'Chat',
                         headerBackTitle: 'Back',
+                    }}
+                />
+
+                {/* Standalone video player — used when tapping a shared post in chat */}
+                <Stack.Screen
+                    name="VideoPlayer"
+                    component={VideoPlayerScreen}
+                    options={{
+                        headerShown: false,
+                        animation: 'fade',
                     }}
                 />
 

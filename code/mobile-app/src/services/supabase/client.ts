@@ -44,24 +44,41 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /**
- * Returns a Supabase client instance that is guaranteed to have the latest session
- * from secureStorage applied.
+ * Push the access/refresh token pair into the Supabase JS client so that
+ * `supabase.auth.getUser()` and (more importantly) Realtime / RLS-aware
+ * subscriptions know which user is connected.
+ *
+ * The rest of this codebase signs users in via the backend REST endpoint
+ * (`authService.signIn`) and only writes tokens to `secureStorage`, which means
+ * the Supabase JS client itself has no idea the user is authenticated. Without
+ * this sync, realtime channels are evaluated as the anonymous role and every
+ * `postgres_changes` event for `friendships` / `messages` / `conversations` is
+ * silently dropped by RLS.
  */
-export const getAuthenticatedSupabase = async () => {
-    // We can rely on the built-in persistence if we hook it up correctly above.
-    // However, since authService manages the session *externally* via direct API calls
-    // and manual secureStorage updates, the supabase client might be out of sync
-    // if it wasn't the one that established the session.
-
-    // So we manually set the session from storage to be safe.
+export const syncSupabaseSessionFromStorage = async (): Promise<boolean> => {
     const session = await secureStorage.getSession();
 
-    if (session.accessToken && session.refreshToken) {
+    if (!session.accessToken || !session.refreshToken) {
+        return false;
+    }
+
+    try {
         await supabase.auth.setSession({
             access_token: session.accessToken,
             refresh_token: session.refreshToken,
         });
+        return true;
+    } catch (error) {
+        console.warn('[supabase] Failed to sync session from secureStorage:', error);
+        return false;
     }
+};
 
+/**
+ * Returns a Supabase client instance that is guaranteed to have the latest session
+ * from secureStorage applied.
+ */
+export const getAuthenticatedSupabase = async () => {
+    await syncSupabaseSessionFromStorage();
     return supabase;
 };

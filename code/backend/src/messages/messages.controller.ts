@@ -80,6 +80,7 @@ export class MessagesController {
       sendDto.messageType,
       sendDto.mediaUrl,
       sendDto.thumbnailUrl,
+      sendDto.metadata,
       accessToken,
     );
   }

@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from '../api/apiClient';
+import type { Video } from '../../features/feed/types';
 
 // Types
 export interface Conversation {
@@ -18,6 +19,19 @@ export interface Conversation {
   other_user_avatar_url: string | null;
 }
 
+/**
+ * Structured payload for `message_type === 'post'`. Stored on the server in
+ * the `metadata` JSONB column. Lets the chat bubble render a rich preview
+ * (title + creator) without an extra round-trip to the feed API.
+ */
+export interface SharedPostMetadata {
+  videoId: string;
+  title: string;
+  creatorName?: string | null;
+  creatorAvatar?: string | null;
+  duration?: number | null;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -26,6 +40,7 @@ export interface Message {
   message_type: string;
   media_url: string | null;
   thumbnail_url: string | null;
+  metadata: SharedPostMetadata | Record<string, any> | null;
   is_edited: boolean;
   is_deleted: boolean;
   created_at: string;
@@ -134,13 +149,19 @@ class ChatService {
   }
 
   /**
-   * Send a message
+   * Send a message.
+   *
+   * For shared posts (`messageType === 'post'`), pass the videoId in
+   * `mediaUrl`, the preview image in `thumbnailUrl`, and the rich payload in
+   * `metadata`. See `sharePostToFriend` below for the high-level helper.
    */
   async sendMessage(
     conversationId: string,
-    content: string,
+    content: string | null,
     messageType: string = 'text',
     mediaUrl?: string,
+    thumbnailUrl?: string,
+    metadata?: Record<string, any>,
   ): Promise<{
     success: boolean;
     data?: { message: Message };
@@ -152,6 +173,8 @@ class ChatService {
         content,
         messageType,
         mediaUrl,
+        thumbnailUrl,
+        metadata,
       },
     );
 
@@ -165,6 +188,59 @@ class ChatService {
     return {
       success: true,
       data: response.data,
+    };
+  }
+
+  /**
+   * Share a feed video to a friend via direct message.
+   *
+   * Resolves (creates if necessary) the 1:1 conversation with the friend,
+   * then posts a `message_type === 'post'` message that the chat bubble can
+   * render as a tappable video card.
+   */
+  async sharePostToFriend(
+    friendId: string,
+    video: Video,
+    caption?: string,
+  ): Promise<{
+    success: boolean;
+    data?: { conversation: Conversation; message: Message };
+    error?: string;
+  }> {
+    const conv = await this.createOrGetConversation(friendId);
+    if (!conv.success || !conv.data) {
+      return { success: false, error: conv.error || 'Failed to start conversation' };
+    }
+
+    const conversationId = conv.data.conversation.conversation_id;
+
+    const metadata: SharedPostMetadata = {
+      videoId: video.id,
+      title: video.title,
+      creatorName: video.creator?.displayName ?? null,
+      creatorAvatar: video.creator?.avatarUrl ?? null,
+      duration: video.duration ?? null,
+    };
+
+    const result = await this.sendMessage(
+      conversationId,
+      caption?.trim() ? caption.trim() : null,
+      'post',
+      video.id,
+      video.thumbnailUrl ?? undefined,
+      metadata,
+    );
+
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || 'Failed to share post' };
+    }
+
+    return {
+      success: true,
+      data: {
+        conversation: conv.data.conversation,
+        message: result.data.message,
+      },
     };
   }
 

@@ -26,10 +26,12 @@ import {
   friendsService,
   FriendProfile,
   PendingRequest,
+  SentRequest,
 } from '../../../services/friends';
 import { chatService, Conversation } from '../../../services/chat';
 import { duelService } from '../../playground/services/duelService';
-import { supabase } from '../../../services/supabase/client';
+import { supabase, syncSupabaseSessionFromStorage } from '../../../services/supabase/client';
+import { secureStorage } from '../../../services/storage/secureStorage';
 import { colors } from '../../../theme/colors';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 
@@ -64,6 +66,7 @@ export const SocialScreen: React.FC = () => {
   // Friends data
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<SentRequest[]>([]);
   const [duelRequests, setDuelRequests] = useState<DuelRequestItem[]>([]);
 
   // Messages data
@@ -98,26 +101,127 @@ export const SocialScreen: React.FC = () => {
   };
 
   // ─── Init ─────────────────────────────────────────────────────────────────
+  // The app signs users in via the backend REST endpoint and only persists the
+  // session to `secureStorage`. The Supabase JS client is therefore *not*
+  // automatically aware of who is signed in on a fresh device, which is why
+  // `supabase.auth.getUser()` was silently returning null on a friend's phone
+  // (and consequently friends/conversations/requests never loaded).
+  //
+  // We resolve the current user id from `secureStorage` (the real source of
+  // truth) and, in parallel, push the session into the Supabase client so that
+  // realtime subscriptions can authenticate against RLS.
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        userIdRef.current = user.id;
-        await loadAll(user.id);
-      } else {
+      try {
+        const [{ userId }] = await Promise.all([
+          secureStorage.getSession(),
+          syncSupabaseSessionFromStorage(),
+        ]);
+
+        if (userId) {
+          setCurrentUserId(userId);
+          userIdRef.current = userId;
+          await loadAll(userId);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('[SocialScreen] init error:', error);
         setIsLoading(false);
       }
     };
     init();
   }, []);
 
-  // Reload conversations when screen is focused (so unread counts refresh)
+  // Reload all data when screen is focused (friends, conversations, requests).
+  // Without this, accepting a friend request elsewhere or returning from a chat
+  // would show a stale list until the next manual refresh.
   useEffect(() => {
     if (isFocused && currentUserId) {
+      loadFriends();
+      loadPendingRequests();
+      loadSentRequests();
       loadConversations();
     }
-  }, [isFocused]);
+  }, [isFocused, currentUserId]);
+
+  // Realtime: react to friendship changes (accepted by counterpart, removed,
+  // new incoming request) so the lists update instantly without a refresh.
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`friendships:${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        () => {
+          loadFriends();
+          loadPendingRequests();
+          loadSentRequests();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `friend_id=eq.${currentUserId}`,
+        },
+        () => {
+          loadFriends();
+          loadPendingRequests();
+          loadSentRequests();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  // Realtime: react to new conversations / new messages so the messages tab
+  // updates immediately when a friend starts a chat or sends a message.
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`social-conversations:${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          loadConversations();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+        },
+        () => {
+          loadConversations();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
 
   // ─── Duel realtime subscription ───────────────────────────────────────────
   useEffect(() => {
@@ -178,23 +282,29 @@ export const SocialScreen: React.FC = () => {
     await Promise.all([
       loadFriends(),
       loadPendingRequests(),
+      loadSentRequests(),
       loadDuelRequests(userId),
       loadConversations(),
     ]);
     setIsLoading(false);
   };
 
-  const loadData = async () => {
+  const loadData = async (options: { background?: boolean } = {}) => {
     const uid = userIdRef.current;
     if (!uid) return;
-    setIsLoading(true);
+    if (!options.background) {
+      setIsLoading(true);
+    }
     await Promise.all([
       loadFriends(),
       loadPendingRequests(),
+      loadSentRequests(),
       loadDuelRequests(uid),
       loadConversations(),
     ]);
-    setIsLoading(false);
+    if (!options.background) {
+      setIsLoading(false);
+    }
   };
 
   const loadFriends = async () => {
@@ -208,6 +318,13 @@ export const SocialScreen: React.FC = () => {
     const response = await friendsService.getPendingRequests();
     if (response.success && response.data) {
       setPendingRequests(response.data.requests);
+    }
+  };
+
+  const loadSentRequests = async () => {
+    const response = await friendsService.getSentRequests();
+    if (response.success && response.data) {
+      setSentRequests(response.data.requests);
     }
   };
 
@@ -234,7 +351,7 @@ export const SocialScreen: React.FC = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadData();
+    await loadData({ background: true });
     setIsRefreshing(false);
   };
 
@@ -299,11 +416,42 @@ export const SocialScreen: React.FC = () => {
     const response = await friendsService.acceptFriendRequest(friendshipId);
     setActionInProgress(null);
     if (response.success) {
+      // Optimistically remove the request from the local list so the user
+      // sees an immediate transition without a full-screen loading flash.
+      setPendingRequests((prev) =>
+        prev.filter((req) => req.friendship_id !== friendshipId),
+      );
       Alert.alert('Success', 'Friend request accepted!');
-      await loadData();
+      await loadData({ background: true });
     } else {
       Alert.alert('Error', response.error || 'Failed to accept request');
     }
+  };
+
+  const handleCancelSentRequest = (friendshipId: string, displayName: string) => {
+    Alert.alert(
+      'Cancel Request',
+      `Cancel your friend request to ${displayName}?`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Cancel Request',
+          style: 'destructive',
+          onPress: async () => {
+            setActionInProgress(friendshipId);
+            const response = await friendsService.removeFriend(friendshipId);
+            setActionInProgress(null);
+            if (response.success) {
+              setSentRequests((prev) =>
+                prev.filter((req) => req.friendship_id !== friendshipId),
+              );
+            } else {
+              Alert.alert('Error', response.error || 'Failed to cancel request');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleRejectRequest = async (friendshipId: string) => {
@@ -533,6 +681,45 @@ export const SocialScreen: React.FC = () => {
     );
   };
 
+  const renderSentRequestItem = ({ item }: { item: SentRequest }) => {
+    const inProgress = actionInProgress === item.friendship_id;
+    return (
+      <View style={styles.listItem}>
+        <View style={styles.itemContent}>
+          {item.avatar_url ? (
+            <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person" size={24} color={colors.text.secondary} />
+            </View>
+          )}
+          <View style={styles.itemDetails}>
+            <Text style={styles.itemName}>{item.display_name || 'Anonymous'}</Text>
+            <View style={styles.statsRow}>
+              <Ionicons name="time-outline" size={12} color={colors.text.secondary} />
+              <Text style={styles.requestTime}>
+                Pending • Sent {getTimeAgo(new Date(item.requested_at))}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.iconBtn, styles.rejectBtn, inProgress && styles.btnDisabled]}
+            onPress={() => handleCancelSentRequest(item.friendship_id, item.display_name)}
+            disabled={inProgress}
+          >
+            {inProgress ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Ionicons name="close" size={20} color="#FFF" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   const renderDuelItem = (request: DuelRequestItem) => {
     const inProgress = actionInProgress === request.id;
     const remainingSec = Math.max(
@@ -654,7 +841,9 @@ export const SocialScreen: React.FC = () => {
         data={[{ key: 'content' }]}
         renderItem={() => (
           <View>
-            {duelRequests.length === 0 && pendingRequests.length === 0 ? (
+            {duelRequests.length === 0 &&
+            pendingRequests.length === 0 &&
+            sentRequests.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="mail-open-outline" size={64} color={colors.text.secondary} />
                 <Text style={styles.emptyTitle}>No Pending Requests</Text>
@@ -675,6 +864,16 @@ export const SocialScreen: React.FC = () => {
                     <Text style={styles.sectionHeader}>👋 Friend Requests</Text>
                     {pendingRequests.map((item) => (
                       <View key={item.friendship_id}>{renderRequestItem({ item })}</View>
+                    ))}
+                  </>
+                )}
+                {sentRequests.length > 0 && (
+                  <>
+                    <Text style={styles.sectionHeader}>📤 Sent Requests</Text>
+                    {sentRequests.map((item) => (
+                      <View key={item.friendship_id}>
+                        {renderSentRequestItem({ item })}
+                      </View>
                     ))}
                   </>
                 )}

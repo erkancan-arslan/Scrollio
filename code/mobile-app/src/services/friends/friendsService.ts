@@ -38,6 +38,21 @@ export interface PendingRequestsResponse {
   total: number;
 }
 
+export interface SentRequest {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  level: number;
+  xp: number;
+  requested_at: string;
+  friendship_id: string;
+}
+
+export interface SentRequestsResponse {
+  requests: SentRequest[];
+  total: number;
+}
+
 /**
  * Friends Service
  */
@@ -91,14 +106,42 @@ class FriendsService {
   }
 
   /**
-   * Get sent friend requests
+   * Get sent (outgoing) pending friend requests.
+   *
+   * The backend returns rows joined to `profiles`, where the join may surface
+   * as either an object or a single-element array depending on the Supabase
+   * client version. We normalize both shapes here so callers always get a flat
+   * `SentRequest[]`.
    */
   async getSentRequests(): Promise<{
     success: boolean;
-    data?: any;
+    data?: SentRequestsResponse;
     error?: string;
   }> {
-    const response = await apiClient.get<any>('/friends/requests/sent');
+    const response = await apiClient.get<{
+      requests: Array<{
+        id: string;
+        friend_id: string;
+        requested_at: string;
+        profiles:
+          | {
+              id: string;
+              display_name: string | null;
+              avatar_url: string | null;
+              level: number | null;
+              xp: number | null;
+            }
+          | Array<{
+              id: string;
+              display_name: string | null;
+              avatar_url: string | null;
+              level: number | null;
+              xp: number | null;
+            }>
+          | null;
+      }>;
+      total: number;
+    }>('/friends/requests/sent');
 
     if (response.error || !response.data) {
       return {
@@ -107,9 +150,25 @@ class FriendsService {
       };
     }
 
+    const normalized: SentRequest[] = (response.data.requests || []).map((row) => {
+      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+      return {
+        id: profile?.id || row.friend_id,
+        display_name: profile?.display_name || 'Anonymous',
+        avatar_url: profile?.avatar_url || null,
+        level: profile?.level ?? 0,
+        xp: profile?.xp ?? 0,
+        requested_at: row.requested_at,
+        friendship_id: row.id,
+      };
+    });
+
     return {
       success: true,
-      data: response.data,
+      data: {
+        requests: normalized,
+        total: normalized.length,
+      },
     };
   }
 
