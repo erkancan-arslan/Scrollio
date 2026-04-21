@@ -17,11 +17,21 @@ import {
 } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useIsFocused } from '@react-navigation/native';
-import { FeedVideoItem, FeedOptionsButton, ShareToFriendsModal } from '../components';
-import { Video, FeedState } from '../types';
+import {
+  FeedVideoItem,
+  FeedOptionsButton,
+  ShareToFriendsModal,
+  CoreQuizOverlay,
+} from '../components';
+import { Video, FeedState, QuizLevel } from '../types';
 import { mockVideos } from '../data/mockVideos';
-import { feedService } from '../../../services';
+import { feedService, coreQuizApi } from '../../../services';
 import { colors } from '../../../theme';
+
+interface PendingQuiz {
+  topic: string;
+  level: QuizLevel;
+}
 
 
 export const FeedScreen: React.FC = () => {
@@ -54,6 +64,15 @@ export const FeedScreen: React.FC = () => {
 
   // Video selected for "Share to a friend" sheet (null = sheet hidden).
   const [shareVideo, setShareVideo] = useState<Video | null>(null);
+
+  // Pending level-up quiz (null = no quiz open). When set, the overlay is
+  // shown, the underlying video is paused, and no additional quiz checks
+  // fire until the current one resolves.
+  const [pendingQuiz, setPendingQuiz] = useState<PendingQuiz | null>(null);
+  const quizCheckInFlight = useRef(false);
+  // Topics for which we've already confirmed there is no pending quiz,
+  // so we don't spam `/feed/quiz/status` on every completed video.
+  const topicsWithoutPendingQuiz = useRef<Set<string>>(new Set());
   
   // Calculate the exact height for each video item
   // Subtract tab bar height so content doesn't overflow behind it
@@ -126,22 +145,72 @@ export const FeedScreen: React.FC = () => {
     fetchFeed(true);
   }, []);
 
+  // After any completed view we ask the server if the user now owes a
+  // level-up quiz for that topic. We never re-check a topic we've already
+  // confirmed is clean — the server tells us as soon as the last video at
+  // the current level is watched.
+  const checkQuizForTopic = useCallback(
+    async (topic: string | null | undefined) => {
+      if (!topic) return;
+      if (pendingQuiz) return;
+      if (quizCheckInFlight.current) return;
+      if (topicsWithoutPendingQuiz.current.has(topic)) return;
+
+      quizCheckInFlight.current = true;
+      try {
+        const res = await coreQuizApi.getStatus(topic);
+        const status = res.data;
+        if (!status) return;
+
+        if (status.autoUnlocked) {
+          // Server auto-unlocked (empty pool) — refetch so new-level
+          // videos show up, but don't surface a quiz.
+          topicsWithoutPendingQuiz.current.add(topic);
+          fetchFeed(true);
+          return;
+        }
+
+        if (status.pendingQuizLevel && status.hasQuestions) {
+          setPendingQuiz({ topic, level: status.pendingQuizLevel });
+        } else {
+          topicsWithoutPendingQuiz.current.add(topic);
+        }
+      } catch {
+        // Non-blocking — ignore quiz errors
+      } finally {
+        quizCheckInFlight.current = false;
+      }
+    },
+    [pendingQuiz, fetchFeed],
+  );
+
   // Record view for a video that is leaving the viewport
-  const recordVideoView = useCallback((videoId: string, startTime: number) => {
-    const watchDuration = Math.round((Date.now() - startTime) / 1000);
-    // Fire-and-forget — do not block UI
-    feedService.recordView(videoId, watchDuration, false).catch(() => {});
-  }, []);
+  const recordVideoView = useCallback(
+    (videoId: string, startTime: number, topic?: string | null) => {
+      const watchDuration = Math.round((Date.now() - startTime) / 1000);
+      // Fire-and-forget — do not block UI
+      feedService
+        .recordView(videoId, watchDuration, false)
+        .then(() => {
+          // Only trigger the quiz check when the user spent a meaningful
+          // amount of time on the video (2s+). This avoids accidental swipes.
+          if (watchDuration >= 2) checkQuizForTopic(topic);
+        })
+        .catch(() => {});
+    },
+    [checkQuizForTopic],
+  );
 
   // Record view when navigating away from the feed tab
   useEffect(() => {
     if (!isFocused && activeVideoId.current && activeVideoStartTime.current !== null) {
-      recordVideoView(activeVideoId.current, activeVideoStartTime.current);
+      const watched = feedState.videos.find((v) => v.id === activeVideoId.current);
+      recordVideoView(activeVideoId.current, activeVideoStartTime.current, watched?.topic);
       activeVideoStartTime.current = null;
     } else if (isFocused && activeVideoId.current) {
       activeVideoStartTime.current = Date.now();
     }
-  }, [isFocused, recordVideoView]);
+  }, [isFocused, recordVideoView, feedState.videos]);
 
   // Handle pull to refresh
   const handleRefresh = useCallback(() => {
@@ -329,7 +398,9 @@ export const FeedScreen: React.FC = () => {
           activeVideoStartTime.current !== null &&
           activeVideoId.current !== newVideoId
         ) {
-          recordVideoView(activeVideoId.current, activeVideoStartTime.current);
+          const prevId = activeVideoId.current;
+          const prevVideo = feedState.videos.find((v) => v.id === prevId);
+          recordVideoView(prevId, activeVideoStartTime.current, prevVideo?.topic);
         }
 
         // Start tracking the new active video
@@ -352,7 +423,7 @@ export const FeedScreen: React.FC = () => {
     ({ item, index }: { item: Video; index: number }) => (
       <FeedVideoItem
         video={item}
-        isActive={index === currentIndex && isFocused}
+        isActive={index === currentIndex && isFocused && !pendingQuiz}
         isMuted={isMuted}
         onLike={handleLike}
         onComment={handleComment}
@@ -369,6 +440,7 @@ export const FeedScreen: React.FC = () => {
       isFocused,
       isMuted,
       autoAdvance,
+      pendingQuiz,
       handleLike,
       handleComment,
       handleBookmark,
@@ -475,6 +547,25 @@ export const FeedScreen: React.FC = () => {
         video={shareVideo}
         onClose={() => setShareVideo(null)}
       />
+
+      {/* Level-up quiz overlay */}
+      {pendingQuiz && (
+        <CoreQuizOverlay
+          visible
+          topic={pendingQuiz.topic}
+          level={pendingQuiz.level}
+          onClose={(result) => {
+            setPendingQuiz(null);
+            if (result.unlockedLevel) {
+              // Clear the cache entry so the next video in that topic
+              // can re-check (the user has progressed).
+              topicsWithoutPendingQuiz.current.delete(pendingQuiz.topic);
+              // Refetch so new-level videos enter the stream.
+              fetchFeed(true);
+            }
+          }}
+        />
+      )}
     </View>
   );
 };

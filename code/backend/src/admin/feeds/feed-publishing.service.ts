@@ -110,6 +110,7 @@ export class FeedPublishingService {
       is_published: true,
       moderation_status: 'approved',
       source_generated_video_id: genVideo.id,
+      quiz_questions: Array.isArray(genVideo.quiz_questions) ? genVideo.quiz_questions : [],
     };
 
     const { data, error } = await admin
@@ -124,8 +125,10 @@ export class FeedPublishingService {
         `The video may be missing 'source_generated_video_id' column. ` +
         `Run the latest migration to add it.`,
       );
-      // Fallback: try without the source tracking column
+      // Fallback: try without the source tracking column (and without
+      // quiz_questions in case the latest migration hasn't been applied).
       delete videoRecord.source_generated_video_id;
+      delete videoRecord.quiz_questions;
       const { error: fallbackError } = await admin.from('videos').insert(videoRecord);
       if (fallbackError) {
         this.logger.error('Fallback insert into videos also failed', fallbackError);

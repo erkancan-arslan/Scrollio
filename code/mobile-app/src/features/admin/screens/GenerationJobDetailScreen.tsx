@@ -17,7 +17,7 @@ import { AdminHeader } from '../components/AdminHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { ProgressCard } from '../components/ProgressCard';
 import { LogsViewer } from '../components/LogsViewer';
-import { GenerationJob, JobLog } from '../types/admin.types';
+import { CoreQuizQuestionRow, GenerationJob, JobLog } from '../types/admin.types';
 import * as adminApi from '../services/adminApi';
 import * as kidsAdminApi from '../services/kidsAdminApi';
 
@@ -27,6 +27,7 @@ export const GenerationJobDetailScreen: React.FC = () => {
   const useKidsApi = route.params?.kidsApi === true;
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [logs, setLogs] = useState<JobLog[]>([]);
+  const [quizQuestions, setQuizQuestions] = useState<CoreQuizQuestionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -38,6 +39,18 @@ export const GenerationJobDetailScreen: React.FC = () => {
     ]);
     if (jobRes.data) setJob(jobRes.data);
     if (logsRes.data) setLogs(logsRes.data);
+
+    // Load quiz questions from the generated video linked to this job.
+    // Only relevant for Core jobs that are in a terminal state.
+    if (!useKidsApi && jobRes.data?.content_target === 'core' &&
+        ['published', 'active'].includes(jobRes.data?.status ?? '')) {
+      const genRes = await adminApi.listGeneratedVideos({ jobId, limit: 1 });
+      const gv = genRes.data?.data?.[0];
+      if (gv?.quiz_questions && Array.isArray(gv.quiz_questions) && gv.quiz_questions.length > 0) {
+        setQuizQuestions(gv.quiz_questions as CoreQuizQuestionRow[]);
+      }
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, [jobId, useKidsApi]);
@@ -153,6 +166,48 @@ export const GenerationJobDetailScreen: React.FC = () => {
           <DetailRow label="Final Video URL" value={job.final_video_url} />
         )}
 
+        {/* Quiz Questions (Core only) */}
+        {quizQuestions.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Quiz Questions ({quizQuestions.length})</Text>
+            {quizQuestions.map((q, qi) => (
+              <View key={q.id} style={styles.quizCard}>
+                <Text style={styles.quizIndex}>Q{qi + 1}</Text>
+                <Text style={styles.quizQuestion}>{q.question}</Text>
+                {q.options.map((opt, oi) => (
+                  <View
+                    key={oi}
+                    style={[styles.quizOption, oi === q.correctAnswer && styles.quizOptionCorrect]}
+                  >
+                    <Text
+                      style={[
+                        styles.quizOptionLabel,
+                        oi === q.correctAnswer && styles.quizOptionLabelCorrect,
+                      ]}
+                    >
+                      {String.fromCharCode(65 + oi)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.quizOptionText,
+                        oi === q.correctAnswer && styles.quizOptionTextCorrect,
+                      ]}
+                    >
+                      {opt}
+                    </Text>
+                  </View>
+                ))}
+                {q.explanation ? (
+                  <Text style={styles.quizExplanation}>
+                    <Text style={styles.quizExplanationLabel}>Explanation: </Text>
+                    {q.explanation}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </>
+        )}
+
         {/* Logs */}
         <Text style={styles.sectionTitle}>Logs</Text>
         <LogsViewer logs={logs} />
@@ -263,5 +318,79 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: '#EBEBF5',
     lineHeight: 20,
+  },
+  quizCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quizIndex: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: '#FF8C42',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  quizQuestion: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+    lineHeight: 20,
+  },
+  quizOption: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 4,
+    backgroundColor: 'transparent',
+  },
+  quizOptionCorrect: {
+    backgroundColor: '#E8F5E9',
+  },
+  quizOptionLabel: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E0E0E0',
+    textAlign: 'center',
+    lineHeight: 22,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.secondary,
+    marginRight: 8,
+    marginTop: 1,
+  },
+  quizOptionLabelCorrect: {
+    backgroundColor: '#4CAF50',
+    color: '#FFFFFF',
+  },
+  quizOptionText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+  },
+  quizOptionTextCorrect: {
+    color: '#2E7D32',
+    fontWeight: typography.fontWeight.semibold,
+  },
+  quizExplanation: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  quizExplanationLabel: {
+    fontStyle: 'normal',
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
   },
 });

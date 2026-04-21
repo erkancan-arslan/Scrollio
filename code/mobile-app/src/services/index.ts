@@ -6,6 +6,14 @@ export { apiClient } from './api/apiClient';
 export type { ApiResponse } from './api/apiClient';
 
 export { feedService } from './feed/feedService';
+export { coreQuizApi } from './feed/coreQuizApi';
+export type {
+  QuizLevel,
+  QuizStatus,
+  QuizQuestionPublic,
+  QuizSubmitResult,
+  VideoDifficulty,
+} from './feed/coreQuizApi';
 
 export { profileService } from './profile/profileService';
 

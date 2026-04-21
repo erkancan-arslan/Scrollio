@@ -81,3 +81,30 @@ export interface FeedState {
   hasMore: boolean;
 }
 
+// ── Quiz types (re-exported from the API client for convenience) ───────────
+
+export type QuizLevel = 'beginner' | 'intermediate';
+
+export interface QuizStatus {
+  currentLevel: 'beginner' | 'intermediate' | 'advanced';
+  pendingQuizLevel: QuizLevel | null;
+  hasQuestions: boolean;
+  autoUnlocked?: boolean;
+}
+
+export interface QuizQuestionPublic {
+  questionId: string;
+  videoId: string;
+  question: string;
+  options: string[];
+  autoUnlock?: boolean;
+  unlockedLevel?: 'beginner' | 'intermediate' | 'advanced';
+}
+
+export interface QuizSubmitResult {
+  correct: boolean;
+  explanation?: string;
+  unlockedLevel?: 'beginner' | 'intermediate' | 'advanced';
+  nextLevel?: 'beginner' | 'intermediate' | 'advanced';
+}
+

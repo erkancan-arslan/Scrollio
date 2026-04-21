@@ -80,6 +80,14 @@ export interface GenerationJob {
   reference_videos?: Pick<ReferenceVideo, 'id' | 'title' | 'public_url' | 'thumbnail_url' | 'persona_name'>;
 }
 
+export interface CoreQuizQuestionRow {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation?: string;
+}
+
 export interface GeneratedVideo {
   id: string;
   job_id: string;
@@ -94,6 +102,8 @@ export interface GeneratedVideo {
   video_url: string;
   thumbnail_url?: string;
   reference_video_id?: string;
+  /** AI-generated MC questions stored on publish (Core). */
+  quiz_questions?: CoreQuizQuestionRow[];
   status: string;
   published_by?: string;
   created_at: string;

@@ -495,9 +495,15 @@ export class FeedService {
 
   /**
    * For each preferred topic, determine which difficulty levels a user may see.
-   * - If the user hasn't watched every beginner video in a topic → beginner only.
-   * - If they have → beginner + intermediate (graduated).
-   * - If a topic has no beginner videos → all difficulties.
+   *
+   * Level progression is now driven by the quiz feature — a user only sees
+   * intermediate/advanced content in a topic after answering the
+   * corresponding level-up quiz correctly (recorded in
+   * `user_topic_level_unlocks`).
+   *
+   * Fallback: if a topic has no beginner videos at all we unlock everything
+   * so users with a preference for a sparsely-seeded topic don't get an
+   * empty feed.
    */
   private async getTopicDifficultyAllowances(
     userId: string,
@@ -505,47 +511,47 @@ export class FeedService {
   ): Promise<Record<string, string[]>> {
     const supabase = this.supabaseService.getAdminClient();
 
-    // Fetch all beginner video IDs for the preferred topics in one query
+    // Topics that have at least one published beginner video.
     const { data: beginnerVideos } = await supabase
       .from('videos')
-      .select('id, topic')
+      .select('topic')
       .in('topic', preferredTopics)
       .eq('difficulty_level', 'beginner')
       .eq('is_published', true)
       .eq('moderation_status', 'approved');
 
-    // Group by topic
-    const beginnerByTopic = new Map<string, Set<string>>();
+    const topicsWithBeginner = new Set<string>();
     for (const v of beginnerVideos ?? []) {
-      if (!v.topic) continue;
-      if (!beginnerByTopic.has(v.topic)) beginnerByTopic.set(v.topic, new Set());
-      beginnerByTopic.get(v.topic)!.add(v.id);
+      if (v.topic) topicsWithBeginner.add(v.topic);
     }
 
-    // Find which beginner videos the user has already watched
-    let watchedBeginnerIds = new Set<string>();
-    const allBeginnerIds = (beginnerVideos ?? []).map((v) => v.id);
-    if (allBeginnerIds.length > 0) {
-      const { data: watched } = await supabase
-        .from('video_views')
-        .select('video_id')
-        .eq('user_id', userId)
-        .in('video_id', allBeginnerIds);
+    // All unlocks for this user across the preferred topics.
+    const { data: unlocks } = await supabase
+      .from('user_topic_level_unlocks')
+      .select('topic, level')
+      .eq('user_id', userId)
+      .in('topic', preferredTopics);
 
-      watchedBeginnerIds = new Set((watched ?? []).map((w) => w.video_id));
+    const unlocksByTopic = new Map<string, Set<string>>();
+    for (const u of unlocks ?? []) {
+      if (!u.topic) continue;
+      if (!unlocksByTopic.has(u.topic)) unlocksByTopic.set(u.topic, new Set());
+      unlocksByTopic.get(u.topic)!.add(u.level);
     }
 
-    // Decide allowed difficulties per topic
     const allowances: Record<string, string[]> = {};
     for (const topic of preferredTopics) {
-      const ids = beginnerByTopic.get(topic);
-      if (!ids || ids.size === 0) {
-        // No beginner content exists → unlock all difficulties
+      if (!topicsWithBeginner.has(topic)) {
+        // No beginner content exists for this topic → unlock all difficulties
+        // so the feed isn't empty during seeding.
         allowances[topic] = ['beginner', 'intermediate', 'advanced'];
-      } else {
-        const allWatched = [...ids].every((id) => watchedBeginnerIds.has(id));
-        allowances[topic] = allWatched ? ['beginner', 'intermediate'] : ['beginner'];
+        continue;
       }
+      const unlocked = unlocksByTopic.get(topic) ?? new Set<string>();
+      const diffs: string[] = ['beginner'];
+      if (unlocked.has('intermediate')) diffs.push('intermediate');
+      if (unlocked.has('advanced')) diffs.push('advanced');
+      allowances[topic] = diffs;
     }
     return allowances;
   }

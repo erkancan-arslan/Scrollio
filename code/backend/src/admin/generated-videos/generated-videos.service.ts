@@ -15,6 +15,7 @@ interface CreateFromJobInput {
   videoUrl: string;
   thumbnailUrl?: string;
   referenceVideoId?: string;
+  quizQuestions?: unknown[];
 }
 
 @Injectable()
@@ -39,6 +40,7 @@ export class GeneratedVideosService {
       video_url: input.videoUrl,
       thumbnail_url: input.thumbnailUrl || null,
       reference_video_id: input.referenceVideoId || null,
+      quiz_questions: input.quizQuestions ?? [],
       status: 'active',
     };
 
@@ -65,6 +67,7 @@ export class GeneratedVideosService {
     if (query.contentTarget) q = q.eq('content_target', query.contentTarget);
     if (query.status) q = q.eq('status', query.status);
     if (query.language) q = q.eq('language', query.language);
+    if (query.jobId) q = q.eq('job_id', query.jobId);
     if (query.search) q = q.ilike('title', `%${query.search}%`);
     if (query.limit) q = q.limit(query.limit);
     if (query.offset) q = q.range(query.offset, query.offset + (query.limit || 50) - 1);

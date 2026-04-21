@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GenerationJobsService } from './generation-jobs.service';
 import { ReferenceVideosService } from '../reference-videos/reference-videos.service';
 import { ScriptGenerationService } from '../ai/script-generation.service';
+import { QuizGenerationService, QuizQuestion } from '../ai/quiz-generation.service';
 import { TtsService } from '../ai/tts.service';
 import { LipsyncService } from '../ai/lipsync.service';
 import { ThumbnailService } from '../ai/thumbnail.service';
@@ -22,6 +23,7 @@ interface JobState {
   videoUrl: string;
   composedVideoUrl: string;
   thumbnailUrl: string;
+  quizQuestions: QuizQuestion[];
 }
 
 interface JobStateWithRecord extends JobState {
@@ -38,6 +40,7 @@ export class GenerationOrchestratorService {
     private readonly jobsService: GenerationJobsService,
     private readonly referenceVideosService: ReferenceVideosService,
     private readonly scriptService: ScriptGenerationService,
+    private readonly quizGenerationService: QuizGenerationService,
     private readonly ttsService: TtsService,
     private readonly lipsyncService: LipsyncService,
     private readonly thumbnailService: ThumbnailService,
@@ -88,6 +91,17 @@ export class GenerationOrchestratorService {
       const narration = this.cleanNarration(script);
       await this.jobsService.updateStatus(jobId, { cleanedNarrationText: narration });
       await this.logsService.log(jobId, JobStep.CLEANING_NARRATION, 'success', 'Narration cleaned');
+
+      // Step 4.5: Generate quiz questions (non-blocking — failures yield [])
+      const quizQuestions =
+        job.content_target === 'core'
+          ? await this.quizGenerationService.generate({
+              narration,
+              topic: job.topic,
+              difficulty: job.difficulty,
+              language: job.language,
+            })
+          : [];
 
       // Step 5: Generate TTS
       await this.advanceStep(jobId, JobStep.GENERATING_TTS, 'Generating TTS audio');
@@ -157,6 +171,7 @@ export class GenerationOrchestratorService {
         videoUrl: canonicalVideoUrl,
         thumbnailUrl,
         referenceVideoId: job.reference_video_id,
+        quizQuestions,
       });
       await this.logsService.log(jobId, JobStep.CREATING_GENERATED_VIDEO, 'success', `Generated video: ${generatedVideo.id}`);
 
@@ -309,6 +324,17 @@ export class GenerationOrchestratorService {
       await this.jobsService.updateStatus(jobId, { thumbnailUrl });
       await this.logsService.log(jobId, JobStep.GENERATING_THUMBNAIL, 'success', `Thumbnail: ${thumbnailUrl}`);
 
+      // Generate quiz questions from approved narration (core only)
+      const quizQuestions =
+        job.content_target === 'core'
+          ? await this.quizGenerationService.generate({
+              narration,
+              topic: job.topic,
+              difficulty: job.difficulty,
+              language: job.language,
+            })
+          : [];
+
       // Create generated_video record
       await this.advanceStep(jobId, JobStep.CREATING_GENERATED_VIDEO, 'Creating generated video record');
       const generatedVideo = await this.generatedVideosService.createFromJob({
@@ -324,6 +350,7 @@ export class GenerationOrchestratorService {
         videoUrl: canonicalVideoUrl,
         thumbnailUrl,
         referenceVideoId: job.reference_video_id,
+        quizQuestions,
       });
       await this.logsService.log(jobId, JobStep.CREATING_GENERATED_VIDEO, 'success', `Generated video: ${generatedVideo.id}`);
 
@@ -387,6 +414,7 @@ export class GenerationOrchestratorService {
         videoUrl: '',
         composedVideoUrl: '',
         thumbnailUrl: '',
+        quizQuestions: [],
       }));
 
       // ── 1. Generate all scripts in parallel ────────────────────────────────
@@ -413,6 +441,27 @@ export class GenerationOrchestratorService {
         });
       });
       if (alive.length === 0) return;
+
+      // ── 1.5. Generate quiz questions for every alive core job in parallel ─
+      // Failures here are non-blocking (the service returns []), so we don't
+      // filter the alive list — a video without quiz_questions simply won't
+      // contribute to its topic's quiz pool.
+      const quizResults = await Promise.allSettled(
+        alive.map((s) =>
+          s.job.content_target === 'core'
+            ? this.quizGenerationService.generate({
+                narration: s.narration,
+                topic: s.job.topic,
+                difficulty: s.job.difficulty,
+                language: s.job.language,
+              })
+            : Promise.resolve([] as QuizQuestion[]),
+        ),
+      );
+      for (let i = 0; i < quizResults.length; i++) {
+        const r = quizResults[i];
+        alive[i].quizQuestions = r.status === 'fulfilled' ? r.value : [];
+      }
 
       // ── 2. Generate all TTS audio in parallel ──────────────────────────────
       await Promise.all(alive.map((s) => this.advanceStep(s.job.id, JobStep.GENERATING_TTS, 'Generating TTS')));
@@ -502,6 +551,7 @@ export class GenerationOrchestratorService {
             videoUrl: s.composedVideoUrl,
             thumbnailUrl: s.thumbnailUrl,
             referenceVideoId: s.job.reference_video_id,
+            quizQuestions: s.quizQuestions,
           }),
         ),
       );

@@ -134,6 +134,7 @@ export async function getAdminStats(): Promise<ApiResponse<AdminStats>> {
 // ---- Generated Videos ----
 
 export async function listGeneratedVideos(filters?: {
+  jobId?: string;
   contentTarget?: string;
   status?: string;
   language?: string;
@@ -142,6 +143,7 @@ export async function listGeneratedVideos(filters?: {
   offset?: number;
 }): Promise<ApiResponse<PaginatedResponse<GeneratedVideo>>> {
   const params = new URLSearchParams();
+  if (filters?.jobId) params.set('jobId', filters.jobId);
   if (filters?.contentTarget) params.set('contentTarget', filters.contentTarget);
   if (filters?.status) params.set('status', filters.status);
   if (filters?.language) params.set('language', filters.language);

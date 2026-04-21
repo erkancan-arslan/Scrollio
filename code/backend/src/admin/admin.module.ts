@@ -14,6 +14,7 @@ import { GeneratedVideosController } from './generated-videos/generated-videos.c
 import { GeneratedVideosService } from './generated-videos/generated-videos.service';
 
 import { ScriptGenerationService } from './ai/script-generation.service';
+import { QuizGenerationService } from './ai/quiz-generation.service';
 import { TtsService } from './ai/tts.service';
 import { LipsyncService } from './ai/lipsync.service';
 import { ThumbnailService } from './ai/thumbnail.service';
@@ -42,6 +43,7 @@ import { BatchJobsService } from './batch-jobs/batch-jobs.service';
     GenerationOrchestratorService,
     GeneratedVideosService,
     ScriptGenerationService,
+    QuizGenerationService,
     TtsService,
     LipsyncService,
     ThumbnailService,
