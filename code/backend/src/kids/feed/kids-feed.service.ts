@@ -86,6 +86,12 @@ export class KidsFeedService {
     const viewedIds = (recentViews ?? []).map((v: { content_id: string }) => v.content_id);
 
     const ageGroup = this.ageGroupFromDob(childProfile?.date_of_birth as string | null | undefined);
+    if (!ageGroup) {
+      this.logger.warn(
+        `Feed age filter skipped previously; missing/invalid DOB for childId=${childId}. Returning empty feed.`,
+      );
+      return empty('no_matching_content');
+    }
 
     // 4. Build feed query on kids_content only
     let feedQuery = admin
@@ -96,9 +102,7 @@ export class KidsFeedService {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (ageGroup) {
-      feedQuery = feedQuery.eq('age_group', ageGroup);
-    }
+    feedQuery = feedQuery.eq('age_group', ageGroup);
 
     if (query.topicId) {
       const { data: topic } = await admin

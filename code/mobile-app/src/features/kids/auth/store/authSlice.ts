@@ -124,7 +124,7 @@ export const fetchChildrenThunk = createAsyncThunk(
 export const createChildThunk = createAsyncThunk(
   'kidsAuth/createChild',
   async (
-    data: { displayName: string; dateOfBirth?: string; avatarConfig?: Record<string, unknown> },
+    data: { displayName: string; dateOfBirth: string; avatarConfig?: Record<string, unknown> },
     { rejectWithValue },
   ) => {
     const res = await childProfileApi.createChild(data);

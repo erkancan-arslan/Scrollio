@@ -13,7 +13,7 @@ export const getChildren = async (): Promise<KidsApiResponse<ChildProfile[]>> =>
 /** POST /api/v1/kids/auth/children */
 export const createChild = async (data: {
   displayName: string;
-  dateOfBirth?: string;
+  dateOfBirth: string;
   avatarConfig?: Record<string, unknown>;
 }): Promise<KidsApiResponse<ChildProfile>> => {
   return kidsApi.post<ChildProfile>('/kids/auth/children', data);

@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { createChildThunk } from '../store/authSlice';
@@ -38,6 +40,13 @@ interface Props {
   };
 }
 
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const KidsCreateChildScreen: React.FC<Props> = ({ navigation }) => {
   const nav = useNavigation();
   const dispatch = useAppDispatch();
@@ -45,7 +54,8 @@ export const KidsCreateChildScreen: React.FC<Props> = ({ navigation }) => {
 
   const [displayName, setDisplayName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0].id);
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const handleCreate = async () => {
@@ -55,13 +65,17 @@ export const KidsCreateChildScreen: React.FC<Props> = ({ navigation }) => {
       setLocalError('Name must be 2-30 characters');
       return;
     }
+    if (!dateOfBirth) {
+      setLocalError('Date of birth is required');
+      return;
+    }
 
     const avatar = AVATAR_OPTIONS.find((a) => a.id === selectedAvatar);
     try {
       await dispatch(
         createChildThunk({
           displayName: displayName.trim(),
-          dateOfBirth: dateOfBirth || undefined,
+          dateOfBirth: toIsoDate(dateOfBirth),
           avatarConfig: {
             avatarId: selectedAvatar,
             avatarEmoji: avatar?.emoji ?? '🦊',
@@ -78,6 +92,23 @@ export const KidsCreateChildScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const displayError = localError || error;
+  const maximumDob = new Date();
+  maximumDob.setFullYear(maximumDob.getFullYear() - 7);
+  const minimumDob = new Date();
+  minimumDob.setFullYear(minimumDob.getFullYear() - 12);
+  const dobLabel = dateOfBirth ? toIsoDate(dateOfBirth) : 'Select date of birth';
+
+  const onChangeDate = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'dismissed') {
+      return;
+    }
+    if (selectedDate) {
+      setDateOfBirth(selectedDate);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -109,17 +140,36 @@ export const KidsCreateChildScreen: React.FC<Props> = ({ navigation }) => {
           accessibilityLabel="Child's name"
         />
 
-        <Text style={styles.label}>Date of Birth (optional)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={kidsColors.text.muted}
-          value={dateOfBirth}
-          onChangeText={setDateOfBirth}
-          keyboardType="numbers-and-punctuation"
-          editable={!isLoading}
-          accessibilityLabel="Date of birth"
-        />
+        <Text style={styles.label}>Date of Birth</Text>
+        <Pressable
+          style={styles.datePickerTrigger}
+          onPress={() => setShowDatePicker(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Choose date of birth"
+          disabled={isLoading}
+        >
+          <Text style={[styles.datePickerText, !dateOfBirth && styles.datePlaceholder]}>
+            {dobLabel}
+          </Text>
+        </Pressable>
+        {showDatePicker ? (
+          <DateTimePicker
+            value={dateOfBirth ?? maximumDob}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onChangeDate}
+            minimumDate={minimumDob}
+            maximumDate={maximumDob}
+          />
+        ) : null}
+        {showDatePicker && Platform.OS === 'ios' ? (
+          <KidsThemedButton
+            title="Done"
+            onPress={() => setShowDatePicker(false)}
+            disabled={isLoading}
+            style={styles.doneButton}
+          />
+        ) : null}
 
         <Text style={styles.label}>Choose an Avatar</Text>
         <View style={styles.avatarGrid}>
@@ -161,6 +211,10 @@ const styles = StyleSheet.create({
   errorText: { color: kidsColors.error, ...kidsTypography.bodySmall, textAlign: 'center' },
   label: { ...kidsTypography.bodySmall, color: kidsColors.text.primary, fontWeight: '600', marginBottom: 6, marginTop: 16 },
   input: { backgroundColor: '#FFF', borderWidth: 1.5, borderColor: kidsColors.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, ...kidsTypography.body, color: kidsColors.text.primary },
+  datePickerTrigger: { backgroundColor: '#FFF', borderWidth: 1.5, borderColor: kidsColors.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  datePickerText: { ...kidsTypography.body, color: kidsColors.text.primary },
+  datePlaceholder: { color: kidsColors.text.muted },
+  doneButton: { marginTop: 10 },
   avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, justifyContent: 'center' },
   avatarOption: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
   avatarSelected: { borderColor: kidsColors.primary, backgroundColor: kidsColors.primaryLight + '20' },

@@ -14,7 +14,7 @@ export const useChildProfiles = () => {
   }, [dispatch]);
 
   const createChild = useCallback(
-    async (data: { displayName: string; dateOfBirth?: string; avatarConfig?: Record<string, unknown> }) => {
+    async (data: { displayName: string; dateOfBirth: string; avatarConfig?: Record<string, unknown> }) => {
       await dispatch(createChildThunk(data)).unwrap();
     },
     [dispatch],

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, MaxLength, IsObject, IsIn } from 'class-validator';
+import { IsString, IsOptional, MinLength, MaxLength, IsObject, IsIn, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { KIDS_MASCOT_CHARACTER_IDS } from '../../constants/kids-mascots';
 
@@ -9,10 +9,9 @@ export class CreateChildProfileDto {
   @MaxLength(30)
   displayName: string;
 
-  @ApiPropertyOptional({ description: 'Date of birth (YYYY-MM-DD)' })
-  @IsOptional()
-  @IsString()
-  dateOfBirth?: string;
+  @ApiProperty({ description: 'Date of birth (YYYY-MM-DD)' })
+  @IsDateString()
+  dateOfBirth: string;
 
   @ApiPropertyOptional({ description: 'Avatar configuration JSON' })
   @IsOptional()
