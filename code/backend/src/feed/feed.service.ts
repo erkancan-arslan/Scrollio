@@ -72,11 +72,38 @@ export class FeedService {
   }
 
   /**
-   * Get personalized feed for a user
+   * Get personalized feed for a user.
+   *
+   * Personalization logic (applied when the user is authenticated and has
+   * preferred topics set, and no explicit topicId/difficulty filter is in
+   * the query):
+   *   - Videos are restricted to the user's preferred topics.
+   *   - Per topic, only beginner videos are shown until the user has watched
+   *     every beginner video in that topic; after that, beginner + intermediate
+   *     videos are unlocked.
    */
   async getFeed(userId: string | null, query: FeedQueryDto): Promise<FeedResponseDto> {
     const supabase = this.supabaseService.getAdminClient();
     const limit = query.limit || 10;
+
+    // Resolve personalization filter (topic + difficulty per topic)
+    let topicOrFilter: string | null = null;
+    const shouldPersonalize = !query.topicId && !query.difficulty;
+
+    if (shouldPersonalize && userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('preferences')
+        .eq('id', userId)
+        .single();
+
+      const preferredTopics: string[] = profile?.preferences?.preferredTopics ?? [];
+
+      if (preferredTopics.length > 0) {
+        const allowances = await this.getTopicDifficultyAllowances(userId, preferredTopics);
+        topicOrFilter = this.buildTopicOrFilter(preferredTopics, allowances);
+      }
+    }
 
     // Step 1: count eligible videos so we can pick a random starting offset
     let countQuery = supabase
@@ -87,6 +114,7 @@ export class FeedService {
 
     if (query.topicId) countQuery = countQuery.eq('topic_id', query.topicId);
     if (query.difficulty) countQuery = countQuery.eq('difficulty_level', query.difficulty);
+    if (topicOrFilter) countQuery = countQuery.or(topicOrFilter);
 
     const { count, error: countError } = await countQuery;
     if (countError) {
@@ -118,6 +146,7 @@ export class FeedService {
 
     if (query.topicId) dbQuery = dbQuery.eq('topic_id', query.topicId);
     if (query.difficulty) dbQuery = dbQuery.eq('difficulty_level', query.difficulty);
+    if (topicOrFilter) dbQuery = dbQuery.or(topicOrFilter);
 
     const { data: videos, error } = await dbQuery;
 
@@ -438,6 +467,108 @@ export class FeedService {
         : null,
       hasMore,
     };
+  }
+
+  /**
+   * Get distinct topic strings from the videos table (used for onboarding topic selection)
+   */
+  async getVideoTopics(): Promise<{ topics: string[] }> {
+    const supabase = this.supabaseService.getAdminClient();
+
+    const { data, error } = await supabase
+      .from('videos')
+      .select('topic')
+      .eq('is_published', true)
+      .eq('moderation_status', 'approved')
+      .not('topic', 'is', null)
+      .order('topic');
+
+    if (error) {
+      this.logger.error('Error fetching video topics:', error);
+      throw error;
+    }
+
+    // Deduplicate client-side
+    const topics = [...new Set((data ?? []).map((v) => v.topic).filter(Boolean))].sort();
+    return { topics };
+  }
+
+  /**
+   * For each preferred topic, determine which difficulty levels a user may see.
+   * - If the user hasn't watched every beginner video in a topic → beginner only.
+   * - If they have → beginner + intermediate (graduated).
+   * - If a topic has no beginner videos → all difficulties.
+   */
+  private async getTopicDifficultyAllowances(
+    userId: string,
+    preferredTopics: string[],
+  ): Promise<Record<string, string[]>> {
+    const supabase = this.supabaseService.getAdminClient();
+
+    // Fetch all beginner video IDs for the preferred topics in one query
+    const { data: beginnerVideos } = await supabase
+      .from('videos')
+      .select('id, topic')
+      .in('topic', preferredTopics)
+      .eq('difficulty_level', 'beginner')
+      .eq('is_published', true)
+      .eq('moderation_status', 'approved');
+
+    // Group by topic
+    const beginnerByTopic = new Map<string, Set<string>>();
+    for (const v of beginnerVideos ?? []) {
+      if (!v.topic) continue;
+      if (!beginnerByTopic.has(v.topic)) beginnerByTopic.set(v.topic, new Set());
+      beginnerByTopic.get(v.topic)!.add(v.id);
+    }
+
+    // Find which beginner videos the user has already watched
+    let watchedBeginnerIds = new Set<string>();
+    const allBeginnerIds = (beginnerVideos ?? []).map((v) => v.id);
+    if (allBeginnerIds.length > 0) {
+      const { data: watched } = await supabase
+        .from('video_views')
+        .select('video_id')
+        .eq('user_id', userId)
+        .in('video_id', allBeginnerIds);
+
+      watchedBeginnerIds = new Set((watched ?? []).map((w) => w.video_id));
+    }
+
+    // Decide allowed difficulties per topic
+    const allowances: Record<string, string[]> = {};
+    for (const topic of preferredTopics) {
+      const ids = beginnerByTopic.get(topic);
+      if (!ids || ids.size === 0) {
+        // No beginner content exists → unlock all difficulties
+        allowances[topic] = ['beginner', 'intermediate', 'advanced'];
+      } else {
+        const allWatched = [...ids].every((id) => watchedBeginnerIds.has(id));
+        allowances[topic] = allWatched ? ['beginner', 'intermediate'] : ['beginner'];
+      }
+    }
+    return allowances;
+  }
+
+  /**
+   * Build a PostgREST OR filter string that restricts the feed to the
+   * allowed (topic, difficulty) combinations for this user.
+   */
+  private buildTopicOrFilter(
+    topics: string[],
+    allowances: Record<string, string[]>,
+  ): string | null {
+    if (topics.length === 0) return null;
+
+    const parts = topics.map((topic) => {
+      const diffs = allowances[topic] ?? ['beginner'];
+      if (diffs.length === 1) {
+        return `and(topic.eq.${topic},difficulty_level.eq.${diffs[0]})`;
+      }
+      return `and(topic.eq.${topic},difficulty_level.in.(${diffs.join(',')}))`;
+    });
+
+    return parts.join(',');
   }
 
   /**

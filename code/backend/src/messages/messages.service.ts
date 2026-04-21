@@ -102,6 +102,7 @@ export class MessagesService {
           message_type: msg.message_type,
           media_url: msg.media_url,
           thumbnail_url: msg.thumbnail_url,
+          metadata: msg.metadata ?? null,
           is_edited: msg.is_edited,
           is_deleted: msg.is_deleted,
           created_at: msg.created_at,
@@ -133,10 +134,11 @@ export class MessagesService {
   async sendMessage(
     userId: string,
     conversationId: string,
-    content: string,
+    content: string | null | undefined,
     messageType: string = 'text',
     mediaUrl?: string,
     thumbnailUrl?: string,
+    metadata?: Record<string, any>,
     accessToken?: string,
   ) {
     try {
@@ -165,10 +167,11 @@ export class MessagesService {
         .insert({
           conversation_id: conversationId,
           sender_id: userId,
-          content,
+          content: content ?? null,
           message_type: messageType,
           media_url: mediaUrl,
           thumbnail_url: thumbnailUrl,
+          metadata: metadata ?? null,
         })
         .select('*')
         .single();
@@ -194,6 +197,7 @@ export class MessagesService {
         message_type: message.message_type,
         media_url: message.media_url,
         thumbnail_url: message.thumbnail_url,
+        metadata: message.metadata ?? null,
         is_edited: message.is_edited,
         is_deleted: message.is_deleted,
         created_at: message.created_at,
@@ -294,7 +298,8 @@ export class MessagesService {
         throw new NotFoundException('Message not found or access denied');
       }
 
-      // Soft delete
+      // Soft delete — wipe all payload fields so deleted shared posts can't
+      // still be tapped to play in the chat bubble.
       const { error } = await supabase
         .from('messages')
         .update({
@@ -302,6 +307,7 @@ export class MessagesService {
           content: null,
           media_url: null,
           thumbnail_url: null,
+          metadata: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', messageId);

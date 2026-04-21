@@ -25,7 +25,9 @@
       "Bash(python3:*)",
       "Bash(pip3 list:*)",
       "Bash(pip3 install:*)",
-      "Bash(grep -r react-native-reanimated /Users/komacyus/projects/Scrollio/code/mobile-app/src --include=*.ts --include=*.tsx -l)"
+      "Bash(grep -r react-native-reanimated /Users/komacyus/projects/Scrollio/code/mobile-app/src --include=*.ts --include=*.tsx -l)",
+      "Bash(grep -E \"\\\\.sql$\")",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
     ],
     "deny": [],
     "ask": []

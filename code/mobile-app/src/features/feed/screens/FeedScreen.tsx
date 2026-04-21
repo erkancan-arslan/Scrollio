@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useIsFocused } from '@react-navigation/native';
-import { FeedVideoItem, FeedOptionsButton } from '../components';
+import { FeedVideoItem, FeedOptionsButton, ShareToFriendsModal } from '../components';
 import { Video, FeedState } from '../types';
 import { mockVideos } from '../data/mockVideos';
 import { feedService } from '../../../services';
@@ -51,6 +51,9 @@ export const FeedScreen: React.FC = () => {
   // Playback options state
   const [isMuted, setIsMuted] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
+
+  // Video selected for "Share to a friend" sheet (null = sheet hidden).
+  const [shareVideo, setShareVideo] = useState<Video | null>(null);
   
   // Calculate the exact height for each video item
   // Subtract tab bar height so content doesn't overflow behind it
@@ -268,11 +271,16 @@ export const FeedScreen: React.FC = () => {
     // TODO: Open comments modal
   }, []);
 
-  // Handle share action (placeholder for now)
-  const handleShare = useCallback((videoId: string) => {
-    console.log('Share video:', videoId);
-    // TODO: Open share sheet
-  }, []);
+  // Handle share action — opens the "Share to a friend" sheet for this video.
+  // We snapshot the current Video object (not just the id) so the sheet can
+  // render a thumbnail/title preview without a refetch.
+  const handleShare = useCallback(
+    (videoId: string) => {
+      const v = feedState.videos.find((video) => video.id === videoId);
+      if (v) setShareVideo(v);
+    },
+    [feedState.videos],
+  );
 
   // Handle creator profile navigation
   const handleCreatorPress = useCallback((creatorId: string) => {
@@ -459,6 +467,13 @@ export const FeedScreen: React.FC = () => {
             colors={[colors.primary]}
           />
         }
+      />
+
+      {/* Share-to-friend bottom sheet */}
+      <ShareToFriendsModal
+        visible={shareVideo !== null}
+        video={shareVideo}
+        onClose={() => setShareVideo(null)}
       />
     </View>
   );

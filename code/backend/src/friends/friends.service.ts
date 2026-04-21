@@ -221,28 +221,23 @@ export class FriendsService {
   }
 
   /**
-   * Get sent friend requests (requests I sent to others)
+   * Get sent friend requests (requests I sent to others).
+   *
+   * NOTE: We can't use PostgREST's inline embed `profiles:friend_id (...)`
+   * here because `friendships.friend_id` references `auth.users(id)` — not
+   * `profiles(id)` — so PostgREST has no foreign-key edge to follow and
+   * fails with PGRST200 ("Could not find a relationship between
+   * 'friendships' and 'friend_id' in the schema cache"). Instead we do two
+   * cheap queries and join in JS. The response shape stays identical so
+   * the mobile normalization layer keeps working.
    */
   async getSentRequests(userId: string) {
     try {
       const supabase = this.supabaseService.getClient();
 
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('friendships')
-        .select(
-          `
-          id,
-          friend_id,
-          requested_at,
-          profiles:friend_id (
-            id,
-            display_name,
-            avatar_url,
-            level,
-            xp
-          )
-        `,
-        )
+        .select('id, friend_id, requested_at')
         .eq('user_id', userId)
         .eq('status', 'pending')
         .order('requested_at', { ascending: false });
@@ -252,9 +247,36 @@ export class FriendsService {
         throw new Error(`Failed to fetch sent requests: ${error.message}`);
       }
 
+      const friendships = rows || [];
+      if (friendships.length === 0) {
+        return { requests: [], total: 0 };
+      }
+
+      const friendIds = friendships.map((r) => r.friend_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, level, xp')
+        .in('id', friendIds);
+
+      if (profilesError) {
+        this.logger.error('Error fetching profiles for sent requests:', profilesError);
+        throw new Error(
+          `Failed to fetch profiles for sent requests: ${profilesError.message}`,
+        );
+      }
+
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+      const requests = friendships.map((row) => ({
+        id: row.id,
+        friend_id: row.friend_id,
+        requested_at: row.requested_at,
+        profiles: profileMap.get(row.friend_id) || null,
+      }));
+
       return {
-        requests: data || [],
-        total: data?.length || 0,
+        requests,
+        total: requests.length,
       };
     } catch (error) {
       this.logger.error('Get sent requests error:', error);

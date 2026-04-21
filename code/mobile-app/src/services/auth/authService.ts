@@ -5,6 +5,7 @@
 
 import { apiClient, ApiResponse } from '../api/apiClient';
 import { secureStorage } from '../storage/secureStorage';
+import { supabase, syncSupabaseSessionFromStorage } from '../supabase/client';
 
 // Types
 export interface User {
@@ -66,6 +67,10 @@ class AuthService {
       userId: response.data.user.id,
     });
 
+    // Mirror the session into the Supabase JS client so realtime
+    // subscriptions and `supabase.auth.getUser()` know who is signed in.
+    await syncSupabaseSessionFromStorage();
+
     this.currentUser = response.data.user;
 
     return { success: true };
@@ -89,6 +94,10 @@ class AuthService {
       userId: response.data.user.id,
     });
 
+    // Mirror the session into the Supabase JS client so realtime
+    // subscriptions and `supabase.auth.getUser()` know who is signed in.
+    await syncSupabaseSessionFromStorage();
+
     this.currentUser = response.data.user;
 
     return { success: true };
@@ -108,6 +117,15 @@ class AuthService {
 
     // Clear local session from Keychain
     await secureStorage.clearSession();
+
+    // Also tear down the Supabase JS client session so realtime channels
+    // disconnect and `supabase.auth.getUser()` no longer returns a stale user.
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn('Supabase client signOut failed:', error);
+    }
+
     this.currentUser = null;
   }
 
@@ -141,6 +159,9 @@ class AuthService {
       expiresAt: response.data.session.expiresAt,
       userId: response.data.user.id,
     });
+
+    // Keep the Supabase JS client in sync after a token refresh.
+    await syncSupabaseSessionFromStorage();
 
     this.currentUser = response.data.user;
 

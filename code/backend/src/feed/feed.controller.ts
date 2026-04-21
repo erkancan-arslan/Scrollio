@@ -143,6 +143,16 @@ export class FeedController {
   }
 
   /**
+   * GET /feed/video-topics
+   * Get distinct topic strings from published videos (for onboarding topic selection)
+   * Authentication: Not required
+   */
+  @Get('video-topics')
+  async getVideoTopics(): Promise<{ topics: string[] }> {
+    return this.feedService.getVideoTopics();
+  }
+
+  /**
    * GET /feed/videos/:videoId
    * Get a single video by ID
    * Authentication: Optional
