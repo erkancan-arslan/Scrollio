@@ -10,6 +10,7 @@ import { Audio } from 'expo-av';
 import { SlideRenderer } from '../components/SlideRenderer';
 import { apiClient } from '../../../../services/api/apiClient';
 import { spacing } from '../../../../theme';
+import { ScreenTimeGuard } from '../../parental/components/ScreenTimeGuard';
 
 const KIDS_ORANGE = '#FF6B35';
 
@@ -134,8 +135,9 @@ export const KidsLessonPlayerScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Top bar */}
+    <ScreenTimeGuard>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={28} color="#333" />
@@ -200,6 +202,7 @@ export const KidsLessonPlayerScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </ScreenTimeGuard>
   );
 };
 

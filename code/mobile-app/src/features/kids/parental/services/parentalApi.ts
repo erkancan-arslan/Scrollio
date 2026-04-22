@@ -32,6 +32,20 @@ interface ContentFiltersResponse {
   safeSearchEnabled: boolean;
 }
 
+export interface MediaItem {
+  id: string;
+  title: string;
+  thumbnail_url: string;
+  video_url: string;
+  duration_seconds: number;
+}
+
+export interface MediaEngagementResponse {
+  watched: MediaItem[];
+  liked: MediaItem[];
+  bookmarked: MediaItem[];
+}
+
 /** GET /api/v1/kids/parental/activity */
 export const getActivity = async (): Promise<KidsApiResponse<ActivityResponse>> => {
   return kidsApi.get<ActivityResponse>('/kids/parental/activity');
@@ -59,4 +73,9 @@ export const updateContentFilters = async (
   data: Partial<{ blockedTopicIds: string[]; maxDifficulty: string; safeSearchEnabled: boolean }>,
 ): Promise<KidsApiResponse<ContentFiltersResponse>> => {
   return kidsApi.patch<ContentFiltersResponse>('/kids/parental/content-filters', data);
+};
+
+/** GET /api/v1/kids/parental/media-engagement */
+export const getMediaEngagement = async (): Promise<KidsApiResponse<MediaEngagementResponse>> => {
+  return kidsApi.get<MediaEngagementResponse>('/kids/parental/media-engagement');
 };

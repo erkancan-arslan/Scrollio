@@ -16,7 +16,6 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   { key: 'mascot', label: 'My friend (mascot)', icon: '🐾' },
   { key: 'topics', label: 'My topics', icon: '📚' },
-  { key: 'parental', label: 'Parental Controls', icon: '🔒' },
   { key: 'avatar', label: 'Change Avatar', icon: '🧑‍🎨' },
 ];
 

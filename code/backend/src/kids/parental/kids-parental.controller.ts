@@ -50,4 +50,10 @@ export class KidsParentalController {
   ) {
     return this.kidsParentalService.updateContentFilters(childId, dto);
   }
+
+  @Get('media-engagement')
+  @ApiOperation({ summary: 'Get videos the child has watched, liked, and bookmarked' })
+  async getMediaEngagement(@CurrentChild() childId: string) {
+    return this.kidsParentalService.getMediaEngagement(childId);
+  }
 }

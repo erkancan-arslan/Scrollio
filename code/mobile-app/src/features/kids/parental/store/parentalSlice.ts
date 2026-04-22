@@ -31,6 +31,7 @@ interface ParentalState {
   activities: ActivityEntry[];
   screenTime: ScreenTimeState | null;
   contentFilters: ContentFilters | null;
+  mediaEngagement: parentalApi.MediaEngagementResponse | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -39,6 +40,7 @@ const initialState: ParentalState = {
   activities: [],
   screenTime: null,
   contentFilters: null,
+  mediaEngagement: null,
   isLoading: false,
   error: null,
 };
@@ -96,6 +98,15 @@ export const updateContentFiltersThunk = createAsyncThunk(
   },
 );
 
+export const fetchMediaEngagementThunk = createAsyncThunk(
+  'kidsParental/fetchMediaEngagement',
+  async (_, { rejectWithValue }) => {
+    const res = await parentalApi.getMediaEngagement();
+    if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
+    return res.data;
+  },
+);
+
 // ── Slice ──
 
 const parentalSlice = createSlice({
@@ -136,6 +147,11 @@ const parentalSlice = createSlice({
     builder
       .addCase(updateContentFiltersThunk.fulfilled, (state, action) => {
         state.contentFilters = action.payload;
+      });
+
+    builder
+      .addCase(fetchMediaEngagementThunk.fulfilled, (state, action) => {
+        state.mediaEngagement = action.payload;
       });
   },
 });

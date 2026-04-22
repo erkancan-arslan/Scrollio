@@ -82,11 +82,17 @@ export const KidsScreenTimeScreen: React.FC = () => {
         <View style={styles.sliderContainer}>
           <Text style={styles.sliderLabel}>15 min</Text>
           <View style={styles.sliderWrapper}>
-            {/* Note: @react-native-community/slider may need to be installed.
-                Using a simple view for now if it's not available */}
-            <View style={styles.sliderTrack}>
-              <View style={[styles.sliderFill, { width: `${((dailyLimit - 15) / (240 - 15)) * 100}%` }]} />
-            </View>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={15}
+              maximumValue={240}
+              step={15}
+              value={dailyLimit}
+              onValueChange={setDailyLimit}
+              minimumTrackTintColor={kidsColors.primary}
+              maximumTrackTintColor={kidsColors.border}
+              thumbTintColor={kidsColors.primary}
+            />
           </View>
           <Text style={styles.sliderLabel}>4 hrs</Text>
         </View>
@@ -128,6 +134,9 @@ export const KidsScreenTimeScreen: React.FC = () => {
             <Text style={styles.scheduleValue}>{screenTime?.allowedEndTime ?? '20:00'}</Text>
           </View>
         </View>
+        <Text style={{ ...kidsTypography.caption, color: kidsColors.text.muted, textAlign: 'center', marginTop: 12 }}>
+          (Schedule editing will be available in a future update)
+        </Text>
       </View>
     </ScrollView>
   );

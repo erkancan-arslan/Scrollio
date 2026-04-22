@@ -168,4 +168,39 @@ export class KidsParentalService {
 
     return newSettings;
   }
+
+  /**
+   * Get media engagement (watched, liked, bookmarked videos).
+   */
+  async getMediaEngagement(childId: string) {
+    const admin = this.supabaseService.getAdminClient();
+
+    const [viewsRes, likesRes, bookmarksRes] = await Promise.all([
+      admin.from('kids_feed_views').select('content_id, created_at').eq('child_profile_id', childId).order('created_at', { ascending: false }).limit(30),
+      admin.from('kids_likes').select('content_id').eq('child_profile_id', childId).order('created_at', { ascending: false }).limit(20),
+      admin.from('kids_bookmarks').select('content_id').eq('child_profile_id', childId).order('created_at', { ascending: false }).limit(20)
+    ]);
+
+    const viewIds = Array.from(new Set((viewsRes.data ?? []).map(v => v.content_id)));
+    const likeIds = Array.from(new Set((likesRes.data ?? []).map(l => l.content_id)));
+    const bookmarkIds = Array.from(new Set((bookmarksRes.data ?? []).map(b => b.content_id)));
+
+    const allIds = Array.from(new Set([...viewIds, ...likeIds, ...bookmarkIds]));
+
+    let contentMap = new Map();
+    if (allIds.length > 0) {
+      const { data: content } = await admin
+        .from('kids_content')
+        .select('*')
+        .in('id', allIds);
+      
+      (content ?? []).forEach(c => contentMap.set(c.id, c));
+    }
+
+    return {
+      watched: viewIds.map(id => contentMap.get(id)).filter(Boolean),
+      liked: likeIds.map(id => contentMap.get(id)).filter(Boolean),
+      bookmarked: bookmarkIds.map(id => contentMap.get(id)).filter(Boolean),
+    };
+  }
 }

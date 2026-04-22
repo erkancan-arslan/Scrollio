@@ -9,11 +9,16 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { KidsTabCompositeNavigation } from '../../../../navigation/KidsNavigator';
 import { useActiveChild } from '../../shared/hooks/useActiveChild';
+import { useAppDispatch } from '../../../../store/hooks';
+import { verifyPinThunk } from '../../auth/store/authSlice';
+import { PinPad } from '../../auth/components/PinPad';
 import { getSettings, updateNotifications } from '../services/settingsApi';
 import { NotificationPrefs } from '../components/NotificationPrefs';
 import { SettingsMenu } from '../components/SettingsMenu';
@@ -21,6 +26,7 @@ import { LogOutButton } from '../components/LogOutButton';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
+import { KidsThemedButton } from '../../shared/components/KidsThemedButton';
 
 interface SettingsData {
   pushNotificationsEnabled: boolean;
@@ -32,9 +38,14 @@ interface SettingsData {
 export const KidsSettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<KidsTabCompositeNavigation>();
+  const dispatch = useAppDispatch();
   const { childProfile, childId } = useActiveChild();
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // PIN Modal State
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -61,9 +72,7 @@ export const KidsSettingsScreen: React.FC = () => {
   };
 
   const handleNavigate = (screen: string) => {
-    if (screen === 'parental') {
-      navigation.navigate('KidsParentalDashboard');
-    } else if (screen === 'topics') {
+    if (screen === 'topics') {
       navigation.navigate('KidsTopicPreferences');
     } else if (screen === 'mascot') {
       if (!childId) {
@@ -73,6 +82,25 @@ export const KidsSettingsScreen: React.FC = () => {
       navigation.navigate('KidsCharacterSelect', { childId, afterSave: 'go-back' });
     } else if (screen === 'avatar') {
       navigation.navigate('KidsProfile');
+    }
+  };
+
+  const handleParentalPress = () => {
+    setShowPinModal(true);
+    setPinError(null);
+  };
+
+  const handlePinComplete = async (pin: string) => {
+    try {
+      const result = await dispatch(verifyPinThunk(pin)).unwrap();
+      if (result.valid) {
+        setShowPinModal(false);
+        navigation.navigate('KidsParentalDashboard');
+      } else {
+        setPinError('Incorrect PIN. Please try again.');
+      }
+    } catch {
+      setPinError('Failed to verify PIN.');
     }
   };
 
@@ -112,10 +140,35 @@ export const KidsSettingsScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Parental Controls Shortcut */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Parental Settings</Text>
+        <KidsThemedButton
+          title="🔒 Parent Dashboard"
+          onPress={handleParentalPress}
+          variant="outline"
+        />
+      </View>
+
       {/* Log Out */}
       <View style={styles.logoutSection}>
         <LogOutButton />
       </View>
+
+      {/* PIN Modal */}
+      <Modal visible={showPinModal} animationType="slide" transparent={false} onRequestClose={() => setShowPinModal(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: kidsColors.background }}>
+          <TouchableOpacity style={styles.closeBtn} onPress={() => setShowPinModal(false)}>
+             <Text style={styles.closeBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <PinPad
+            title="Parent Dashboard"
+            subtitle="Enter your PIN to access parental controls"
+            onComplete={handlePinComplete}
+            error={pinError}
+          />
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 };
@@ -148,4 +201,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 8 },
   logoutSection: { marginTop: 16 },
+  closeBtn: {
+    padding: 16,
+    alignSelf: 'flex-start',
+  },
+  closeBtnText: {
+    ...kidsTypography.heading3,
+    color: kidsColors.primary,
+  },
 });

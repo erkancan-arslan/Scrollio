@@ -102,6 +102,17 @@ export const KidsContentSafetyScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Blocked Topics */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Blocked Topics</Text>
+        <Text style={styles.cardDesc}>
+          {contentFilters?.blockedTopicIds.length ?? 0} topics are currently blocked.
+        </Text>
+        <View style={styles.topicsPlaceholder}>
+          <Text style={styles.topicsPlaceholderText}>Topic selection interface will be integrated with the main topic directory in an upcoming update.</Text>
+        </View>
+      </View>
+
       {/* Save */}
       <KidsThemedButton
         title="Save Filters"
@@ -134,5 +145,7 @@ const styles = StyleSheet.create({
   cardDesc: { ...kidsTypography.bodySmall, color: kidsColors.text.secondary },
   optionsList: { marginTop: 12, gap: 8 },
   optionBtn: { width: '100%' },
+  topicsPlaceholder: { marginTop: 16, padding: 16, backgroundColor: kidsColors.background, borderRadius: 12, alignItems: 'center' },
+  topicsPlaceholderText: { ...kidsTypography.caption, color: kidsColors.text.muted, textAlign: 'center', fontStyle: 'italic' },
   saveButton: { marginTop: 8 },
 });

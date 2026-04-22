@@ -14,6 +14,7 @@ import { KidsClassroomScreen } from '../features/kids/classroom/screens/KidsClas
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { KidsProfileScreen } from '../features/kids/profile/screens/KidsProfileScreen';
 import { KidsSettingsScreen } from '../features/kids/settings/screens/KidsSettingsScreen';
+import { ScreenTimeGuard } from '../features/kids/parental/components/ScreenTimeGuard';
 
 // ── Tab navigator ──
 
@@ -33,8 +34,9 @@ export const KidsMainTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   return (
-    <Tab.Navigator
-      screenOptions={{
+    <ScreenTimeGuard>
+      <Tab.Navigator
+        screenOptions={{
         headerShown: false,
         tabBarStyle: [
           styles.tabBar,
@@ -131,6 +133,7 @@ export const KidsMainTabNavigator: React.FC = () => {
         }}
       />
     </Tab.Navigator>
+    </ScreenTimeGuard>
   );
 };
 

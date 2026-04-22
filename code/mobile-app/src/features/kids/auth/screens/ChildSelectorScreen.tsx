@@ -102,17 +102,30 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderAddCard = () => (
-    <TouchableOpacity
-      style={styles.addCard}
-      onPress={handleAddChild}
-      activeOpacity={0.7}
-      accessibilityLabel="Add a new child"
-      accessibilityRole="button"
-    >
-      <Text style={styles.addIcon}>+</Text>
-      <Text style={styles.addText}>Add a Child</Text>
-    </TouchableOpacity>
+  const renderFooter = () => (
+    <View style={styles.footerRow}>
+      <TouchableOpacity
+        style={styles.actionCard}
+        onPress={handleAddChild}
+        activeOpacity={0.7}
+        accessibilityLabel="Add a new child"
+        accessibilityRole="button"
+      >
+        <Text style={styles.actionIcon}>+</Text>
+        <Text style={styles.actionText}>Add a Child</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.actionCard}
+        onPress={() => nav.navigate('KidsParentalDashboard' as never)}
+        activeOpacity={0.7}
+        accessibilityLabel="Parent Dashboard"
+        accessibilityRole="button"
+      >
+        <Text style={styles.actionIcon}>🔒</Text>
+        <Text style={styles.actionText}>Parent Dashboard</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -127,7 +140,7 @@ export const KidsChildSelectorScreen: React.FC<Props> = ({ navigation }) => {
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
-        ListFooterComponent={renderAddCard}
+        ListFooterComponent={renderFooter}
       />
     </SafeAreaView>
   );
@@ -184,7 +197,13 @@ const styles = StyleSheet.create({
     color: kidsColors.text.primary,
     textAlign: 'center',
   },
-  addCard: {
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  actionCard: {
     width: 150,
     height: 160,
     borderRadius: 20,
@@ -194,17 +213,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: kidsColors.border,
     borderStyle: 'dashed',
-    alignSelf: 'center',
-    marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
-  addIcon: {
+  actionIcon: {
     fontSize: 40,
     color: kidsColors.text.muted,
     marginBottom: 4,
   },
-  addText: {
+  actionText: {
     ...kidsTypography.bodySmall,
     color: kidsColors.text.muted,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
