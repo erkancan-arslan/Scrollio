@@ -90,9 +90,9 @@ export class BatchJobsService {
         return {
           batch_id: batch.id,
           title: suggestion?.title ?? `${dto.title} — ${this.capitalize(difficulty)} #${i + 1}`,
-          topic: suggestion?.subTopic ?? dto.topic,
+          topic: dto.topic,
           suggested_sub_topic: suggestion?.subTopic ?? null,
-          subject: dto.subject || null,
+          subject: suggestion?.subTopic ?? dto.subject ?? null,
           content_target: dto.contentTarget,
           language: dto.language,
           tone: dto.tone || 'friendly',
@@ -139,7 +139,7 @@ export class BatchJobsService {
           .from('generated_video_jobs')
           .update({
             title,
-            topic: subTopic,
+            subject: subTopic,
             suggested_sub_topic: subTopic,
             updated_at: new Date().toISOString(),
           })
@@ -220,7 +220,7 @@ export class BatchJobsService {
             .from('generated_video_jobs')
             .update({
               title: s.title,
-              topic: s.subTopic,
+              subject: s.subTopic,
               suggested_sub_topic: s.subTopic,
               updated_at: new Date().toISOString(),
             })
@@ -253,7 +253,7 @@ export class BatchJobsService {
           .from('generated_video_jobs')
           .update({
             title,
-            topic: subTopic,
+            subject: subTopic,
             suggested_sub_topic: subTopic,
             updated_at: new Date().toISOString(),
           })

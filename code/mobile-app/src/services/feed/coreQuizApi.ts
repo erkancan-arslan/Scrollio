@@ -33,6 +33,10 @@ export interface QuizSubmitResult {
   unlockedLevel?: VideoDifficulty;
   /** Same as `unlockedLevel` when the answer was correct (API spec alias). */
   nextLevel?: VideoDifficulty;
+  xpAwarded?: number;
+  newXp?: number;
+  newLevel?: number;
+  levelUp?: boolean;
 }
 
 class CoreQuizApi {

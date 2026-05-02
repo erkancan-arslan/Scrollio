@@ -111,4 +111,18 @@ export class StreakResponseDto {
   streakMaintained: boolean;
 }
 
+export class TopicBreakdownDto {
+  topic: string;
+  videosWatched: number;
+  percentage: number;
+}
+
+export class WeeklyAnalyticsDto {
+  weekStart: string;
+  videosWatched: number;
+  totalWatchTimeSeconds: number;
+  quizAccuracy: number | null;
+  quizAttempts: number;
+  topicDistribution: TopicBreakdownDto[];
+}
 

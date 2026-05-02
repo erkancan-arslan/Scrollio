@@ -26,6 +26,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useDispatch } from 'react-redux';
 import {
   coreQuizApi,
   QuizLevel,
@@ -33,6 +34,8 @@ import {
   QuizSubmitResult,
   VideoDifficulty,
 } from '../../../services/feed/coreQuizApi';
+import { AppDispatch } from '../../../store/store';
+import { applyXpAward } from '../../profile/store/profileSlice';
 import { CoreQuizFeedback } from './CoreQuizFeedback';
 
 const BRAND_ORANGE = '#FF8C42';
@@ -52,6 +55,7 @@ interface Props {
 }
 
 export const CoreQuizOverlay: React.FC<Props> = ({ visible, topic, level, onClose }) => {
+  const dispatch = useDispatch<AppDispatch>();
   const [question, setQuestion] = useState<QuizQuestionPublic | null>(null);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +116,19 @@ export const CoreQuizOverlay: React.FC<Props> = ({ visible, topic, level, onClos
       return;
     }
 
-    setFeedback(res.data);
+    const result = res.data;
+    setFeedback(result);
+
+    // If correct and XP was awarded, update the in-memory profile state so
+    // the Profile tab reflects the new XP/level without a full refetch.
+    if (result.correct && result.xpAwarded != null && result.newXp != null && result.newLevel != null) {
+      dispatch(applyXpAward({
+        xpAwarded: result.xpAwarded,
+        newXp: result.newXp,
+        newLevel: result.newLevel,
+        levelUp: result.levelUp ?? false,
+      }));
+    }
   };
 
   const handleContinue = () => {
@@ -161,6 +177,8 @@ export const CoreQuizOverlay: React.FC<Props> = ({ visible, topic, level, onClos
               explanation={feedback.explanation}
               onPrimaryAction={handleContinue}
               primaryLabel={feedback.correct ? 'Continue' : 'Try another question'}
+              xpAwarded={feedback.xpAwarded}
+              levelUp={feedback.levelUp}
             />
           ) : question ? (
             <>

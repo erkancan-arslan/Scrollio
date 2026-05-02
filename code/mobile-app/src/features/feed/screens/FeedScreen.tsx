@@ -3,30 +3,34 @@
  * Main screen after user signs in
  */
 
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   StatusBar,
   ViewToken,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
   RefreshControl,
   Text,
 } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
+import { useDispatch } from 'react-redux';
 import {
   FeedVideoItem,
   FeedOptionsButton,
   ShareToFriendsModal,
   CoreQuizOverlay,
+  XpToast,
 } from '../components';
 import { Video, FeedState, QuizLevel } from '../types';
 import { mockVideos } from '../data/mockVideos';
 import { feedService, coreQuizApi } from '../../../services';
 import { colors } from '../../../theme';
+import { AppDispatch } from '../../../store/store';
+import { applyXpAward } from '../../profile/store/profileSlice';
 
 interface PendingQuiz {
   topic: string;
@@ -34,11 +38,29 @@ interface PendingQuiz {
 }
 
 
+interface XpToastState {
+  xpAwarded: number;
+  levelUp: boolean;
+}
+
 export const FeedScreen: React.FC = () => {
-  const { height: windowHeight } = Dimensions.get('window');
+  const dispatch = useDispatch<AppDispatch>();
+  const { height: windowHeight } = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
   const isFocused = useIsFocused();
-  
+
+  // We measure the FlatList's actual viewport with onLayout instead of
+  // computing it from windowHeight - tabBarHeight. The computed value can be
+  // off by a pixel or two (and silently rounds), which causes the LAST item
+  // to land slightly off-snap because there's no content past it to clamp
+  // the scroll. Using the measured value guarantees viewport === itemHeight.
+  const fallbackHeight = Math.max(1, windowHeight - tabBarHeight);
+  const [measuredHeight, setMeasuredHeight] = useState(fallbackHeight);
+  const itemHeight = measuredHeight;
+
+  // Transient XP toast shown after earning XP from a watched video
+  const [xpToast, setXpToast] = useState<XpToastState | null>(null);
+
   // Feed state
   const [feedState, setFeedState] = useState<FeedState>({
     videos: [],
@@ -53,6 +75,9 @@ export const FeedScreen: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const isLoadingMore = useRef(false);
+  // Stable ref — always points to the latest fetchFeed without being a dep.
+  // This prevents useFocusEffect from re-firing every time feedState changes.
+  const fetchFeedRef = useRef<((refresh?: boolean) => Promise<void>) | null>(null);
 
   // Watch tracking
   const activeVideoStartTime = useRef<number | null>(null);
@@ -73,16 +98,12 @@ export const FeedScreen: React.FC = () => {
   // Topics for which we've already confirmed there is no pending quiz,
   // so we don't spam `/feed/quiz/status` on every completed video.
   const topicsWithoutPendingQuiz = useRef<Set<string>>(new Set());
-  
-  // Calculate the exact height for each video item
-  // Subtract tab bar height so content doesn't overflow behind it
-  const itemHeight = useMemo(() => {
-    const calculated = windowHeight - tabBarHeight;
-    return calculated > 0 ? calculated : windowHeight;
-  }, [windowHeight, tabBarHeight]);
 
   // Fetch feed from API
   const fetchFeed = useCallback(async (refresh = false) => {
+    // Prevent concurrent refresh calls from stacking up
+    if (refresh && isLoadingMore.current) return;
+
     if (refresh) {
       setFeedState((prev) => ({ ...prev, refreshing: true }));
     } else if (!feedState.hasMore) {
@@ -140,10 +161,27 @@ export const FeedScreen: React.FC = () => {
     }
   }, [feedState.nextCursor, feedState.hasMore]);
 
-  // Initial fetch
+  // Keep the ref in sync with the latest fetchFeed without making it a dep
+  // of useFocusEffect (which would cause useFocusEffect to re-fire on every
+  // feedState update while the screen is focused).
+  useEffect(() => {
+    fetchFeedRef.current = fetchFeed;
+  }, [fetchFeed]);
+
+  // Initial load
   useEffect(() => {
     fetchFeed(true);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh feed whenever this tab comes into focus (e.g. after changing topics
+  // in Profile). The stable empty-dep callback ensures this only fires on real
+  // focus transitions, not on every feedState/fetchFeed recreation.
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeedRef.current?.(true);
+      topicsWithoutPendingQuiz.current.clear();
+    }, []),
+  );
 
   // After any completed view we ask the server if the user now owes a
   // level-up quiz for that topic. We never re-check a topic we've already
@@ -188,17 +226,26 @@ export const FeedScreen: React.FC = () => {
   const recordVideoView = useCallback(
     (videoId: string, startTime: number, topic?: string | null) => {
       const watchDuration = Math.round((Date.now() - startTime) / 1000);
-      // Fire-and-forget — do not block UI
       feedService
         .recordView(videoId, watchDuration, false)
-        .then(() => {
-          // Only trigger the quiz check when the user spent a meaningful
-          // amount of time on the video (2s+). This avoids accidental swipes.
+        .then((res) => {
           if (watchDuration >= 2) checkQuizForTopic(topic);
+
+          // Show XP toast and update profile state if XP was awarded
+          const data = res.data;
+          if (data?.xpAwarded && data.newXp != null && data.newLevel != null) {
+            dispatch(applyXpAward({
+              xpAwarded: data.xpAwarded,
+              newXp: data.newXp,
+              newLevel: data.newLevel,
+              levelUp: data.levelUp ?? false,
+            }));
+            setXpToast({ xpAwarded: data.xpAwarded, levelUp: data.levelUp ?? false });
+          }
         })
         .catch(() => {});
     },
-    [checkQuizForTopic],
+    [checkQuizForTopic, dispatch],
   );
 
   // Record view when navigating away from the feed tab
@@ -384,6 +431,17 @@ export const FeedScreen: React.FC = () => {
     }
   }, [autoAdvance, currentIndex, feedState.videos.length]);
 
+  // Fires every time a video plays through to the end, regardless of auto-advance.
+  // Ensures the last video in the feed (which can't be swiped away) still records
+  // a watch and triggers the quiz check.
+  const handleVideoComplete = useCallback((videoId: string) => {
+    if (activeVideoStartTime.current === null) return;
+    const video = feedState.videos.find((v) => v.id === videoId);
+    recordVideoView(videoId, activeVideoStartTime.current, video?.topic);
+    // Reset so a subsequent swipe doesn't double-count the same session.
+    activeVideoStartTime.current = Date.now();
+  }, [feedState.videos, recordVideoView]);
+
 
   // Track viewable items for auto-play and watch time recording
   const onViewableItemsChanged = useCallback(
@@ -432,6 +490,7 @@ export const FeedScreen: React.FC = () => {
         onCreatorPress={handleCreatorPress}
         onTopicPress={handleTopicPress}
         onVideoEnd={autoAdvance ? handleVideoEnd : undefined}
+        onVideoComplete={handleVideoComplete}
         itemHeight={itemHeight}
       />
     ),
@@ -448,6 +507,7 @@ export const FeedScreen: React.FC = () => {
       handleCreatorPress,
       handleTopicPress,
       handleVideoEnd,
+      handleVideoComplete,
       itemHeight,
     ]
   );
@@ -462,15 +522,6 @@ export const FeedScreen: React.FC = () => {
     [itemHeight]
   );
 
-  // Render footer (loading indicator for infinite scroll)
-  const renderFooter = useCallback(() => {
-    if (!feedState.hasMore) return null;
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={colors.primary} />
-      </View>
-    );
-  }, [feedState.hasMore]);
 
   // Show loading state on initial load
   if (feedState.loading && feedState.videos.length === 0) {
@@ -497,7 +548,17 @@ export const FeedScreen: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={(e) => {
+        // Use the measured viewport as the canonical itemHeight. This avoids
+        // pixel-level drift between (windowHeight - tabBarHeight) and the
+        // actual layout React Navigation gives us, which is what was leaving
+        // the last video half-snapped with the previous one peeking in.
+        const h = Math.round(e.nativeEvent.layout.height);
+        if (h > 0 && h !== measuredHeight) setMeasuredHeight(h);
+      }}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Options Button */}
@@ -508,17 +569,21 @@ export const FeedScreen: React.FC = () => {
         onToggleAutoAdvance={handleToggleAutoAdvance}
       />
 
-      {/* Video Feed */}
+      {/* Video Feed.
+          pagingEnabled snaps to the FlatList's own viewport size — and since
+          each FeedVideoItem is rendered at exactly itemHeight (== measured
+          viewport), every snap lands cleanly on a single video, including
+          the last one. This is more reliable than snapToInterval, which
+          can drift when the computed itemHeight doesn't match the actual
+          rendered viewport. */}
       <FlatList
         ref={flatListRef}
         data={feedState.videos}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        snapToInterval={itemHeight}
-        snapToAlignment="start"
+        pagingEnabled
         decelerationRate="fast"
-        disableIntervalMomentum={true}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={getItemLayout}
@@ -530,7 +595,6 @@ export const FeedScreen: React.FC = () => {
         overScrollMode="never"
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
             refreshing={feedState.refreshing}
@@ -547,6 +611,17 @@ export const FeedScreen: React.FC = () => {
         video={shareVideo}
         onClose={() => setShareVideo(null)}
       />
+
+      {/* XP toast — floats above the feed when a video XP award is received */}
+      {xpToast && (
+        <View style={styles.xpToastContainer} pointerEvents="none">
+          <XpToast
+            xpAwarded={xpToast.xpAwarded}
+            levelUp={xpToast.levelUp}
+            onDismiss={() => setXpToast(null)}
+          />
+        </View>
+      )}
 
       {/* Level-up quiz overlay */}
       {pendingQuiz && (
@@ -604,9 +679,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  loadingFooter: {
-    paddingVertical: 20,
+  xpToastContainer: {
+    position: 'absolute',
+    bottom: 96,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    zIndex: 100,
   },
 });
 

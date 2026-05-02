@@ -57,5 +57,9 @@ export interface ActionResponseDto {
   message: string;
   likeCount?: number;
   bookmarkCount?: number;
+  xpAwarded?: number;
+  newXp?: number;
+  newLevel?: number;
+  levelUp?: boolean;
 }
 

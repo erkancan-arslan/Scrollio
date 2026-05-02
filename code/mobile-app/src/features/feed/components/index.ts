@@ -6,4 +6,5 @@ export { ShareToFriendsModal } from './ShareToFriendsModal';
 export { CoreQuizOverlay } from './CoreQuizOverlay';
 export type { CoreQuizOverlayResult } from './CoreQuizOverlay';
 export { CoreQuizFeedback } from './CoreQuizFeedback';
+export { XpToast } from './XpToast';
 

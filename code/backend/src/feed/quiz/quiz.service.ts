@@ -40,6 +40,11 @@ export interface SubmitResponse {
   /** Newly unlocked difficulty tier (same as `nextLevel` in the product spec). */
   unlockedLevel?: VideoDifficulty;
   nextLevel?: VideoDifficulty;
+  /** XP awarded for a correct answer (spec §3.2 req 16: 50–150 XP). */
+  xpAwarded?: number;
+  newXp?: number;
+  newLevel?: number;
+  levelUp?: boolean;
 }
 
 const NEXT_LEVEL: Record<QuizLevel, VideoDifficulty> = {
@@ -278,10 +283,32 @@ export class QuizService {
 
     const unlockedLevel = NEXT_LEVEL[input.level];
     await this.upsertUnlock(userId, input.topic, unlockedLevel);
+
+    // Award XP for a correct quiz answer (spec §3.2 req 16: 50–150 XP).
+    //   beginner quiz (unlocks intermediate) → 50 XP
+    //   intermediate quiz (unlocks advanced)  → 150 XP
+    let xpFields: Pick<SubmitResponse, 'xpAwarded' | 'newXp' | 'newLevel' | 'levelUp'> = {};
+    try {
+      const xpAmount = this.quizXpForLevel(input.level);
+      const { data: xpData, error: xpError } = await admin.rpc('add_xp', {
+        user_id: userId,
+        xp_amount: xpAmount,
+      });
+      if (!xpError && xpData?.[0]) {
+        const r = xpData[0];
+        xpFields = { xpAwarded: xpAmount, newXp: r.new_xp, newLevel: r.new_level, levelUp: r.level_up };
+      } else if (xpError) {
+        this.logger.warn(`Failed to award quiz XP: ${xpError.message}`);
+      }
+    } catch (err) {
+      this.logger.warn(`Unexpected error awarding quiz XP: ${err}`);
+    }
+
     return {
       correct: true,
       explanation: question.explanation,
       unlockedLevel,
+      ...xpFields,
     };
   }
 
@@ -373,6 +400,11 @@ export class QuizService {
       n += this.extractQuestions(v.quiz_questions).length;
     }
     return n;
+  }
+
+  /** 50 XP for beginner quiz, 150 XP for intermediate quiz (spec range 50–150). */
+  private quizXpForLevel(level: QuizLevel): number {
+    return level === 'intermediate' ? 150 : 50;
   }
 
   private extractQuestions(raw: unknown): StoredQuestion[] {

@@ -96,3 +96,18 @@ export interface StreakResponse {
 }
 
 export type ProfileTab = 'bookmarks' | 'likes' | 'watched';
+
+export interface TopicBreakdown {
+  topic: string;
+  videosWatched: number;
+  percentage: number;
+}
+
+export interface WeeklyAnalytics {
+  weekStart: string;
+  videosWatched: number;
+  totalWatchTimeSeconds: number;
+  quizAccuracy: number | null;
+  quizAttempts: number;
+  topicDistribution: TopicBreakdown[];
+}

@@ -11,6 +11,7 @@ import {
   FollowResponse,
   XpResponse,
   StreakResponse,
+  WeeklyAnalytics,
 } from '../../features/profile/types';
 
 /**
@@ -107,6 +108,13 @@ class ProfileService {
    */
   async updateStreak(): Promise<ApiResponse<StreakResponse>> {
     return apiClient.post<StreakResponse>('/profile/me/streak', undefined, true);
+  }
+
+  /**
+   * Get weekly analytics for the current user
+   */
+  async getWeeklyAnalytics(): Promise<ApiResponse<WeeklyAnalytics>> {
+    return apiClient.get<WeeklyAnalytics>('/profile/me/weekly-analytics', true);
   }
 }
 

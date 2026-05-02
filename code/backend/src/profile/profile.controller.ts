@@ -21,6 +21,7 @@ import {
   FollowResponseDto,
   XpResponseDto,
   StreakResponseDto,
+  WeeklyAnalyticsDto,
 } from './dto';
 
 interface AuthenticatedRequest {
@@ -30,6 +31,19 @@ interface AuthenticatedRequest {
 @Controller('profile')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
+
+  /**
+   * GET /profile/me/weekly-analytics
+   * Get the current user's weekly analytics
+   * Authentication: Required
+   */
+  @Get('me/weekly-analytics')
+  @UseGuards(AuthGuard)
+  async getWeeklyAnalytics(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<WeeklyAnalyticsDto> {
+    return this.profileService.getWeeklyAnalytics(req.user.id);
+  }
 
   /**
    * GET /profile/me

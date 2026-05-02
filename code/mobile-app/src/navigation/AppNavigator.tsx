@@ -20,6 +20,7 @@ import { AdminNavigator } from './AdminNavigator';
 import { TeacherNavigator } from './TeacherNavigator';
 import { ClassroomLobbyScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomLobbyScreen';
 import { ClassroomGameScreen } from '../features/playground/games/bil-ve-fethet-classroom/ClassroomGameScreen';
+import { ManageTopicsScreen } from '../features/profile/screens/ManageTopicsScreen';
 
 export type RootStackParamList = {
     AppLanding: undefined;
@@ -63,6 +64,7 @@ export type RootStackParamList = {
         playerBId: string;
     };
 
+    ManageTopics: { currentTopics: string[] };
     Admin: undefined;
     Teacher: undefined;
     ClassroomLobby: { roomCode: string; isHost: boolean };
@@ -167,6 +169,13 @@ export const AppNavigator = () => {
                     name="DuelGame"
                     component={DuelGameScreen}
                     options={{ headerShown: false, gestureEnabled: false }}
+                />
+
+                {/* Manage Topics (accessible from Profile) */}
+                <Stack.Screen
+                    name="ManageTopics"
+                    component={ManageTopicsScreen}
+                    options={{ headerShown: false, animation: 'slide_from_bottom' }}
                 />
 
                 {/* Admin Panel */}

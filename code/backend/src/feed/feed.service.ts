@@ -136,7 +136,7 @@ export class FeedService {
       .from('videos')
       .select(`
         *,
-        topic:topics(id, name, slug),
+        topicData:topics(id, name, slug),
         creator:creators(id, username, display_name, avatar_url, is_verified)
       `)
       .eq('is_published', true)
@@ -220,7 +220,7 @@ export class FeedService {
         created_at,
         video:videos(
           *,
-          topic:topics(id, name, slug),
+          topicData:topics(id, name, slug),
           creator:creators(id, username, display_name, avatar_url, is_verified)
         )
       `)
@@ -305,7 +305,7 @@ export class FeedService {
         created_at,
         video:videos(
           *,
-          topic:topics(id, name, slug),
+          topicData:topics(id, name, slug),
           creator:creators(id, username, display_name, avatar_url, is_verified)
         )
       `)
@@ -392,7 +392,7 @@ export class FeedService {
         watched_at,
         video:videos(
           *,
-          topic:topics(id, name, slug),
+          topicData:topics(id, name, slug),
           creator:creators(id, username, display_name, avatar_url, is_verified)
         )
       `)
@@ -763,7 +763,15 @@ export class FeedService {
   }
 
   /**
-   * Record a video view
+   * Record a video view and award XP for the first meaningful watch.
+   *
+   * XP scale (spec §3.2 req 15: 10–50 XP per watched video):
+   *   beginner    → 10 XP
+   *   intermediate → 30 XP
+   *   advanced     → 50 XP
+   *
+   * XP is only awarded once per video per user (first watch) and only when
+   * the user watched at least 5 seconds of it.
    */
   async recordView(
     userId: string | null,
@@ -771,6 +779,18 @@ export class FeedService {
     viewData: RecordViewDto,
   ): Promise<ActionResponseDto> {
     const supabase = this.supabaseService.getAdminClient();
+
+    // Determine whether this is the user's first watch BEFORE inserting,
+    // so the count stays at 0 and we can safely use == 0 as the first-watch gate.
+    let isFirstWatch = false;
+    if (userId && viewData.watchDuration >= 5) {
+      const { count } = await supabase
+        .from('video_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('video_id', videoId);
+      isFirstWatch = (count ?? 0) === 0;
+    }
 
     const { error } = await supabase.from('video_views').insert({
       user_id: userId,
@@ -784,10 +804,49 @@ export class FeedService {
       throw error;
     }
 
-    return {
-      success: true,
-      message: 'View recorded successfully',
-    };
+    if (isFirstWatch && userId) {
+      try {
+        const xpData = await this.awardVideoXp(userId, videoId);
+        return { success: true, message: 'View recorded successfully', ...xpData };
+      } catch (xpErr) {
+        this.logger.warn(`Failed to award video XP for ${videoId}: ${xpErr}`);
+      }
+    }
+
+    return { success: true, message: 'View recorded successfully' };
+  }
+
+  /** Fetch the video difficulty and call add_xp for the appropriate amount. */
+  private async awardVideoXp(
+    userId: string,
+    videoId: string,
+  ): Promise<{ xpAwarded: number; newXp: number; newLevel: number; levelUp: boolean }> {
+    const supabase = this.supabaseService.getAdminClient();
+
+    const { data: video } = await supabase
+      .from('videos')
+      .select('difficulty_level')
+      .eq('id', videoId)
+      .single();
+
+    const xpAmount = this.videoXpForDifficulty(video?.difficulty_level);
+
+    const { data, error } = await supabase.rpc('add_xp', {
+      user_id: userId,
+      xp_amount: xpAmount,
+    });
+
+    if (error || !data?.[0]) throw new Error(error?.message ?? 'add_xp returned no data');
+
+    const r = data[0];
+    return { xpAwarded: xpAmount, newXp: r.new_xp, newLevel: r.new_level, levelUp: r.level_up };
+  }
+
+  /** 10 / 30 / 50 XP for beginner / intermediate / advanced (spec range 10–50). */
+  private videoXpForDifficulty(difficulty: string | null | undefined): number {
+    if (difficulty === 'intermediate') return 30;
+    if (difficulty === 'advanced') return 50;
+    return 10;
   }
 
   /**
@@ -800,7 +859,7 @@ export class FeedService {
       .from('videos')
       .select(`
         *,
-        topic:topics(id, name, slug),
+        topicData:topics(id, name, slug),
         creator:creators(id, username, display_name, avatar_url, is_verified)
       `)
       .eq('id', videoId)
@@ -889,8 +948,8 @@ export class FeedService {
         bookmarks: video.bookmark_count || 0,
         shares: video.share_count || 0,
       },
-      topic: video.topic?.name || 'General',
-      topicId: video.topic?.id || null,
+      topic: video.topic || video.topicData?.name || 'General',
+      topicId: video.topicData?.id || null,
       tags: video.tags || [],
       difficulty: video.difficulty_level || 'beginner',
       isLiked: userLikes.has(video.id),

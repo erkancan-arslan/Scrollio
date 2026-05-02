@@ -7,6 +7,7 @@ import {
   FollowResponseDto,
   XpResponseDto,
   StreakResponseDto,
+  WeeklyAnalyticsDto,
 } from './dto';
 
 @Injectable()
@@ -397,6 +398,65 @@ export class ProfileService {
     );
 
     return { users, total: count || 0 };
+  }
+
+  /**
+   * Get weekly analytics for the current user
+   */
+  async getWeeklyAnalytics(userId: string): Promise<WeeklyAnalyticsDto> {
+    const supabase = this.supabaseService.getAdminClient();
+    const since = new Date();
+    since.setDate(since.getDate() - 6);
+    since.setHours(0, 0, 0, 0);
+    const sinceIso = since.toISOString();
+
+    const [viewsResult, quizzesResult] = await Promise.all([
+      supabase
+        .from('video_views')
+        .select('video_id, watch_duration, videos(topic)')
+        .eq('user_id', userId)
+        .gte('created_at', sinceIso),
+      supabase
+        .from('core_quiz_attempts')
+        .select('is_correct')
+        .eq('user_id', userId)
+        .gte('attempted_at', sinceIso),
+    ]);
+
+    const views = viewsResult.data ?? [];
+    const uniqueVideos = new Set(views.map((v) => v.video_id));
+    const totalWatchTimeSeconds = views.reduce((s, v) => s + (v.watch_duration ?? 0), 0);
+
+    const topicCounts: Record<string, number> = {};
+    for (const v of views) {
+      const topic = (v.videos as any)?.topic;
+      if (topic) topicCounts[topic] = (topicCounts[topic] ?? 0) + 1;
+    }
+    const totalTopicViews = Object.values(topicCounts).reduce((s, n) => s + n, 0);
+    const topicDistribution = Object.entries(topicCounts)
+      .sort(([, a], [, b]) => b - a)
+      .map(([topic, count]) => ({
+        topic,
+        videosWatched: count,
+        percentage: totalTopicViews > 0 ? Math.round((count / totalTopicViews) * 100) : 0,
+      }));
+
+    const attempts = quizzesResult.data ?? [];
+    const correct = attempts.filter((q) => q.is_correct).length;
+    const quizAccuracy = attempts.length > 0 ? Math.round((correct / attempts.length) * 100) : null;
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    weekStart.setHours(0, 0, 0, 0);
+
+    return {
+      weekStart: weekStart.toISOString().split('T')[0],
+      videosWatched: uniqueVideos.size,
+      totalWatchTimeSeconds,
+      quizAccuracy,
+      quizAttempts: attempts.length,
+      topicDistribution,
+    };
   }
 
   /**

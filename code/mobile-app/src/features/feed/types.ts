@@ -62,6 +62,10 @@ export interface ActionResponse {
   message: string;
   likeCount?: number;
   bookmarkCount?: number;
+  xpAwarded?: number;
+  newXp?: number;
+  newLevel?: number;
+  levelUp?: boolean;
 }
 
 export interface FeedQueryParams {
@@ -106,5 +110,9 @@ export interface QuizSubmitResult {
   explanation?: string;
   unlockedLevel?: 'beginner' | 'intermediate' | 'advanced';
   nextLevel?: 'beginner' | 'intermediate' | 'advanced';
+  xpAwarded?: number;
+  newXp?: number;
+  newLevel?: number;
+  levelUp?: boolean;
 }
 

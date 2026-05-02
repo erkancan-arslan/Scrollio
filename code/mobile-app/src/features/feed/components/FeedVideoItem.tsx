@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { Video } from '../types';
 import { VideoActions } from './VideoActions';
@@ -38,6 +38,8 @@ interface FeedVideoItemProps {
   onCreatorPress: (creatorId: string) => void;
   onTopicPress: (topic: string) => void;
   onVideoEnd?: () => void;
+  /** Fires every time the video plays through to the end, regardless of auto-advance. */
+  onVideoComplete?: (videoId: string) => void;
   itemHeight: number;
 }
 
@@ -52,10 +54,15 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
   onCreatorPress,
   onTopicPress,
   onVideoEnd,
+  onVideoComplete,
   itemHeight,
 }) {
   const { width } = Dimensions.get('window');
-  const insets = useSafeAreaInsets();
+  // Each item now fills the full screen (so pagingEnabled snaps cleanly),
+  // which means the bottom of the item sits behind the absolute tab bar.
+  // Pull bottom UI overlays above the tab bar by its full reported height
+  // (which already includes the iOS safe-area inset).
+  const tabBarHeight = useBottomTabBarHeight();
   // Check cache to see if this video has already loaded - skip loading indicator if so
   const [isLoading, setIsLoading] = useState(() => !loadedVideosCache.has(video.videoUrl));
   const [isBuffering, setIsBuffering] = useState(false);
@@ -76,8 +83,8 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pauseIconTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Calculate bottom offset for content to not overlap with any UI
-  const bottomOffset = useMemo(() => 16 + insets.bottom, [insets.bottom]);
+  // Keep UI elements above the (absolute) tab bar so they aren't clipped
+  const bottomOffset = useMemo(() => 16 + tabBarHeight, [tabBarHeight]);
 
   // Clear hide timer
   const clearHideTimer = useCallback(() => {
@@ -131,7 +138,9 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
 
   // Create video player with expo-video
   const player = useVideoPlayer(video.videoUrl, (player) => {
-    player.loop = !onVideoEnd; // Only loop if no onVideoEnd handler (auto-advance disabled)
+    // Disable native looping whenever we need the playToEnd event (auto-advance or
+    // completion tracking). We replay manually when auto-advance is off.
+    player.loop = !onVideoEnd && !onVideoComplete;
     player.muted = isMuted;
     // IMPORTANT: Start paused - only play when isActive
     player.pause();
@@ -160,23 +169,30 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
     player.muted = isMuted;
   }, [isMuted, player]);
 
-  // Listen for video end when auto-advance is enabled
+  // Listen for video end — needed for auto-advance and/or completion tracking
   useEffect(() => {
-    if (!onVideoEnd) {
+    if (!onVideoEnd && !onVideoComplete) {
       player.loop = true;
       return;
     }
 
     player.loop = false;
-    
+
     const subscription = player.addListener('playToEnd', () => {
-      onVideoEnd();
+      onVideoComplete?.(video.id);
+      if (onVideoEnd) {
+        onVideoEnd();
+      } else {
+        // No auto-advance — replay so the video keeps looping visually,
+        // but we still got to fire onVideoComplete above.
+        player.replay();
+      }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [player, onVideoEnd]);
+  }, [player, onVideoEnd, onVideoComplete, video.id]);
 
   // Listen for buffering/error state and playback stalls
   useEffect(() => {
@@ -315,10 +331,12 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
     <View style={[styles.container, { width, height: itemHeight }]}>
       <TouchableWithoutFeedback onPress={handleTap}>
         <View style={styles.videoContainer}>
-          {/* Video Player */}
+          {/* The outer item is full-screen so pagingEnabled snaps cleanly,
+              but the video frame itself ends `tabBarHeight` above the bottom
+              so burnt-in subtitles stay visible above the tab bar. */}
           <VideoView
             player={player}
-            style={styles.video}
+            style={[styles.video, { bottom: tabBarHeight }]}
             contentFit="cover"
             nativeControls={false}
             onFirstFrameRender={handleFirstFrameRender}

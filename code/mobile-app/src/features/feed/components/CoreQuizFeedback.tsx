@@ -17,6 +17,8 @@ interface Props {
   explanation?: string;
   primaryLabel: string;
   onPrimaryAction: () => void;
+  xpAwarded?: number;
+  levelUp?: boolean;
 }
 
 export const CoreQuizFeedback: React.FC<Props> = ({
@@ -24,6 +26,8 @@ export const CoreQuizFeedback: React.FC<Props> = ({
   explanation,
   primaryLabel,
   onPrimaryAction,
+  xpAwarded,
+  levelUp,
 }) => {
   return (
     <View style={styles.container}>
@@ -42,8 +46,21 @@ export const CoreQuizFeedback: React.FC<Props> = ({
       <Text style={styles.subtitle}>
         {correct
           ? 'The next level just unlocked for this topic.'
-          : 'Let’s try another question.'}
+          : "Let's try another question."}
       </Text>
+
+      {correct && xpAwarded != null && (
+        <View style={styles.xpRow}>
+          <View style={styles.xpPill}>
+            <Text style={styles.xpText}>+{xpAwarded} XP</Text>
+          </View>
+          {levelUp && (
+            <View style={styles.levelUpPill}>
+              <Text style={styles.levelUpText}>LEVEL UP!</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {explanation ? <Text style={styles.explanation}>{explanation}</Text> : null}
 
@@ -93,6 +110,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 6,
+  },
+  xpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  xpPill: {
+    backgroundColor: BRAND_ORANGE,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  xpText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  levelUpPill: {
+    backgroundColor: '#FFD700',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  levelUpText: {
+    color: '#1C1C22',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   explanation: {
     color: '#E5E5EA',

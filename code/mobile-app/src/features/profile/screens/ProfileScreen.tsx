@@ -6,6 +6,7 @@
 import React, { useEffect, useCallback } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -13,7 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ import {
   fetchBookmarkedVideos,
   fetchLikedVideos,
   fetchWatchedVideos,
+  fetchWeeklyAnalytics,
   setActiveTab,
   clearProfile,
 } from '../store/profileSlice';
@@ -35,6 +37,7 @@ import {
   ProfileStats,
   ProfileTabs,
   VideoGrid,
+  WeeklyAnalyticsCard,
 } from '../components';
 
 export const ProfileScreen: React.FC = () => {
@@ -63,15 +66,28 @@ export const ProfileScreen: React.FC = () => {
     watchedError,
     hasMoreWatched,
     watchedCursor,
+    weeklyAnalytics,
+    weeklyAnalyticsLoading,
   } = useSelector((state: RootState) => state.profile);
 
-  // Load profile and initial tab data on mount
+  // Load video lists once on mount (these don't change from other screens)
   useEffect(() => {
-    dispatch(fetchMyProfile());
     dispatch(fetchBookmarkedVideos({ limit: 20 }));
     dispatch(fetchLikedVideos({ limit: 20 }));
     dispatch(fetchWatchedVideos({ limit: 20 }));
   }, [dispatch]);
+
+  // Re-fetch profile every time this tab is focused so that XP earned on the
+  // Feed tab and topic changes from ManageTopicsScreen are always reflected.
+  // A single fetch per focus is enough — the old double-fetch (useEffect +
+  // useFocusEffect) was removed to prevent stale snapshots overwriting fresh
+  // applyXpAward updates.
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchMyProfile());
+      dispatch(fetchWeeklyAnalytics());
+    }, [dispatch]),
+  );
 
   // Handle tab change — lazy-load if data hasn't been fetched yet
   const handleTabChange = useCallback((tab: ProfileTab) => {
@@ -91,6 +107,7 @@ export const ProfileScreen: React.FC = () => {
   // Handle refresh
   const handleRefresh = useCallback(() => {
     dispatch(fetchMyProfile());
+    dispatch(fetchWeeklyAnalytics());
     if (activeTab === 'bookmarks') {
       dispatch(fetchBookmarkedVideos({ limit: 20 }));
     } else if (activeTab === 'likes') {
@@ -257,6 +274,43 @@ export const ProfileScreen: React.FC = () => {
         {/* Profile Stats */}
         <ProfileStats profile={profile} />
 
+        {/* Weekly Analytics */}
+        {weeklyAnalyticsLoading && !weeklyAnalytics ? (
+          <View style={styles.analyticsSkeletonCard} />
+        ) : weeklyAnalytics ? (
+          <WeeklyAnalyticsCard analytics={weeklyAnalytics} />
+        ) : null}
+
+        {/* My Interests */}
+        <View style={styles.interestsCard}>
+          <View style={styles.interestsHeader}>
+            <Text style={styles.interestsTitle}>My Interests</Text>
+            <TouchableOpacity
+              style={styles.editTopicsBtn}
+              onPress={() =>
+                navigation.navigate('ManageTopics', {
+                  currentTopics: profile.preferences?.preferredTopics ?? [],
+                })
+              }
+            >
+              <Ionicons name="pencil-outline" size={14} color="#FF8C42" />
+              <Text style={styles.editTopicsBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(profile.preferences?.preferredTopics ?? []).length === 0 ? (
+            <Text style={styles.interestsEmpty}>No topics selected yet.</Text>
+          ) : (
+            <View style={styles.topicChips}>
+              {(profile.preferences?.preferredTopics ?? []).map((topic) => (
+                <View key={topic} style={styles.topicChip}>
+                  <Text style={styles.topicChipText}>{topic}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Tabs */}
         <ProfileTabs
           activeTab={activeTab}
@@ -330,6 +384,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+
+  analyticsSkeletonCard: {
+    backgroundColor: '#EFEFEF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    height: 180,
+  },
+
+  // My Interests section
+  interestsCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  interestsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  interestsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  editTopicsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FF8C42',
+  },
+  editTopicsBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF8C42',
+  },
+  interestsEmpty: {
+    fontSize: 13,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  topicChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  topicChip: {
+    backgroundColor: '#FFF2E8',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#FFD4B3',
+  },
+  topicChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF8C42',
   },
 });
 

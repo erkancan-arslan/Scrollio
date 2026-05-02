@@ -6,7 +6,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { profileService } from '../../../services/profile/profileService';
 import { feedService } from '../../../services/feed/feedService';
-import { Profile, ProfileTab } from '../types';
+import { Profile, ProfileTab, WeeklyAnalytics } from '../types';
 import { Video } from '../../feed/types';
 
 interface ProfileState {
@@ -38,6 +38,11 @@ interface ProfileState {
   watchedError: string | null;
   watchedCursor: string | null;
   hasMoreWatched: boolean;
+
+  // Weekly analytics
+  weeklyAnalytics: WeeklyAnalytics | null;
+  weeklyAnalyticsLoading: boolean;
+  weeklyAnalyticsError: string | null;
 }
 
 const initialState: ProfileState = {
@@ -64,6 +69,10 @@ const initialState: ProfileState = {
   watchedError: null,
   watchedCursor: null,
   hasMoreWatched: true,
+
+  weeklyAnalytics: null,
+  weeklyAnalyticsLoading: false,
+  weeklyAnalyticsError: null,
 };
 
 // Async thunks
@@ -143,6 +152,15 @@ export const updateProfile = createAsyncThunk(
   }
 );
 
+export const fetchWeeklyAnalytics = createAsyncThunk(
+  'profile/fetchWeeklyAnalytics',
+  async (_, { rejectWithValue }) => {
+    const response = await profileService.getWeeklyAnalytics();
+    if (response.data) return response.data;
+    return rejectWithValue(response.error || 'Failed to fetch weekly analytics');
+  },
+);
+
 const profileSlice = createSlice({
   name: 'profile',
   initialState,
@@ -161,6 +179,9 @@ const profileSlice = createSlice({
       state.hasMoreLikes = true;
       state.watchedCursor = null;
       state.hasMoreWatched = true;
+      state.weeklyAnalytics = null;
+      state.weeklyAnalyticsLoading = false;
+      state.weeklyAnalyticsError = null;
     },
     addBookmark: (state, action: PayloadAction<Video>) => {
       // Add video to bookmarks if not already present
@@ -173,10 +194,18 @@ const profileSlice = createSlice({
       state.bookmarkedVideos = state.bookmarkedVideos.filter(v => v.id !== action.payload);
     },
     updateVideoInBookmarks: (state, action: PayloadAction<Video>) => {
-      // Update video in bookmarks list
       const index = state.bookmarkedVideos.findIndex(v => v.id === action.payload.id);
       if (index !== -1) {
         state.bookmarkedVideos[index] = action.payload;
+      }
+    },
+    applyXpAward: (
+      state,
+      action: PayloadAction<{ xpAwarded: number; newXp: number; newLevel: number; levelUp: boolean }>,
+    ) => {
+      if (state.profile) {
+        state.profile.xp = action.payload.newXp;
+        state.profile.level = action.payload.newLevel;
       }
     },
   },
@@ -189,7 +218,19 @@ const profileSlice = createSlice({
       })
       .addCase(fetchMyProfile.fulfilled, (state, action) => {
         state.profileLoading = false;
-        state.profile = action.payload;
+        const incoming = action.payload;
+        // Guard against a stale server snapshot overwriting XP/level that
+        // applyXpAward already wrote into Redux with fresher data.
+        // XP only ever increases, so the higher value is always the correct one.
+        if (state.profile && incoming.xp < state.profile.xp) {
+          state.profile = {
+            ...incoming,
+            xp: state.profile.xp,
+            level: state.profile.level,
+          };
+        } else {
+          state.profile = incoming;
+        }
       })
       .addCase(fetchMyProfile.rejected, (state, action) => {
         state.profileLoading = false;
@@ -275,6 +316,21 @@ const profileSlice = createSlice({
         state.profileLoading = false;
         state.profileError = action.payload as string;
       });
+
+    // Fetch weekly analytics
+    builder
+      .addCase(fetchWeeklyAnalytics.pending, (state) => {
+        state.weeklyAnalyticsLoading = true;
+        state.weeklyAnalyticsError = null;
+      })
+      .addCase(fetchWeeklyAnalytics.fulfilled, (state, action) => {
+        state.weeklyAnalyticsLoading = false;
+        state.weeklyAnalytics = action.payload;
+      })
+      .addCase(fetchWeeklyAnalytics.rejected, (state, action) => {
+        state.weeklyAnalyticsLoading = false;
+        state.weeklyAnalyticsError = action.payload as string;
+      });
   },
 });
 
@@ -284,6 +340,7 @@ export const {
   addBookmark,
   removeBookmark,
   updateVideoInBookmarks,
+  applyXpAward,
 } = profileSlice.actions;
 
 export default profileSlice.reducer;

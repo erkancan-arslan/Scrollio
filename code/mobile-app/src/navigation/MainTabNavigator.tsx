@@ -3,7 +3,7 @@
  * Feed and Profile tabs
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { ProfileScreen } from '../features/profile';
 import { PlaygroundScreen } from '../features/playground/screens/PlaygroundScreen';
 import { SearchScreen } from '../features/search';
 import { SocialScreen } from '../features/social/screens/SocialScreen';
+import { profileService } from '../services/profile/profileService';
 
 // Scrollio brand orange color
 const SCROLLIO_ORANGE = '#FF8C42';
@@ -30,6 +31,12 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
+
+  // Fire once per session when the user enters the main app.
+  // The SQL function is idempotent — multiple calls on the same day are no-ops.
+  useEffect(() => {
+    profileService.updateStreak();
+  }, []);
 
   return (
     <Tab.Navigator
