@@ -2,7 +2,7 @@
  * KidsParentalDashboardScreen — Main parental controls dashboard
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
-import { fetchScreenTimeThunk, fetchActivityThunk, fetchContentFiltersThunk, fetchMediaEngagementThunk, fetchWatchTimeSummaryThunk, fetchQuizPerformanceThunk, fetchWeeklyReportThunk } from '../store/parentalSlice';
+import { fetchScreenTimeThunk, fetchActivityThunk, fetchContentFiltersThunk, fetchMediaEngagementThunk, fetchWatchTimeSummaryThunk, fetchQuizPerformanceThunk, fetchWeeklyReportThunk, fetchProgressHistoryThunk } from '../store/parentalSlice';
 import { switchChildThunk } from '../../auth/store/authSlice';
 import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { MultiProfileSwitcher } from '../../profile/components/MultiProfileSwitcher';
@@ -50,11 +50,202 @@ const formatEventType = (type: string): string => {
     .join(' ');
 };
 
+const HISTORY_TABS = ['Watch Time', 'Quiz Scores', 'XP Earned'] as const;
+type HistoryTab = typeof HISTORY_TABS[number];
+
+interface ProgressHistoryCardProps {
+  history: Array<{
+    date: string;
+    watchMinutes: number;
+    quizAttempts: number;
+    avgQuizScore: number;
+    xpEarned: number;
+    activitiesCount: number;
+  }>;
+}
+
+const ProgressHistoryCard: React.FC<ProgressHistoryCardProps> = ({ history }) => {
+  const [activeTab, setActiveTab] = useState<HistoryTab>('Watch Time');
+
+  const getValue = (entry: ProgressHistoryCardProps['history'][number]): number => {
+    if (activeTab === 'Watch Time') return entry.watchMinutes;
+    if (activeTab === 'Quiz Scores') return entry.avgQuizScore;
+    return entry.xpEarned;
+  };
+
+  const getUnit = (): string => {
+    if (activeTab === 'Watch Time') return 'min';
+    if (activeTab === 'Quiz Scores') return '%';
+    return 'XP';
+  };
+
+  const maxValue = Math.max(...history.map(getValue), 1);
+
+  const formatDate = (iso: string): string => {
+    const d = new Date(iso + 'T00:00:00');
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  };
+
+  // Show one bar per day; label every ~5th day to avoid crowding
+  const labelStep = Math.max(1, Math.floor(history.length / 6));
+
+  const totalWatchMinutes = history.reduce((s, d) => s + d.watchMinutes, 0);
+  const totalQuizAttempts = history.reduce((s, d) => s + d.quizAttempts, 0);
+  const totalXp = history.reduce((s, d) => s + d.xpEarned, 0);
+  const avgScore = totalQuizAttempts > 0
+    ? Math.round(history.reduce((s, d) => s + (d.quizAttempts > 0 ? d.avgQuizScore : 0), 0) / history.filter(d => d.quizAttempts > 0).length)
+    : 0;
+
+  return (
+    <View style={historyStyles.card}>
+      <View style={historyStyles.header}>
+        <Text style={historyStyles.title}>📈 30-Day Progress</Text>
+        <Text style={historyStyles.subtitle}>Last 30 days</Text>
+      </View>
+
+      {/* Summary row */}
+      <View style={historyStyles.summaryRow}>
+        <View style={historyStyles.summaryCell}>
+          <Text style={historyStyles.summaryValue}>{totalWatchMinutes}</Text>
+          <Text style={historyStyles.summaryLabel}>min watched</Text>
+        </View>
+        <View style={historyStyles.summaryDivider} />
+        <View style={historyStyles.summaryCell}>
+          <Text style={historyStyles.summaryValue}>{totalQuizAttempts}</Text>
+          <Text style={historyStyles.summaryLabel}>quizzes</Text>
+        </View>
+        <View style={historyStyles.summaryDivider} />
+        <View style={historyStyles.summaryCell}>
+          <Text style={historyStyles.summaryValue}>{avgScore > 0 ? `${avgScore}%` : '—'}</Text>
+          <Text style={historyStyles.summaryLabel}>avg score</Text>
+        </View>
+        <View style={historyStyles.summaryDivider} />
+        <View style={historyStyles.summaryCell}>
+          <Text style={historyStyles.summaryValue}>{totalXp}</Text>
+          <Text style={historyStyles.summaryLabel}>XP earned</Text>
+        </View>
+      </View>
+
+      {/* Tab switcher */}
+      <View style={historyStyles.tabs}>
+        {HISTORY_TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[historyStyles.tab, activeTab === tab && historyStyles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[historyStyles.tabText, activeTab === tab && historyStyles.tabTextActive]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Bar chart */}
+      {history.length === 0 ? (
+        <Text style={historyStyles.empty}>No data yet for this period.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={historyStyles.chartScroll}>
+          <View style={historyStyles.chartArea}>
+            {/* Bars */}
+            <View style={historyStyles.barsRow}>
+              {history.map((entry, idx) => {
+                const val = getValue(entry);
+                const barHeightPct = maxValue > 0 ? val / maxValue : 0;
+                const barColor =
+                  activeTab === 'Watch Time'
+                    ? kidsColors.primary ?? '#6C63FF'
+                    : activeTab === 'Quiz Scores'
+                    ? (val >= 70 ? kidsColors.success : val >= 40 ? '#F59E0B' : val > 0 ? kidsColors.error : kidsColors.border)
+                    : '#F59E0B';
+                return (
+                  <View key={entry.date} style={historyStyles.barCol}>
+                    <View style={historyStyles.barTrack}>
+                      <View
+                        style={[
+                          historyStyles.barFill,
+                          {
+                            height: `${Math.round(barHeightPct * 100)}%`,
+                            backgroundColor: barColor,
+                            opacity: val === 0 ? 0.15 : 1,
+                          },
+                        ]}
+                      />
+                    </View>
+                    {idx % labelStep === 0 && (
+                      <Text style={historyStyles.barLabel}>{formatDate(entry.date)}</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Max value label on y-axis */}
+            <Text style={historyStyles.yAxisLabel}>
+              {maxValue} {getUnit()}
+            </Text>
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+const historyStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  header: { marginBottom: 16 },
+  title: { fontSize: 16, fontWeight: '700', color: '#1A1A2E', marginBottom: 2 },
+  subtitle: { fontSize: 12, color: '#999' },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  summaryCell: { flex: 1, alignItems: 'center' },
+  summaryValue: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
+  summaryLabel: { fontSize: 11, color: '#999', marginTop: 2 },
+  summaryDivider: { width: 1, height: 32, backgroundColor: '#E5E5EA' },
+  tabs: { flexDirection: 'row', marginBottom: 12, gap: 8 },
+  tab: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F8F9FF',
+  },
+  tabActive: { backgroundColor: '#6C63FF' },
+  tabText: { fontSize: 11, fontWeight: '600', color: '#999' },
+  tabTextActive: { color: '#FFF' },
+  chartScroll: { marginTop: 4 },
+  chartArea: { paddingBottom: 4 },
+  barsRow: { flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 2 },
+  barCol: { alignItems: 'center', width: 12 },
+  barTrack: { width: 8, height: 72, justifyContent: 'flex-end', borderRadius: 4, backgroundColor: '#F0F0F0' },
+  barFill: { width: 8, borderRadius: 4 },
+  barLabel: { fontSize: 8, color: '#999', marginTop: 3, textAlign: 'center' },
+  yAxisLabel: { fontSize: 10, color: '#BBBBC8', marginTop: 2, textAlign: 'right' },
+  empty: { fontSize: 12, color: '#999', textAlign: 'center', paddingVertical: 16 },
+});
+
 export const KidsParentalDashboardScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<{ navigate: (s: string) => void }>();
   const { childId, childProfile, childProfiles } = useActiveChild();
-  const { screenTime, activities, contentFilters, mediaEngagement, watchTimeSummary, quizPerformance, weeklyReport, isLoading } = useAppSelector((s) => s.kidsParental);
+  const { screenTime, activities, contentFilters, mediaEngagement, watchTimeSummary, quizPerformance, weeklyReport, progressHistory, isLoading } = useAppSelector((s) => s.kidsParental);
 
   // If accessed from profile selector, we might not have an active child.
   // Auto-select the first one so we can view their dashboard.
@@ -73,6 +264,7 @@ export const KidsParentalDashboardScreen: React.FC = () => {
       dispatch(fetchWatchTimeSummaryThunk());
       dispatch(fetchQuizPerformanceThunk());
       dispatch(fetchWeeklyReportThunk());
+      dispatch(fetchProgressHistoryThunk());
     }
   }, [dispatch, childId]);
 
@@ -334,6 +526,9 @@ export const KidsParentalDashboardScreen: React.FC = () => {
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* 30-Day Progress History */}
+      <ProgressHistoryCard history={progressHistory} />
 
       {/* Media Engagement Sections */}
       <View style={styles.sectionHeader}>

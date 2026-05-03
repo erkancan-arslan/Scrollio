@@ -419,6 +419,106 @@ export class KidsParentalService {
   }
 
   /**
+   * Get daily progress history for the last 30 days.
+   * Aggregates watch time, quiz attempts, XP earned, and activity count per calendar day.
+   */
+  async getProgressHistory(childId: string) {
+    this.assertChildId(childId);
+    const admin = this.supabaseService.getAdminClient();
+
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+    since.setHours(0, 0, 0, 0);
+    const sinceIso = since.toISOString();
+
+    const [viewsRes, attemptsRes, activityRes] = await Promise.all([
+      admin
+        .from('kids_feed_views')
+        .select('watched_seconds, created_at')
+        .eq('child_profile_id', childId)
+        .gte('created_at', sinceIso),
+      admin
+        .from('kids_quiz_attempts')
+        .select('score, created_at')
+        .eq('child_profile_id', childId)
+        .not('completed_at', 'is', null)
+        .gte('created_at', sinceIso),
+      admin
+        .from('kids_activity_logs')
+        .select('event_type, metadata, created_at')
+        .eq('child_profile_id', childId)
+        .gte('created_at', sinceIso),
+    ]);
+
+    // Build a map keyed by YYYY-MM-DD
+    type DayStats = {
+      date: string;
+      watchMinutes: number;
+      quizAttempts: number;
+      quizTotalScore: number;
+      xpEarned: number;
+      activitiesCount: number;
+    };
+
+    const toDateKey = (iso: string) => iso.slice(0, 10);
+
+    const days = new Map<string, DayStats>();
+
+    const ensureDay = (key: string): DayStats => {
+      if (!days.has(key)) {
+        days.set(key, {
+          date: key,
+          watchMinutes: 0,
+          quizAttempts: 0,
+          quizTotalScore: 0,
+          xpEarned: 0,
+          activitiesCount: 0,
+        });
+      }
+      return days.get(key)!;
+    };
+
+    for (const v of viewsRes.data ?? []) {
+      const d = ensureDay(toDateKey(v.created_at as string));
+      d.watchMinutes += Math.round(((v.watched_seconds as number) ?? 0) / 60);
+    }
+
+    for (const a of attemptsRes.data ?? []) {
+      const d = ensureDay(toDateKey(a.created_at as string));
+      d.quizAttempts += 1;
+      d.quizTotalScore += (a.score as number) ?? 0;
+    }
+
+    for (const e of activityRes.data ?? []) {
+      const d = ensureDay(toDateKey(e.created_at as string));
+      d.activitiesCount += 1;
+      const meta = (e.metadata ?? {}) as Record<string, unknown>;
+      if (typeof meta.xp_earned === 'number') {
+        d.xpEarned += meta.xp_earned;
+      }
+    }
+
+    // Ensure all 30 days are present (fill gaps with zeros)
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      ensureDay(key);
+    }
+
+    return Array.from(days.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(({ date, watchMinutes, quizAttempts, quizTotalScore, xpEarned, activitiesCount }) => ({
+        date,
+        watchMinutes,
+        quizAttempts,
+        avgQuizScore: quizAttempts > 0 ? Math.round(quizTotalScore / quizAttempts) : 0,
+        xpEarned,
+        activitiesCount,
+      }));
+  }
+
+  /**
    * Get all active child profile IDs mapped to their parent user IDs.
    */
   async getAllActiveChildParentPairs(): Promise<Array<{ childId: string; parentId: string }>> {

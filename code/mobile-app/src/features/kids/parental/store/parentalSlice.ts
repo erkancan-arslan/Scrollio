@@ -35,6 +35,7 @@ interface ParentalState {
   watchTimeSummary: parentalApi.WatchTimeSummaryResponse | null;
   quizPerformance: parentalApi.QuizTopicPerformance[];
   weeklyReport: parentalApi.WeeklyReportResponse | null;
+  progressHistory: parentalApi.DailyProgressEntry[];
   isLoading: boolean;
   error: string | null;
 }
@@ -47,6 +48,7 @@ const initialState: ParentalState = {
   watchTimeSummary: null,
   quizPerformance: [],
   weeklyReport: null,
+  progressHistory: [],
   isLoading: false,
   error: null,
 };
@@ -126,6 +128,15 @@ export const fetchQuizPerformanceThunk = createAsyncThunk(
   'kidsParental/fetchQuizPerformance',
   async (_, { rejectWithValue }) => {
     const res = await parentalApi.getQuizPerformance();
+    if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
+    return res.data;
+  },
+);
+
+export const fetchProgressHistoryThunk = createAsyncThunk(
+  'kidsParental/fetchProgressHistory',
+  async (_, { rejectWithValue }) => {
+    const res = await parentalApi.getProgressHistory();
     if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
     return res.data;
   },
@@ -211,6 +222,14 @@ const parentalSlice = createSlice({
         state.weeklyReport = action.payload;
       })
       .addCase(fetchWeeklyReportThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    builder
+      .addCase(fetchProgressHistoryThunk.fulfilled, (state, action) => {
+        state.progressHistory = action.payload;
+      })
+      .addCase(fetchProgressHistoryThunk.rejected, (state, action) => {
         state.error = action.payload as string;
       });
   },

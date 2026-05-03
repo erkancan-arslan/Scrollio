@@ -115,3 +115,17 @@ export interface WeeklyReportResponse {
 export const getWeeklyReport = async (): Promise<KidsApiResponse<WeeklyReportResponse>> => {
   return kidsApi.get<WeeklyReportResponse>('/kids/parental/weekly-report');
 };
+
+export interface DailyProgressEntry {
+  date: string;
+  watchMinutes: number;
+  quizAttempts: number;
+  avgQuizScore: number;
+  xpEarned: number;
+  activitiesCount: number;
+}
+
+/** GET /api/v1/kids/parental/progress-history */
+export const getProgressHistory = async (): Promise<KidsApiResponse<DailyProgressEntry[]>> => {
+  return kidsApi.get<DailyProgressEntry[]>('/kids/parental/progress-history');
+};

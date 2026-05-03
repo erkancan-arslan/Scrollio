@@ -74,4 +74,10 @@ export class KidsParentalController {
   async getWeeklyReport(@CurrentChild() childId: string) {
     return this.kidsParentalService.getWeeklyReportForDashboard(childId);
   }
+
+  @Get('progress-history')
+  @ApiOperation({ summary: 'Get daily progress history for the last 30 days' })
+  async getProgressHistory(@CurrentChild() childId: string) {
+    return this.kidsParentalService.getProgressHistory(childId);
+  }
 }
