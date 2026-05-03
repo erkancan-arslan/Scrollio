@@ -186,6 +186,8 @@ const feedSlice = createSlice({
           watchedSeconds: 0,
           totalSeconds: (item.duration_seconds ?? 0) as number,
           position: idx,
+          isPinned: (item.isPinned ?? false) as boolean,
+          pinnedUntil: (item.pinnedUntil ?? null) as string | null,
           createdAt: (item.created_at ?? '') as string,
           updatedAt: (item.updated_at ?? '') as string,
         };

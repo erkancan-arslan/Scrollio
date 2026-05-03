@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,11 +7,18 @@ import {
     Image,
     useWindowDimensions,
     ScrollView,
+    Modal,
+    TextInput,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { spacing } from '../../../theme';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { verifyPinThunk } from '../../kids/auth/store/authSlice';
 
 type Props = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'AppLanding'>;
@@ -23,8 +30,44 @@ const BG = '#F7F3ED';
 
 export const AppLandingScreen: React.FC<Props> = ({ navigation }) => {
     const { width } = useWindowDimensions();
-    // Stack cards vertically on narrow viewports (e.g. phone); side-by-side on wide (e.g. desktop)
     const isWide = width >= 500;
+
+    const dispatch = useAppDispatch();
+    const isPinSet = useAppSelector((s) => s.kidsAuth.isPinSet);
+
+    const [pinModalVisible, setPinModalVisible] = useState(false);
+    const [pinInput, setPinInput] = useState('');
+    const [pinError, setPinError] = useState<string | null>(null);
+    const [verifying, setVerifying] = useState(false);
+
+    const handleCoreTap = useCallback(() => {
+        if (isPinSet) {
+            setPinInput('');
+            setPinError(null);
+            setPinModalVisible(true);
+        } else {
+            navigation.navigate('SignIn');
+        }
+    }, [isPinSet, navigation]);
+
+    const handlePinSubmit = useCallback(async () => {
+        if (verifying || pinInput.length < 4) return;
+        setVerifying(true);
+        setPinError(null);
+        try {
+            const result = await dispatch(verifyPinThunk(pinInput)).unwrap();
+            if (result.valid) {
+                setPinModalVisible(false);
+                navigation.navigate('SignIn');
+            } else {
+                setPinError('Incorrect PIN. Please try again.');
+            }
+        } catch {
+            setPinError('Incorrect PIN. Please try again.');
+        } finally {
+            setVerifying(false);
+        }
+    }, [dispatch, pinInput, verifying, navigation]);
 
     return (
         <SafeAreaView style={styles.safeRoot} edges={['top', 'bottom']}>
@@ -56,7 +99,7 @@ export const AppLandingScreen: React.FC<Props> = ({ navigation }) => {
                         <TouchableOpacity
                             style={[styles.card, styles.coreCard, isWide && styles.cardWide]}
                             activeOpacity={0.85}
-                            onPress={() => navigation.navigate('SignIn')}
+                            onPress={handleCoreTap}
                         >
                             <Image
                                 source={require('../../../../assets/core_register.png')}
@@ -106,6 +149,64 @@ export const AppLandingScreen: React.FC<Props> = ({ navigation }) => {
                     </TouchableOpacity>
                 </ScrollView>
             </View>
+
+            {/* Parental PIN gate — shown when a Kids PIN is set and user taps Core */}
+            <Modal
+                visible={pinModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPinModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalBackdrop}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={styles.pinSheet}>
+                        <Text style={styles.pinTitle}>Parental Approval Required</Text>
+                        <Text style={styles.pinSubtitle}>
+                            Enter your parental PIN to switch to Scrollio.
+                        </Text>
+
+                        <TextInput
+                            style={styles.pinInput}
+                            value={pinInput}
+                            onChangeText={(t) => {
+                                setPinInput(t.replace(/[^0-9]/g, '').slice(0, 6));
+                                setPinError(null);
+                            }}
+                            keyboardType="number-pad"
+                            secureTextEntry
+                            maxLength={6}
+                            placeholder="••••"
+                            placeholderTextColor="#BBBBBB"
+                            autoFocus
+                        />
+
+                        {pinError && (
+                            <Text style={styles.pinError}>{pinError}</Text>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.pinButton, (verifying || pinInput.length < 4) && styles.pinButtonDisabled]}
+                            onPress={handlePinSubmit}
+                            disabled={verifying || pinInput.length < 4}
+                            activeOpacity={0.85}
+                        >
+                            {verifying
+                                ? <ActivityIndicator color="#FFF" />
+                                : <Text style={styles.pinButtonText}>Confirm</Text>
+                            }
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.pinCancel}
+                            onPress={() => setPinModalVisible(false)}
+                        >
+                            <Text style={styles.pinCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -272,5 +373,77 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         textDecorationLine: 'underline',
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    pinSheet: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: spacing.xl,
+        alignItems: 'center',
+    },
+    pinTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginBottom: spacing.xs,
+        textAlign: 'center',
+    },
+    pinSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: spacing.lg,
+    },
+    pinInput: {
+        width: '100%',
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.md,
+        fontSize: 22,
+        textAlign: 'center',
+        letterSpacing: 8,
+        color: '#1A1A1A',
+        marginBottom: spacing.sm,
+    },
+    pinError: {
+        fontSize: 13,
+        color: '#D32F2F',
+        marginBottom: spacing.sm,
+        textAlign: 'center',
+    },
+    pinButton: {
+        width: '100%',
+        backgroundColor: CORE_ACCENT,
+        borderRadius: 14,
+        paddingVertical: 15,
+        alignItems: 'center',
+        marginTop: spacing.sm,
+    },
+    pinButtonDisabled: {
+        opacity: 0.45,
+    },
+    pinButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    pinCancel: {
+        marginTop: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    pinCancelText: {
+        fontSize: 14,
+        color: '#999',
     },
 });

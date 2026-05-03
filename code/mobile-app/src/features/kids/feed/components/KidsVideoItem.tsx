@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   ActivityIndicator,
   Animated,
   Text,
@@ -245,6 +246,12 @@ export const KidsVideoItem = React.memo<KidsVideoItemProps>(function KidsVideoIt
     };
   }, []);
 
+  const handleReplay = useCallback(() => {
+    player.replay();
+    player.play();
+    revealUI();
+  }, [player, revealUI]);
+
   // Double tap detection
   const lastTap = useRef<number>(0);
   const handleTap = useCallback(() => {
@@ -327,6 +334,16 @@ export const KidsVideoItem = React.memo<KidsVideoItemProps>(function KidsVideoIt
             />
           </Animated.View>
 
+          {/* Pinned ("Your creation") badge — only on the synthetic pinned item */}
+          {item.isPinned ? (
+            <Animated.View
+              style={[styles.pinnedBadge, { top: 16 + (insets.top || 0), opacity: uiOpacity }]}
+              pointerEvents="none"
+            >
+              <Text style={styles.pinnedBadgeText}>★ Your creation</Text>
+            </Animated.View>
+          ) : null}
+
           {/* Video Info (Bottom Left) - animated */}
           <Animated.View
             style={[styles.infoContainer, { bottom: bottomOffset, opacity: uiOpacity }]}
@@ -353,6 +370,14 @@ export const KidsVideoItem = React.memo<KidsVideoItemProps>(function KidsVideoIt
               onBookmark={() => onBookmark(item.contentId)}
               onShare={() => onShare(item.contentId)}
             />
+            <TouchableOpacity
+              style={styles.replayButton}
+              onPress={handleReplay}
+              activeOpacity={0.75}
+              accessibilityLabel="Replay video"
+            >
+              <Text style={styles.replayIcon}>↩</Text>
+            </TouchableOpacity>
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>
@@ -450,5 +475,34 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 8,
     zIndex: 10,
+    alignItems: 'center',
+  },
+  replayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  replayIcon: {
+    color: '#FFFFFF',
+    fontSize: 20,
+  },
+  pinnedBadge: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 217, 61, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    zIndex: 15,
+  },
+  pinnedBadgeText: {
+    color: '#2D2D2D',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
 });

@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   useNavigation,
@@ -29,7 +30,8 @@ import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import type { KidsStackParamList } from '../../../../navigation/KidsNavigator';
 
-const MIN_ONBOARDING_TOPICS = 3;
+const MIN_ONBOARDING_TOPICS = 1;
+const MAX_ONBOARDING_TOPICS = 10;
 
 export const KidsTopicPreferencesScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -70,11 +72,14 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
   const toggle = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (!isOnboarding || next.size < MAX_ONBOARDING_TOPICS) {
+        next.add(id);
+      }
       return next;
     });
-  }, []);
+  }, [isOnboarding]);
 
   const catalog = useMemo(
     () => [...allTopics].sort((a, b) => a.name.localeCompare(b.name)),
@@ -83,13 +88,10 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
 
   const handleSave = async () => {
     const ids = Array.from(selectedIds);
-    const minRequired = isOnboarding ? MIN_ONBOARDING_TOPICS : 1;
-    if (ids.length < minRequired) {
+    if (ids.length < MIN_ONBOARDING_TOPICS) {
       Alert.alert(
-        isOnboarding ? 'Pick at least 3 topics' : 'Pick at least one',
-        isOnboarding
-          ? 'Choose at least 3 topics to complete onboarding.'
-          : 'Choose one or more topics so your feed can show matching videos.',
+        'Pick at least one topic',
+        'Choose at least one topic so your feed can show matching videos.',
       );
       return;
     }
@@ -113,16 +115,25 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    // On web, @react-navigation/stack wraps screens in position:absolute containers
+    // whose height doesn't cascade to flex children, making ScrollView non-scrollable.
+    // Wrapping in an explicit flex:1 View + giving ScrollView its own flex:1 fixes this.
+    <View style={[styles.container, Platform.OS === 'web' && { overflow: 'hidden' }]}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.content}
+      scrollEnabled
+    >
       <Text style={styles.hint}>
         {isOnboarding
-          ? `Pick at least ${MIN_ONBOARDING_TOPICS} topics to personalize your first feed.`
+          ? `Pick 1–${MAX_ONBOARDING_TOPICS} topics to personalize your first feed.`
           : 'Videos in your feed use these topic names. Pick what you like — you can change them anytime.'}
       </Text>
 
       {isOnboarding ? (
-        <Text style={styles.counter}>
-          {selectedIds.size} selected{selectedIds.size >= MIN_ONBOARDING_TOPICS ? ' ✓' : ` / ${MIN_ONBOARDING_TOPICS} min`}
+        <Text style={[styles.counter, selectedIds.size >= MAX_ONBOARDING_TOPICS && styles.counterMax]}>
+          {selectedIds.size} / {MAX_ONBOARDING_TOPICS}
+          {selectedIds.size >= MAX_ONBOARDING_TOPICS ? ' (max)' : selectedIds.size > 0 ? ' ✓' : ' — pick at least 1'}
         </Text>
       ) : null}
 
@@ -139,9 +150,10 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
             return (
               <TouchableOpacity
                 key={t.id}
-                style={styles.row}
+                style={[styles.row, !on && isOnboarding && selectedIds.size >= MAX_ONBOARDING_TOPICS && styles.rowDisabled]}
                 onPress={() => toggle(t.id)}
                 activeOpacity={0.7}
+                disabled={!on && isOnboarding && selectedIds.size >= MAX_ONBOARDING_TOPICS}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
               >
@@ -170,11 +182,13 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
         )}
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: kidsColors.background },
+  scrollView: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
   hint: {
     ...kidsTypography.bodySmall,
@@ -186,6 +200,12 @@ const styles = StyleSheet.create({
     color: kidsColors.text.secondary,
     marginBottom: 8,
     fontWeight: '600',
+  },
+  counterMax: {
+    color: kidsColors.primary,
+  },
+  rowDisabled: {
+    opacity: 0.4,
   },
   errorText: { ...kidsTypography.bodySmall, color: kidsColors.error, marginBottom: 8 },
   spinner: { marginVertical: 24 },

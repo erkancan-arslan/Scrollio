@@ -43,6 +43,7 @@ import { KidsFeedOptionsButton } from '../components/KidsFeedOptionsButton';
 import { QuizOverlay } from '../components/QuizOverlay';
 import { kidsApi } from '../../shared/utils/api';
 import type { KidsFeedItem } from '../types/feed.types';
+import { KidsDrawingCountdownOverlay } from '../../drawing-video/components/KidsDrawingCountdownOverlay';
 
 export const KidsFeedScreen: React.FC = () => {
   const { height: windowHeight } = Dimensions.get('window');
@@ -304,10 +305,13 @@ export const KidsFeedScreen: React.FC = () => {
   // Show loading state on initial load
   if (isLoading && items.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <ActivityIndicator size="large" color={kidsColors.primary} />
-        <Text style={styles.loadingText}>Loading videos...</Text>
+      <View style={styles.shell}>
+        {isFocused ? <KidsDrawingCountdownOverlay /> : null}
+        <View style={styles.loadingContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <ActivityIndicator size="large" color={kidsColors.primary} />
+          <Text style={styles.loadingText}>Loading videos...</Text>
+        </View>
       </View>
     );
   }
@@ -315,32 +319,35 @@ export const KidsFeedScreen: React.FC = () => {
   // Show error state
   if (error && items.length === 0) {
     return (
-      <>
+      <View style={styles.shell}>
+        {isFocused ? <KidsDrawingCountdownOverlay /> : null}
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <ErrorScreen
           message={error}
           onRetry={() => dispatch(fetchFeedThunk({ page: 1, limit: 10 }))}
         />
-      </>
+      </View>
     );
   }
 
   // Show empty state
   if (!isLoading && items.length === 0) {
     return (
-      <>
+      <View style={styles.shell}>
+        {isFocused ? <KidsDrawingCountdownOverlay /> : null}
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <EmptyState
           title={emptyStateCopy.title}
           message={emptyStateCopy.message}
           icon={emptyStateCopy.icon}
         />
-      </>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {isFocused ? <KidsDrawingCountdownOverlay /> : null}
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Options Button */}
@@ -398,6 +405,10 @@ export const KidsFeedScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  /** Wrapper so absolute countdown overlay is scoped to this screen only. */
+  shell: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#000000',

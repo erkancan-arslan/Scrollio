@@ -19,7 +19,8 @@ type Props = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'OnboardingInterests'>;
 };
 
-const MIN_SELECTIONS = 3;
+const MIN_SELECTIONS = 1;
+const MAX_SELECTIONS = 10;
 
 /** Maps known topic names to emojis for display. Falls back to 📚. */
 const TOPIC_EMOJI: Record<string, string> = {
@@ -80,13 +81,17 @@ export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
     const toggleTopic = (topic: string) => {
         setSelected((prev) => {
             const next = new Set(prev);
-            if (next.has(topic)) next.delete(topic);
-            else next.add(topic);
+            if (next.has(topic)) {
+                next.delete(topic);
+            } else if (next.size < MAX_SELECTIONS) {
+                next.add(topic);
+            }
             return next;
         });
     };
 
     const canContinue = selected.size >= MIN_SELECTIONS;
+    const atMax = selected.size >= MAX_SELECTIONS;
 
     const handleFinish = async () => {
         if (!canContinue || saving) return;
@@ -128,12 +133,12 @@ export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.emoji}>🎯</Text>
                 <Text style={styles.title}>What interests you?</Text>
                 <Text style={styles.subtitle}>
-                    Select at least {MIN_SELECTIONS} topics to personalise your feed.
+                    Select 1–{MAX_SELECTIONS} topics to personalise your feed.
                 </Text>
 
                 <View style={styles.counterRow}>
-                    <Text style={[styles.counter, canContinue && styles.counterReady]}>
-                        {selected.size} selected{canContinue ? ' ✓' : ` / ${MIN_SELECTIONS} min`}
+                    <Text style={[styles.counter, canContinue && styles.counterReady, atMax && styles.counterMax]}>
+                        {selected.size} / {MAX_SELECTIONS}{atMax ? ' (max)' : canContinue ? ' ✓' : ' — pick at least 1'}
                     </Text>
                 </View>
 
@@ -163,9 +168,10 @@ export const OnboardingInterestsScreen: React.FC<Props> = ({ navigation }) => {
                         return (
                             <TouchableOpacity
                                 key={topic}
-                                style={[styles.tile, isSelected && styles.tileSelected]}
+                                style={[styles.tile, isSelected && styles.tileSelected, !isSelected && atMax && styles.tileDisabled]}
                                 onPress={() => toggleTopic(topic)}
                                 activeOpacity={0.75}
+                                disabled={!isSelected && atMax}
                             >
                                 <Text style={styles.tileEmoji}>{getEmoji(topic)}</Text>
                                 <Text
@@ -242,6 +248,7 @@ const styles = StyleSheet.create({
     counterRow: { marginBottom: spacing.xs },
     counter: { fontSize: 13, color: '#999999', fontWeight: '600' },
     counterReady: { color: '#34C759' },
+    counterMax: { color: ACCENT },
     errorContainer: {
         backgroundColor: '#FFEBEE', borderRadius: 10,
         paddingVertical: spacing.xs, paddingHorizontal: spacing.md, marginTop: spacing.xs,
@@ -273,6 +280,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
     },
     tileSelected: { backgroundColor: '#FFF2E8', borderColor: ACCENT },
+    tileDisabled: { opacity: 0.4 },
     tileEmoji: { fontSize: 28, marginBottom: 6 },
     tileLabel: { fontSize: 11, fontWeight: '600', color: '#555555', textAlign: 'center', lineHeight: 14 },
     tileLabelSelected: { color: ACCENT },

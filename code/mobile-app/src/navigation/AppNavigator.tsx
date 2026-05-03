@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer, NavigatorScreenParams, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, useNavigation, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AppLandingScreen } from '../features/auth/screens/AppLandingScreen';
 import { SignInScreen } from '../features/auth/screens/SignInScreen';
@@ -73,9 +73,59 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/**
+ * Web URL ↔ screen mapping so that refreshing the page restores the current
+ * screen instead of always resetting to AppLanding.
+ * Only active on web — React Navigation ignores this on native.
+ */
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [
+    'http://localhost:8081',
+    'http://localhost:3000',
+    'https://scrollio.app',
+  ],
+  config: {
+    screens: {
+      AppLanding: '',
+      SignIn: 'signin',
+      SignUp: 'signup',
+      OnboardingUsername: 'onboarding/username',
+      OnboardingInterests: 'onboarding/interests',
+      OnboardingDifficulty: 'onboarding/difficulty',
+      MainTabs: 'home',
+      Admin: 'admin',
+      Teacher: 'teacher',
+      ManageTopics: 'topics',
+      Kids: {
+        path: 'kids',
+        screens: {
+          KidsLogin: '',
+          KidsRegister: 'register',
+          KidsRoleBlocked: 'blocked',
+          KidsPinEntry: 'pin',
+          KidsSetPin: 'setup-pin',
+          KidsChildSelector: 'select',
+          KidsCreateChild: 'create-child',
+          KidsCharacterSelect: 'character',
+          KidsTopicPreferences: 'topics',
+          KidsMainTabs: 'app',
+          KidsYourMascot: 'mascot',
+          KidsMascotDraw: 'mascot/draw',
+          KidsParentalDashboard: 'parental',
+          KidsParentalActivity: 'parental/activity',
+          KidsScreenTime: 'parental/screen-time',
+          KidsContentSafety: 'parental/safety',
+          KidsClassroomLessons: 'classroom/:classroomId',
+          KidsLessonPlayer: 'lesson/:lessonId',
+        },
+      },
+    },
+  },
+};
+
 export const AppNavigator = () => {
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             <Stack.Navigator
                 initialRouteName="AppLanding"
                 screenOptions={{

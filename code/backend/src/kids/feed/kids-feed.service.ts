@@ -1,12 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { GetKidsFeedDto, ViewedEventDto } from './dto';
+import { KidsDrawingVideoJobsService } from '../drawing-video/kids-drawing-video-jobs.service';
+
+/** Synthetic id prefix used for the pinned drawing-video at the top of the feed. */
+const PINNED_PREFIX = 'pinned-drawing-video:';
 
 @Injectable()
 export class KidsFeedService {
   private readonly logger = new Logger(KidsFeedService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly drawingVideoJobs: KidsDrawingVideoJobsService,
+  ) {}
 
   /**
    * Map date of birth → kids_content.age_group band. Null if unknown / unparseable.
@@ -35,16 +42,22 @@ export class KidsFeedService {
 
     type EmptyReason = 'no_mascot' | 'no_topics' | 'no_matching_content';
 
-    const empty = (reason: EmptyReason) => ({
-      data: [] as Record<string, unknown>[],
-      meta: {
-        page,
-        limit,
-        total: 0,
-        hasMore: false,
-        emptyReason: reason,
-      },
-    });
+    // Page 1 always tries to prepend the child's pinned drawing video. The pinned
+    // item is the child's own creation and shouldn't depend on mascot/topic setup.
+    const pinnedItem = page === 1 ? await this.tryGetPinnedFeedItem(childId) : null;
+
+    const empty = (reason: EmptyReason) => {
+      if (pinnedItem) {
+        return {
+          data: [pinnedItem] as Record<string, unknown>[],
+          meta: { page, limit, total: 0, hasMore: false },
+        };
+      }
+      return {
+        data: [] as Record<string, unknown>[],
+        meta: { page, limit, total: 0, hasMore: false, emptyReason: reason },
+      };
+    };
 
     // 1. Child profile (mascot + DOB for age band)
     const { data: childProfile } = await admin
@@ -176,12 +189,14 @@ export class KidsFeedService {
       hasQuiz: quizContentSet.has(item.id as string),
     }));
 
+    const prepended = pinnedItem ? [pinnedItem, ...feedItems] : feedItems;
+
     const total = count ?? 0;
     const emptyReason: EmptyReason | undefined =
-      total === 0 && feedItems.length === 0 ? 'no_matching_content' : undefined;
+      total === 0 && prepended.length === 0 ? 'no_matching_content' : undefined;
 
     return {
-      data: feedItems,
+      data: prepended,
       meta: {
         page,
         limit,
@@ -193,9 +208,52 @@ export class KidsFeedService {
   }
 
   /**
+   * Build a synthetic kids_content row for the pinned 24h drawing video so that
+   * it can flow through the existing mobile feed mapper unchanged. Returns null
+   * if no pinned video exists for the child or if the lookup fails.
+   */
+  private async tryGetPinnedFeedItem(childId: string): Promise<Record<string, unknown> | null> {
+    try {
+      const pinned = await this.drawingVideoJobs.findCurrentPinnedForChild(childId);
+      if (!pinned?.video_url) return null;
+      const id = `${PINNED_PREFIX}${pinned.id}`;
+      return {
+        id,
+        title: 'Your creation',
+        description: 'Made just for you from your latest drawing.',
+        video_url: pinned.video_url,
+        thumbnail_url: '',
+        duration_seconds: 0,
+        age_group: '7-9',
+        topic_tags: [],
+        view_count: 0,
+        like_count: 0,
+        bookmark_count: 0,
+        difficulty: null,
+        created_at: pinned.created_at,
+        updated_at: pinned.created_at,
+        isLiked: false,
+        isBookmarked: false,
+        hasQuiz: false,
+        isPinned: true,
+        pinnedUntil: pinned.pinned_until,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `Failed to load pinned drawing video for ${childId}: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
+    }
+  }
+
+  /**
    * Track a content view event. Awards XP based on watch time.
+   * No-op for the synthetic pinned drawing-video item (it's not a real kids_content row).
    */
   async trackView(childId: string, dto: ViewedEventDto) {
+    if (typeof dto.contentId === 'string' && dto.contentId.startsWith(PINNED_PREFIX)) {
+      return { tracked: false, xpEarned: 0, completed: false };
+    }
     const admin = this.supabaseService.getAdminClient();
 
     // 1. Get content duration to check completion

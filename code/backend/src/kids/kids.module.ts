@@ -14,6 +14,7 @@ import { KidsVoiceModule } from './voice/kids-voice.module';
 import { KidsChildAuthModule } from './child-auth/kids-child-auth.module';
 import { KidsSettingsModule } from './settings/kids-settings.module';
 import { KidsCustomMascotModule } from './custom-mascot/kids-custom-mascot.module';
+import { KidsDrawingVideoModule } from './drawing-video/kids-drawing-video.module';
 
 @Module({
   imports: [
@@ -32,6 +33,8 @@ import { KidsCustomMascotModule } from './custom-mascot/kids-custom-mascot.modul
     KidsChildAuthModule,
     KidsSettingsModule,
     KidsCustomMascotModule,
+    KidsDrawingVideoModule,
   ],
+  exports: [KidsDrawingVideoModule],
 })
 export class KidsModule {}

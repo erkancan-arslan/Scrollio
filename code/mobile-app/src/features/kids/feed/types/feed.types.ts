@@ -36,6 +36,10 @@ export interface KidsFeedItem {
   watchedSeconds: number;
   totalSeconds: number;
   position: number;
+  /** True when this item is the synthetic pinned drawing-video at the top of the feed. */
+  isPinned?: boolean;
+  /** ISO timestamp when the pinned slot expires. */
+  pinnedUntil?: string | null;
   createdAt: string;
   updatedAt: string;
 }

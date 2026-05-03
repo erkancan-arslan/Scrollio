@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   ActivityIndicator,
   Animated,
   Text,
@@ -307,6 +308,13 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
     };
   }, []);
 
+  const handleReplay = useCallback(() => {
+    player.replay();
+    player.play();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    revealUI();
+  }, [player, revealUI]);
+
   // Double tap detection
   const lastTap = useRef<number>(0);
   const handleTap = useCallback(() => {
@@ -421,6 +429,14 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
               onShare={() => onShare(video.id)}
               onCreatorPress={() => onCreatorPress(video.creator.id)}
             />
+            <TouchableOpacity
+              style={styles.replayButton}
+              onPress={handleReplay}
+              activeOpacity={0.75}
+              accessibilityLabel="Replay video"
+            >
+              <Text style={styles.replayIcon}>↩</Text>
+            </TouchableOpacity>
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>
@@ -504,6 +520,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 8,
     zIndex: 10,
+    alignItems: 'center',
+  },
+  replayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  replayIcon: {
+    color: '#FFFFFF',
+    fontSize: 20,
   },
 });
 
