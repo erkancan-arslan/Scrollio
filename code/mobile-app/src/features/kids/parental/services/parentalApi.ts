@@ -79,3 +79,39 @@ export const updateContentFilters = async (
 export const getMediaEngagement = async (): Promise<KidsApiResponse<MediaEngagementResponse>> => {
   return kidsApi.get<MediaEngagementResponse>('/kids/parental/media-engagement');
 };
+
+export interface WatchTimeSummaryResponse {
+  dailyMinutes: number;
+  weeklyMinutes: number;
+  monthlyMinutes: number;
+}
+
+export interface QuizTopicPerformance {
+  topic: string;
+  attempts: number;
+  avgScorePct: number;
+}
+
+/** GET /api/v1/kids/parental/watch-time-summary */
+export const getWatchTimeSummary = async (): Promise<KidsApiResponse<WatchTimeSummaryResponse>> => {
+  return kidsApi.get<WatchTimeSummaryResponse>('/kids/parental/watch-time-summary');
+};
+
+/** GET /api/v1/kids/parental/quiz-performance */
+export const getQuizPerformance = async (): Promise<KidsApiResponse<QuizTopicPerformance[]>> => {
+  return kidsApi.get<QuizTopicPerformance[]>('/kids/parental/quiz-performance');
+};
+
+export interface WeeklyReportResponse {
+  weekLabel: string;
+  watchMinutes: number;
+  videosWatched: number;
+  quizzesAttempted: number;
+  activityBreakdown: Record<string, number>;
+  quizTopics: QuizTopicPerformance[];
+}
+
+/** GET /api/v1/kids/parental/weekly-report */
+export const getWeeklyReport = async (): Promise<KidsApiResponse<WeeklyReportResponse>> => {
+  return kidsApi.get<WeeklyReportResponse>('/kids/parental/weekly-report');
+};

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
-import { fetchScreenTimeThunk, fetchActivityThunk, fetchContentFiltersThunk, fetchMediaEngagementThunk } from '../store/parentalSlice';
+import { fetchScreenTimeThunk, fetchActivityThunk, fetchContentFiltersThunk, fetchMediaEngagementThunk, fetchWatchTimeSummaryThunk, fetchQuizPerformanceThunk, fetchWeeklyReportThunk } from '../store/parentalSlice';
 import { switchChildThunk } from '../../auth/store/authSlice';
 import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { MultiProfileSwitcher } from '../../profile/components/MultiProfileSwitcher';
@@ -54,7 +54,7 @@ export const KidsParentalDashboardScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<{ navigate: (s: string) => void }>();
   const { childId, childProfile, childProfiles } = useActiveChild();
-  const { screenTime, activities, contentFilters, mediaEngagement, isLoading } = useAppSelector((s) => s.kidsParental);
+  const { screenTime, activities, contentFilters, mediaEngagement, watchTimeSummary, quizPerformance, weeklyReport, isLoading } = useAppSelector((s) => s.kidsParental);
 
   // If accessed from profile selector, we might not have an active child.
   // Auto-select the first one so we can view their dashboard.
@@ -70,6 +70,9 @@ export const KidsParentalDashboardScreen: React.FC = () => {
       dispatch(fetchActivityThunk());
       dispatch(fetchContentFiltersThunk());
       dispatch(fetchMediaEngagementThunk());
+      dispatch(fetchWatchTimeSummaryThunk());
+      dispatch(fetchQuizPerformanceThunk());
+      dispatch(fetchWeeklyReportThunk());
     }
   }, [dispatch, childId]);
 
@@ -136,6 +139,144 @@ export const KidsParentalDashboardScreen: React.FC = () => {
         </Text>
       </TouchableOpacity>
 
+      {/* Watch Time Summary Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardIcon}>📅</Text>
+          <View>
+            <Text style={styles.cardTitle}>Watch Time</Text>
+            <Text style={styles.cardSubtitle}>Daily · Weekly · Monthly</Text>
+          </View>
+        </View>
+        <View style={styles.watchTimeRow}>
+          <View style={styles.watchTimeCell}>
+            <Text style={styles.watchTimeValue}>{watchTimeSummary?.dailyMinutes ?? usedMinutes}m</Text>
+            <Text style={styles.watchTimeLabel}>Today</Text>
+          </View>
+          <View style={styles.watchTimeDivider} />
+          <View style={styles.watchTimeCell}>
+            <Text style={styles.watchTimeValue}>{watchTimeSummary?.weeklyMinutes ?? 0}m</Text>
+            <Text style={styles.watchTimeLabel}>This Week</Text>
+          </View>
+          <View style={styles.watchTimeDivider} />
+          <View style={styles.watchTimeCell}>
+            <Text style={styles.watchTimeValue}>{watchTimeSummary?.monthlyMinutes ?? 0}m</Text>
+            <Text style={styles.watchTimeLabel}>This Month</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Weekly Report Card */}
+      <View style={styles.weeklyCard}>
+        <View style={styles.weeklyHeader}>
+          <View>
+            <Text style={styles.weeklyTitle}>📋 This Week's Report</Text>
+            <Text style={styles.weeklyRange}>{weeklyReport?.weekLabel ?? '...'}</Text>
+          </View>
+        </View>
+
+        {/* Stats row */}
+        <View style={styles.weeklyStatsRow}>
+          <View style={styles.weeklyStat}>
+            <Text style={styles.weeklyStatValue}>{weeklyReport?.watchMinutes ?? 0}</Text>
+            <Text style={styles.weeklyStatLabel}>min watched</Text>
+          </View>
+          <View style={styles.weeklyStatDivider} />
+          <View style={styles.weeklyStat}>
+            <Text style={styles.weeklyStatValue}>{weeklyReport?.videosWatched ?? 0}</Text>
+            <Text style={styles.weeklyStatLabel}>videos</Text>
+          </View>
+          <View style={styles.weeklyStatDivider} />
+          <View style={styles.weeklyStat}>
+            <Text style={styles.weeklyStatValue}>{weeklyReport?.quizzesAttempted ?? 0}</Text>
+            <Text style={styles.weeklyStatLabel}>quizzes</Text>
+          </View>
+        </View>
+
+        {/* Quiz topic scores this week */}
+        {weeklyReport && weeklyReport.quizTopics.length > 0 && (
+          <View style={styles.weeklySection}>
+            <Text style={styles.weeklySectionTitle}>Quiz scores this week</Text>
+            {weeklyReport.quizTopics.slice(0, 4).map((item) => (
+              <View key={item.topic} style={styles.quizRow}>
+                <Text style={styles.quizTopic} numberOfLines={1}>{item.topic}</Text>
+                <View style={styles.quizBarBg}>
+                  <View
+                    style={[
+                      styles.quizBarFill,
+                      {
+                        width: `${item.avgScorePct}%`,
+                        backgroundColor:
+                          item.avgScorePct >= 70
+                            ? kidsColors.success
+                            : item.avgScorePct >= 40
+                            ? '#F59E0B'
+                            : kidsColors.error,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.quizPct}>{item.avgScorePct}%</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Activity breakdown this week */}
+        {weeklyReport && Object.keys(weeklyReport.activityBreakdown).length > 0 && (
+          <View style={styles.weeklySection}>
+            <Text style={styles.weeklySectionTitle}>Activity breakdown</Text>
+            <View style={styles.weeklyBadgesRow}>
+              {Object.entries(weeklyReport.activityBreakdown).map(([type, count]) => (
+                <View key={type} style={styles.weeklyBadge}>
+                  <Text style={styles.weeklyBadgeIcon}>{EVENT_ICONS[type] ?? '📌'}</Text>
+                  <Text style={styles.weeklyBadgeCount}>{count}</Text>
+                  <Text style={styles.weeklyBadgeLabel}>{formatEventType(type)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {weeklyReport &&
+          weeklyReport.watchMinutes === 0 &&
+          weeklyReport.quizzesAttempted === 0 && (
+            <Text style={styles.cardCaption}>No activity recorded this week yet.</Text>
+          )}
+      </View>
+
+      {/* Quiz Performance Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardIcon}>🧠</Text>
+          <View>
+            <Text style={styles.cardTitle}>Quiz Performance</Text>
+            <Text style={styles.cardSubtitle}>Average score by topic</Text>
+          </View>
+        </View>
+        {quizPerformance.length > 0 ? (
+          quizPerformance.slice(0, 5).map((item) => (
+            <View key={item.topic} style={styles.quizRow}>
+              <Text style={styles.quizTopic} numberOfLines={1}>{item.topic}</Text>
+              <View style={styles.quizBarBg}>
+                <View
+                  style={[
+                    styles.quizBarFill,
+                    {
+                      width: `${item.avgScorePct}%`,
+                      backgroundColor: item.avgScorePct >= 70 ? kidsColors.success : item.avgScorePct >= 40 ? '#F59E0B' : kidsColors.error,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.quizPct}>{item.avgScorePct}%</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.cardCaption}>No quizzes completed yet.</Text>
+        )}
+      </View>
+
       {/* Activity Card */}
       <TouchableOpacity
         style={styles.card}
@@ -199,21 +340,33 @@ export const KidsParentalDashboardScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>Media Engagement</Text>
       </View>
       
-      {['watched', 'liked', 'bookmarked'].map((type) => {
-        const items = mediaEngagement ? (mediaEngagement as any)[type] : [];
-        const title = type === 'watched' ? 'Recently Watched' : type === 'liked' ? 'Liked Videos' : 'Bookmarked';
-        if (!items || items.length === 0) return null;
+      {([
+        { key: 'watched', title: 'Recently Watched' },
+        { key: 'liked', title: 'Liked Videos' },
+        { key: 'bookmarked', title: 'Bookmarked' },
+      ] as const).map(({ key, title }) => {
+        const items: any[] = mediaEngagement ? (mediaEngagement as any)[key] ?? [] : [];
         return (
-          <View key={type} style={styles.mediaSection}>
+          <View key={key} style={styles.mediaSection}>
             <Text style={styles.mediaTitle}>{title}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaScroll}>
-              {items.map((item: any) => (
-                <View key={item.id} style={styles.mediaItem}>
-                  <Image source={{ uri: item.thumbnail_url || 'https://via.placeholder.com/150' }} style={styles.mediaThumb} />
-                  <Text style={styles.mediaItemTitle} numberOfLines={2}>{item.title || 'Video'}</Text>
-                </View>
-              ))}
-            </ScrollView>
+            {items.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaScroll}>
+                {items.map((item: any) => (
+                  <View key={item.id} style={styles.mediaItem}>
+                    {item.thumbnail_url ? (
+                      <Image source={{ uri: item.thumbnail_url }} style={styles.mediaThumb} />
+                    ) : (
+                      <View style={[styles.mediaThumb, styles.mediaThumbFallback]} />
+                    )}
+                    <Text style={styles.mediaItemTitle} numberOfLines={2}>{item.title || 'Video'}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={styles.mediaEmptyText}>
+                {mediaEngagement ? 'No videos yet.' : 'Loading...'}
+              </Text>
+            )}
           </View>
         );
       })}
@@ -267,5 +420,45 @@ const styles = StyleSheet.create({
   mediaScroll: { paddingHorizontal: 16, gap: 12 },
   mediaItem: { width: 140 },
   mediaThumb: { width: 140, height: 90, borderRadius: 12, backgroundColor: kidsColors.border, marginBottom: 6 },
+  mediaThumbFallback: { backgroundColor: kidsColors.border },
   mediaItemTitle: { ...kidsTypography.caption, color: kidsColors.text.primary, fontWeight: 'bold' },
+  mediaEmptyText: { ...kidsTypography.caption, color: kidsColors.text.muted, paddingHorizontal: 4, marginTop: 4 },
+  watchTimeRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 4 },
+  watchTimeCell: { flex: 1, alignItems: 'center' },
+  watchTimeDivider: { width: 1, height: 40, backgroundColor: kidsColors.border },
+  watchTimeValue: { ...kidsTypography.heading3, color: kidsColors.text.primary, fontWeight: '700' },
+  watchTimeLabel: { ...kidsTypography.caption, color: kidsColors.text.muted, marginTop: 2 },
+  quizRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  quizTopic: { ...kidsTypography.caption, color: kidsColors.text.primary, fontWeight: '600', width: 90 },
+  quizBarBg: { flex: 1, height: 8, backgroundColor: kidsColors.border, borderRadius: 4, marginHorizontal: 8, overflow: 'hidden' },
+  quizBarFill: { height: 8, borderRadius: 4 },
+  quizPct: { ...kidsTypography.caption, color: kidsColors.text.secondary, width: 36, textAlign: 'right', fontWeight: '700' },
+  weeklyCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: kidsColors.primary ?? '#6C63FF',
+  },
+  weeklyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  weeklyTitle: { ...kidsTypography.heading3, color: kidsColors.text.primary, marginBottom: 2 },
+  weeklyRange: { ...kidsTypography.caption, color: kidsColors.text.muted },
+  weeklyStatsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 20, paddingVertical: 12, backgroundColor: kidsColors.background, borderRadius: 12 },
+  weeklyStat: { flex: 1, alignItems: 'center' },
+  weeklyStatValue: { ...kidsTypography.heading2, color: kidsColors.text.primary, fontWeight: '700' },
+  weeklyStatLabel: { ...kidsTypography.caption, color: kidsColors.text.muted, marginTop: 2 },
+  weeklyStatDivider: { width: 1, height: 36, backgroundColor: kidsColors.border },
+  weeklySection: { marginBottom: 16 },
+  weeklySectionTitle: { ...kidsTypography.bodySmall, color: kidsColors.text.secondary, fontWeight: '700', marginBottom: 10 },
+  weeklyBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  weeklyBadge: { alignItems: 'center', backgroundColor: kidsColors.background, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, minWidth: 72 },
+  weeklyBadgeIcon: { fontSize: 20, marginBottom: 2 },
+  weeklyBadgeCount: { ...kidsTypography.heading3, color: kidsColors.text.primary, fontWeight: '700' },
+  weeklyBadgeLabel: { ...kidsTypography.caption, color: kidsColors.text.muted, textAlign: 'center' },
 });

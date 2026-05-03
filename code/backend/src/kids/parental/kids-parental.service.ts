@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SetScreenTimeDto, UpdateContentFiltersDto } from './dto';
 
@@ -8,10 +8,17 @@ export class KidsParentalService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private assertChildId(childId: string | undefined): asserts childId is string {
+    if (!childId || childId === 'undefined') {
+      throw new BadRequestException('X-Child-Profile-Id header is required');
+    }
+  }
+
   /**
    * Get recent activity log entries for a child.
    */
   async getActivity(childId: string, page = 1, limit = 50) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
     const offset = (page - 1) * limit;
 
@@ -36,6 +43,7 @@ export class KidsParentalService {
    * Get screen time settings and today's usage for a child.
    */
   async getScreenTime(childId: string) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
 
     // Get settings
@@ -84,6 +92,7 @@ export class KidsParentalService {
    * Set screen time rules for a child.
    */
   async setScreenTime(childId: string, dto: SetScreenTimeDto) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
 
     const { error } = await admin.from('kids_screen_time_rules').upsert(
@@ -108,6 +117,7 @@ export class KidsParentalService {
    * Get content filter settings for a child.
    */
   async getContentFilters(childId: string) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
 
     const { data: settings } = await admin
@@ -136,6 +146,7 @@ export class KidsParentalService {
    * Update content filter settings for a child.
    */
   async updateContentFilters(childId: string, dto: UpdateContentFiltersDto) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
 
     // Get current settings
@@ -170,9 +181,264 @@ export class KidsParentalService {
   }
 
   /**
+   * Get daily, weekly, and monthly watch time totals for a child.
+   */
+  async getWatchTimeSummary(childId: string) {
+    this.assertChildId(childId);
+    const admin = this.supabaseService.getAdminClient();
+
+    const now = new Date();
+
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(now);
+    monthStart.setDate(now.getDate() - 29);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const { data: views } = await admin
+      .from('kids_feed_views')
+      .select('watched_seconds, created_at')
+      .eq('child_profile_id', childId)
+      .gte('created_at', monthStart.toISOString());
+
+    const rows = views ?? [];
+    const todayIso = todayStart.toISOString();
+    const weekIso = weekStart.toISOString();
+
+    let dailySeconds = 0;
+    let weeklySeconds = 0;
+    let monthlySeconds = 0;
+
+    for (const row of rows) {
+      const secs = row.watched_seconds ?? 0;
+      monthlySeconds += secs;
+      if (row.created_at >= weekIso) weeklySeconds += secs;
+      if (row.created_at >= todayIso) dailySeconds += secs;
+    }
+
+    return {
+      dailyMinutes: Math.round(dailySeconds / 60),
+      weeklyMinutes: Math.round(weeklySeconds / 60),
+      monthlyMinutes: Math.round(monthlySeconds / 60),
+    };
+  }
+
+  /**
+   * Get quiz performance percentage grouped by topic.
+   */
+  async getQuizPerformance(childId: string) {
+    this.assertChildId(childId);
+    const admin = this.supabaseService.getAdminClient();
+
+    const { data: attempts } = await admin
+      .from('kids_quiz_attempts')
+      .select('score, quiz_id')
+      .eq('child_profile_id', childId)
+      .not('completed_at', 'is', null);
+
+    if (!attempts || attempts.length === 0) return [];
+
+    const quizIds = [...new Set(attempts.map((a) => a.quiz_id as string))];
+
+    const { data: quizzes } = await admin
+      .from('kids_quizzes')
+      .select('id, content_id, questions')
+      .in('id', quizIds);
+
+    if (!quizzes || quizzes.length === 0) return [];
+
+    const contentIds = [...new Set(quizzes.map((q) => q.content_id as string))];
+
+    const { data: contents } = await admin
+      .from('kids_content')
+      .select('id, topic, topic_tags')
+      .in('id', contentIds);
+
+    const contentMap = new Map<string, { topic: string }>();
+    for (const c of contents ?? []) {
+      const topic = (c.topic as string) || ((c.topic_tags as string[])?.[0]) || 'General';
+      contentMap.set(c.id as string, { topic });
+    }
+
+    // Each attempt row stores score as 0 or 100 (per-question binary score).
+    const quizMap = new Map<string, { contentId: string }>();
+    for (const q of quizzes) {
+      quizMap.set(q.id as string, { contentId: q.content_id as string });
+    }
+
+    const topicStats = new Map<string, { totalPct: number; count: number }>();
+    for (const attempt of attempts) {
+      const quiz = quizMap.get(attempt.quiz_id as string);
+      if (!quiz) continue;
+      const content = contentMap.get(quiz.contentId);
+      const topic = content?.topic ?? 'General';
+      const pct = attempt.score as number;
+      const existing = topicStats.get(topic) ?? { totalPct: 0, count: 0 };
+      topicStats.set(topic, { totalPct: existing.totalPct + pct, count: existing.count + 1 });
+    }
+
+    return Array.from(topicStats.entries())
+      .map(([topic, { totalPct, count }]) => ({
+        topic,
+        attempts: count,
+        avgScorePct: Math.round(totalPct / count),
+      }))
+      .sort((a, b) => b.avgScorePct - a.avgScorePct);
+  }
+
+  /**
+   * Full weekly report for the dashboard — covers this calendar week (Mon–Sun).
+   */
+  async getWeeklyReportForDashboard(childId: string) {
+    this.assertChildId(childId);
+    const admin = this.supabaseService.getAdminClient();
+
+    const now = new Date();
+
+    // Week starts on Monday
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, …
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - daysFromMonday);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const weekStartIso = weekStart.toISOString();
+    const weekEndIso = weekEnd.toISOString();
+
+    // Watch time + videos watched this week
+    const { data: views } = await admin
+      .from('kids_feed_views')
+      .select('watched_seconds, content_id')
+      .eq('child_profile_id', childId)
+      .gte('created_at', weekStartIso)
+      .lte('created_at', weekEndIso);
+
+    const weeklySeconds = (views ?? []).reduce(
+      (sum, v) => sum + ((v.watched_seconds as number) ?? 0),
+      0,
+    );
+    const uniqueVideos = new Set((views ?? []).map((v) => v.content_id as string)).size;
+
+    // Activity breakdown this week
+    const { data: activityRows } = await admin
+      .from('kids_activity_logs')
+      .select('event_type')
+      .eq('child_profile_id', childId)
+      .gte('created_at', weekStartIso)
+      .lte('created_at', weekEndIso);
+
+    const activityBreakdown: Record<string, number> = {};
+    for (const row of activityRows ?? []) {
+      const t = row.event_type as string;
+      activityBreakdown[t] = (activityBreakdown[t] ?? 0) + 1;
+    }
+
+    // Quiz performance this week
+    const { data: attempts } = await admin
+      .from('kids_quiz_attempts')
+      .select('score, quiz_id')
+      .eq('child_profile_id', childId)
+      .not('completed_at', 'is', null)
+      .gte('created_at', weekStartIso)
+      .lte('created_at', weekEndIso);
+
+    const quizTopics: Array<{ topic: string; attempts: number; avgScorePct: number }> = [];
+
+    if (attempts && attempts.length > 0) {
+      const quizIds = [...new Set(attempts.map((a) => a.quiz_id as string))];
+      const { data: quizzes } = await admin
+        .from('kids_quizzes')
+        .select('id, content_id')
+        .in('id', quizIds);
+
+      const contentIds = [...new Set((quizzes ?? []).map((q) => q.content_id as string))];
+      const { data: contents } = await admin
+        .from('kids_content')
+        .select('id, topic, topic_tags')
+        .in('id', contentIds);
+
+      const contentMap = new Map<string, string>();
+      for (const c of contents ?? []) {
+        const topic = (c.topic as string) || ((c.topic_tags as string[])?.[0]) || 'General';
+        contentMap.set(c.id as string, topic);
+      }
+
+      const quizContentMap = new Map<string, string>();
+      for (const q of quizzes ?? []) {
+        quizContentMap.set(q.id as string, contentMap.get(q.content_id as string) ?? 'General');
+      }
+
+      const topicStats = new Map<string, { total: number; count: number }>();
+      for (const a of attempts) {
+        const topic = quizContentMap.get(a.quiz_id as string) ?? 'General';
+        const existing = topicStats.get(topic) ?? { total: 0, count: 0 };
+        topicStats.set(topic, { total: existing.total + (a.score as number), count: existing.count + 1 });
+      }
+
+      for (const [topic, { total, count }] of topicStats.entries()) {
+        quizTopics.push({ topic, attempts: count, avgScorePct: Math.round(total / count) });
+      }
+      quizTopics.sort((a, b) => b.avgScorePct - a.avgScorePct);
+    }
+
+    const fmt = (d: Date) =>
+      d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    return {
+      weekLabel: `${fmt(weekStart)} – ${fmt(weekEnd)}`,
+      watchMinutes: Math.round(weeklySeconds / 60),
+      videosWatched: uniqueVideos,
+      quizzesAttempted: (activityBreakdown['quiz_attempt'] ?? 0),
+      activityBreakdown,
+      quizTopics,
+    };
+  }
+
+  /**
+   * Build weekly summary report data for a child (used by cron job).
+   */
+  async buildWeeklyReportData(childId: string) {
+    const [watchTime, quizPerf] = await Promise.all([
+      this.getWatchTimeSummary(childId),
+      this.getQuizPerformance(childId),
+    ]);
+
+    return {
+      weeklyMinutes: watchTime.weeklyMinutes,
+      quizTopics: quizPerf.slice(0, 5),
+    };
+  }
+
+  /**
+   * Get all active child profile IDs mapped to their parent user IDs.
+   */
+  async getAllActiveChildParentPairs(): Promise<Array<{ childId: string; parentId: string }>> {
+    const admin = this.supabaseService.getAdminClient();
+    const { data } = await admin
+      .from('kids_child_profiles')
+      .select('id, parent_id')
+      .eq('is_active', true);
+
+    return (data ?? []).map((row) => ({
+      childId: row.id as string,
+      parentId: row.parent_id as string,
+    }));
+  }
+
+  /**
    * Get media engagement (watched, liked, bookmarked videos).
    */
   async getMediaEngagement(childId: string) {
+    this.assertChildId(childId);
     const admin = this.supabaseService.getAdminClient();
 
     const [viewsRes, likesRes, bookmarksRes] = await Promise.all([

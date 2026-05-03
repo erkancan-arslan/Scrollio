@@ -56,4 +56,22 @@ export class KidsParentalController {
   async getMediaEngagement(@CurrentChild() childId: string) {
     return this.kidsParentalService.getMediaEngagement(childId);
   }
+
+  @Get('watch-time-summary')
+  @ApiOperation({ summary: 'Get daily, weekly, and monthly watch time totals' })
+  async getWatchTimeSummary(@CurrentChild() childId: string) {
+    return this.kidsParentalService.getWatchTimeSummary(childId);
+  }
+
+  @Get('quiz-performance')
+  @ApiOperation({ summary: 'Get quiz performance percentage grouped by topic' })
+  async getQuizPerformance(@CurrentChild() childId: string) {
+    return this.kidsParentalService.getQuizPerformance(childId);
+  }
+
+  @Get('weekly-report')
+  @ApiOperation({ summary: 'Get this week\'s full usage report for the dashboard' })
+  async getWeeklyReport(@CurrentChild() childId: string) {
+    return this.kidsParentalService.getWeeklyReportForDashboard(childId);
+  }
 }

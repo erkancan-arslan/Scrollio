@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { fetchActivityThunk } from '../store/parentalSlice';
+import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
@@ -44,10 +45,13 @@ const formatEventType = (type: string): string => {
 export const KidsActivityMonitorScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { activities, isLoading } = useAppSelector((s) => s.kidsParental);
+  const { childId } = useActiveChild();
 
   useEffect(() => {
-    dispatch(fetchActivityThunk());
-  }, [dispatch]);
+    if (childId) {
+      dispatch(fetchActivityThunk());
+    }
+  }, [dispatch, childId]);
 
   if (isLoading && activities.length === 0) {
     return <LoadingSpinner message="Loading activity..." />;

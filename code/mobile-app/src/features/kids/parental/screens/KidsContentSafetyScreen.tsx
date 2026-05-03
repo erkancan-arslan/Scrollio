@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import { fetchContentFiltersThunk, updateContentFiltersThunk } from '../store/parentalSlice';
+import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
 import { KidsThemedButton } from '../../shared/components/KidsThemedButton';
@@ -27,14 +28,17 @@ const DIFFICULTY_OPTIONS = [
 export const KidsContentSafetyScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { contentFilters, isLoading } = useAppSelector((s) => s.kidsParental);
+  const { childId } = useActiveChild();
 
   const [safeSearch, setSafeSearch] = useState(true);
   const [maxDifficulty, setMaxDifficulty] = useState('hard');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchContentFiltersThunk());
-  }, [dispatch]);
+    if (childId) {
+      dispatch(fetchContentFiltersThunk());
+    }
+  }, [dispatch, childId]);
 
   useEffect(() => {
     if (contentFilters) {

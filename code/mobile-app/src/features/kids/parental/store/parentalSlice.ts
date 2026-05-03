@@ -32,6 +32,9 @@ interface ParentalState {
   screenTime: ScreenTimeState | null;
   contentFilters: ContentFilters | null;
   mediaEngagement: parentalApi.MediaEngagementResponse | null;
+  watchTimeSummary: parentalApi.WatchTimeSummaryResponse | null;
+  quizPerformance: parentalApi.QuizTopicPerformance[];
+  weeklyReport: parentalApi.WeeklyReportResponse | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -41,6 +44,9 @@ const initialState: ParentalState = {
   screenTime: null,
   contentFilters: null,
   mediaEngagement: null,
+  watchTimeSummary: null,
+  quizPerformance: [],
+  weeklyReport: null,
   isLoading: false,
   error: null,
 };
@@ -107,6 +113,33 @@ export const fetchMediaEngagementThunk = createAsyncThunk(
   },
 );
 
+export const fetchWatchTimeSummaryThunk = createAsyncThunk(
+  'kidsParental/fetchWatchTimeSummary',
+  async (_, { rejectWithValue }) => {
+    const res = await parentalApi.getWatchTimeSummary();
+    if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
+    return res.data;
+  },
+);
+
+export const fetchQuizPerformanceThunk = createAsyncThunk(
+  'kidsParental/fetchQuizPerformance',
+  async (_, { rejectWithValue }) => {
+    const res = await parentalApi.getQuizPerformance();
+    if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
+    return res.data;
+  },
+);
+
+export const fetchWeeklyReportThunk = createAsyncThunk(
+  'kidsParental/fetchWeeklyReport',
+  async (_, { rejectWithValue }) => {
+    const res = await parentalApi.getWeeklyReport();
+    if (res.error || !res.data) return rejectWithValue(res.error || 'Failed');
+    return res.data;
+  },
+);
+
 // ── Slice ──
 
 const parentalSlice = createSlice({
@@ -152,6 +185,33 @@ const parentalSlice = createSlice({
     builder
       .addCase(fetchMediaEngagementThunk.fulfilled, (state, action) => {
         state.mediaEngagement = action.payload;
+      })
+      .addCase(fetchMediaEngagementThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    builder
+      .addCase(fetchWatchTimeSummaryThunk.fulfilled, (state, action) => {
+        state.watchTimeSummary = action.payload;
+      })
+      .addCase(fetchWatchTimeSummaryThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    builder
+      .addCase(fetchQuizPerformanceThunk.fulfilled, (state, action) => {
+        state.quizPerformance = action.payload;
+      })
+      .addCase(fetchQuizPerformanceThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    builder
+      .addCase(fetchWeeklyReportThunk.fulfilled, (state, action) => {
+        state.weeklyReport = action.payload;
+      })
+      .addCase(fetchWeeklyReportThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
       });
   },
 });

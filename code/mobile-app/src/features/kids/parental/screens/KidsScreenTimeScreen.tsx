@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
+import { useActiveChild } from '../../shared/hooks/useActiveChild';
 import { fetchScreenTimeThunk, updateScreenTimeThunk } from '../store/parentalSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { kidsTypography } from '../../shared/constants/typography';
@@ -21,13 +22,16 @@ import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
 export const KidsScreenTimeScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { screenTime, isLoading } = useAppSelector((s) => s.kidsParental);
+  const { childId } = useActiveChild();
 
   const [dailyLimit, setDailyLimit] = useState(60);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchScreenTimeThunk());
-  }, [dispatch]);
+    if (childId) {
+      dispatch(fetchScreenTimeThunk());
+    }
+  }, [dispatch, childId]);
 
   useEffect(() => {
     if (screenTime) {
