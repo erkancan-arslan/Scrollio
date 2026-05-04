@@ -10,6 +10,7 @@ interface ProgressResponse {
   xpToNextLevel: number;
   progressPercentage: number;
   progressMap: Record<string, unknown>;
+  playgroundPoints?: number;
 }
 
 interface DailyMission {

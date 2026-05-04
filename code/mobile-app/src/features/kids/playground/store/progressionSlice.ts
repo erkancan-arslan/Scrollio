@@ -20,6 +20,8 @@ interface ProgressionState {
   xp: number;
   xpToNextLevel: number;
   progressPercentage: number;
+  /** Earned via kids feed/quiz — for games playground. */
+  playgroundPoints: number;
   missions: Mission[];
   completedMissionIds: string[];
   rewards: unknown[];
@@ -32,6 +34,7 @@ const initialState: ProgressionState = {
   xp: 0,
   xpToNextLevel: 100,
   progressPercentage: 0,
+  playgroundPoints: 0,
   missions: [],
   completedMissionIds: [],
   rewards: [],
@@ -95,6 +98,9 @@ const progressionSlice = createSlice({
     resetProgression() {
       return initialState;
     },
+    syncPlaygroundPointsFromServer(state, action: PayloadAction<number>) {
+      state.playgroundPoints = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -105,6 +111,7 @@ const progressionSlice = createSlice({
         state.xp = action.payload.currentXp;
         state.xpToNextLevel = action.payload.xpToNextLevel;
         state.progressPercentage = action.payload.progressPercentage;
+        state.playgroundPoints = action.payload.playgroundPoints ?? 0;
       })
       .addCase(fetchProgressThunk.rejected, (state, action) => {
         state.isLoading = false;
@@ -138,5 +145,6 @@ const progressionSlice = createSlice({
   },
 });
 
-export const { addXpLocal, resetProgression } = progressionSlice.actions;
+export const { addXpLocal, resetProgression, syncPlaygroundPointsFromServer } =
+  progressionSlice.actions;
 export default progressionSlice.reducer;

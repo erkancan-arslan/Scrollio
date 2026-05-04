@@ -14,6 +14,7 @@ import { BilVeFethetMenuScreen } from '../games/bil_ve_fethet/BilVeFethetMenuScr
 import { BilVeFethetKidsScreen } from '../games/bil-ve-fethet-kids/BilVeFethetKidsScreen';
 import { SpaceRepairLobbyScreen } from '../games/space-repair-kids/SpaceRepairLobbyScreen';
 import { ClassroomMenuScreen } from '../games/bil-ve-fethet-classroom/ClassroomMenuScreen';
+import { useAppSelector } from '../../../store/hooks';
 
 // Ensure games are registered
 initializeGameRegistry();
@@ -32,6 +33,7 @@ const STANDALONE_GAMES: Record<string, boolean> = {
 export const PlaygroundScreen: React.FC = () => {
     const navigation = useNavigation<NavProp>();
     const route = useRoute<PlaygroundRouteProp>();
+    const playgroundCoins = useAppSelector((s) => s.profile.profile?.playgroundCoins ?? 0);
     const [selectedGameId, setSelectedGameId] = React.useState<GameId | null>(null);
     const insets = useSafeAreaInsets();
     
@@ -127,9 +129,15 @@ export const PlaygroundScreen: React.FC = () => {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.headerRow}>
                     <Text style={styles.title}>Playground</Text>
-                    <View style={styles.liveBadgeBadge}>
-                        <View style={styles.dot} />
-                        <Text style={styles.liveBadgeText}>ONLINE</Text>
+                    <View style={styles.headerBadges}>
+                        <View style={styles.coinsBadge}>
+                            <Ionicons name="trophy" size={14} color="#FFD54F" />
+                            <Text style={styles.coinsBadgeText}>{playgroundCoins}</Text>
+                        </View>
+                        <View style={styles.liveBadgeBadge}>
+                            <View style={styles.dot} />
+                            <Text style={styles.liveBadgeText}>ONLINE</Text>
+                        </View>
                     </View>
                 </View>
                 <Text style={styles.subtitle}>Eğlenerek öğrenmeye hazır mısın? Sana özel oyunları keşfet ve fethetmeye başla.</Text>
@@ -199,6 +207,27 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 8,
+    },
+    headerBadges: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    coinsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255, 213, 79, 0.12)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 213, 79, 0.25)',
+    },
+    coinsBadgeText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#FFD54F',
     },
     title: {
         fontSize: 34,

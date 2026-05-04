@@ -12,6 +12,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 interface Props {
   xpAwarded: number;
   levelUp?: boolean;
+  coinsAwarded?: number;
   /** Called after the exit animation finishes so the parent can clear state. */
   onDismiss: () => void;
 }
@@ -20,7 +21,7 @@ const SHOW_DURATION_MS = 1800;
 const ANIM_IN_MS = 300;
 const ANIM_OUT_MS = 400;
 
-export const XpToast: React.FC<Props> = ({ xpAwarded, levelUp, onDismiss }) => {
+export const XpToast: React.FC<Props> = ({ xpAwarded, levelUp, coinsAwarded, onDismiss }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
 
@@ -40,7 +41,12 @@ export const XpToast: React.FC<Props> = ({ xpAwarded, levelUp, onDismiss }) => {
 
   return (
     <Animated.View style={[styles.pill, { opacity, transform: [{ translateY }] }]}>
-      <Text style={styles.xpText}>+{xpAwarded} XP</Text>
+      <View style={{ flexDirection: 'column', gap: 2 }}>
+        <Text style={styles.xpText}>+{xpAwarded} XP</Text>
+        {(coinsAwarded ?? 0) > 0 ? (
+          <Text style={styles.coinsText}>+{coinsAwarded} playground pts</Text>
+        ) : null}
+      </View>
       {levelUp && (
         <View style={styles.levelUpBadge}>
           <Text style={styles.levelUpText}>LEVEL UP!</Text>
@@ -71,6 +77,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  coinsText: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 12,
+    fontWeight: '700',
   },
   levelUpBadge: {
     backgroundColor: '#FFD700',

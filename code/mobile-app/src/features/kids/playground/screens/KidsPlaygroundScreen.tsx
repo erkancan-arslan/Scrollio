@@ -53,8 +53,15 @@ export const KidsPlaygroundScreen: React.FC = () => {
   const canvasHeight = Math.round(canvasWidth * CANVAS_ASPECT);
 
   const dispatch = useAppDispatch();
-  const { level, xp, xpToNextLevel, missions, completedMissionIds, isLoading } =
-    useAppSelector((s) => s.kidsProgression);
+  const {
+    level,
+    xp,
+    xpToNextLevel,
+    playgroundPoints,
+    missions,
+    completedMissionIds,
+    isLoading,
+  } = useAppSelector((s) => s.kidsProgression);
   const { selectedColor, brushSize, paths, isEraser } = useAppSelector((s) => s.kidsCanvas);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -159,6 +166,10 @@ export const KidsPlaygroundScreen: React.FC = () => {
             <View style={[styles.xpBarFill, { width: `${xpPercent}%` }]} />
           </View>
           <Text style={styles.xpLabel}>{xp}/{xpToNextLevel} XP</Text>
+        </View>
+        <View style={styles.playgroundPtsBadge}>
+          <Text style={styles.playgroundPtsLabel}>🎮</Text>
+          <Text style={styles.playgroundPtsValue}>{playgroundPoints}</Text>
         </View>
       </View>
 
@@ -379,6 +390,25 @@ const styles = StyleSheet.create({
   xpBarBg: { height: 8, backgroundColor: kidsColors.border, borderRadius: 4, overflow: 'hidden' },
   xpBarFill: { height: 8, backgroundColor: kidsColors.xp, borderRadius: 4 },
   xpLabel: { ...kidsTypography.caption, color: kidsColors.text.muted, marginTop: 2, textAlign: 'right' },
+  playgroundPtsBadge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+    minWidth: 44,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: kidsColors.border,
+  },
+  playgroundPtsLabel: { fontSize: 12 },
+  playgroundPtsValue: {
+    ...kidsTypography.bodySmall,
+    fontWeight: '800',
+    color: kidsColors.primary,
+  },
   // Tabs
   tabRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, backgroundColor: '#FFF', borderRadius: 16, overflow: 'hidden' },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },

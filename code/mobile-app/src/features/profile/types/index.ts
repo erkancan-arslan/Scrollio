@@ -32,6 +32,7 @@ export interface Profile {
   ageGroup: string | null;
   level: number;
   xp: number;
+  playgroundCoins: number;
   totalVideosWatched: number;
   totalWatchTime: number; // in seconds
   totalQuizzesCompleted: number;

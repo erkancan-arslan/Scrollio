@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { ScrollioCoinsService } from '../scrollio-coins.service';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ export interface SubmitResponse {
   newXp?: number;
   newLevel?: number;
   levelUp?: boolean;
+  coinsAwarded?: number;
+  playgroundCoins?: number;
 }
 
 const NEXT_LEVEL: Record<QuizLevel, VideoDifficulty> = {
@@ -58,7 +61,10 @@ const NEXT_LEVEL: Record<QuizLevel, VideoDifficulty> = {
 export class QuizService {
   private readonly logger = new Logger(QuizService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly scrollioCoinsService: ScrollioCoinsService,
+  ) {}
 
   /**
    * Whether the user owes a quiz for this topic, and at what level.
@@ -304,11 +310,26 @@ export class QuizService {
       this.logger.warn(`Unexpected error awarding quiz XP: ${err}`);
     }
 
+    let coinFields: Pick<SubmitResponse, 'coinsAwarded' | 'playgroundCoins'> = {};
+    try {
+      const coinAmount = this.quizPlaygroundCoinsForLevel(input.level);
+      const c = await this.scrollioCoinsService.awardCoins(
+        userId,
+        coinAmount,
+        'feed_quiz_correct',
+        input.videoId,
+      );
+      if (c) coinFields = { coinsAwarded: c.coinsAwarded, playgroundCoins: c.playgroundCoins };
+    } catch (err) {
+      this.logger.warn(`Unexpected error awarding quiz coins: ${err}`);
+    }
+
     return {
       correct: true,
       explanation: question.explanation,
       unlockedLevel,
       ...xpFields,
+      ...coinFields,
     };
   }
 
@@ -405,6 +426,11 @@ export class QuizService {
   /** 50 XP for beginner quiz, 150 XP for intermediate quiz (spec range 50–150). */
   private quizXpForLevel(level: QuizLevel): number {
     return level === 'intermediate' ? 150 : 50;
+  }
+
+  /** Same scale as quiz XP — coins for playground games. */
+  private quizPlaygroundCoinsForLevel(level: QuizLevel): number {
+    return this.quizXpForLevel(level);
   }
 
   private extractQuestions(raw: unknown): StoredQuestion[] {

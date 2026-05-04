@@ -61,5 +61,8 @@ export interface ActionResponseDto {
   newXp?: number;
   newLevel?: number;
   levelUp?: boolean;
+  /** Playground currency from `scrollio_coins_ledger` (earned on first meaningful video watch). */
+  coinsAwarded?: number;
+  playgroundCoins?: number;
 }
 

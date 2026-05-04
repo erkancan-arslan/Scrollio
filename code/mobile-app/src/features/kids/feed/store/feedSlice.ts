@@ -7,6 +7,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { KidsFeedItem } from '../types/feed.types';
 import * as feedApi from '../services/feedApi';
 import * as quizApi from '../services/quizApi';
+import { syncPlaygroundPointsFromServer } from '../../playground/store/progressionSlice';
 
 function normalizeKidsDifficulty(v: unknown): 'easy' | 'medium' | 'hard' | null {
   if (v === 'easy' || v === 'medium' || v === 'hard') return v;
@@ -32,6 +33,8 @@ interface FeedState {
   quizResult: {
     correct: boolean;
     xpEarned: number;
+    playgroundPointsAwarded?: number;
+    playgroundPoints?: number;
     correctAnswer: string;
     explanation: string | null;
   } | null;
@@ -69,12 +72,16 @@ export const fetchFeedThunk = createAsyncThunk(
 
 export const trackViewThunk = createAsyncThunk(
   'kidsFeed/trackView',
-  async (params: { contentId: string; watchedSeconds: number }, { rejectWithValue }) => {
+  async (params: { contentId: string; watchedSeconds: number }, { rejectWithValue, dispatch }) => {
     const res = await feedApi.trackView(params.contentId, params.watchedSeconds);
     if (res.error) {
       return rejectWithValue(res.error);
     }
-    return res.data;
+    const data = res.data;
+    if (data?.playgroundPoints != null) {
+      dispatch(syncPlaygroundPointsFromServer(data.playgroundPoints));
+    }
+    return data;
   },
 );
 
@@ -93,7 +100,7 @@ export const submitQuizThunk = createAsyncThunk(
   'kidsFeed/submitQuiz',
   async (
     params: { quizId: string; questionId: string; selectedAnswers: string[] },
-    { rejectWithValue },
+    { rejectWithValue, dispatch },
   ) => {
     const res = await quizApi.submitAnswer(
       params.quizId,
@@ -103,7 +110,11 @@ export const submitQuizThunk = createAsyncThunk(
     if (res.error || !res.data) {
       return rejectWithValue(res.error || 'Failed to submit answer');
     }
-    return res.data;
+    const data = res.data;
+    if (data.playgroundPoints != null) {
+      dispatch(syncPlaygroundPointsFromServer(data.playgroundPoints));
+    }
+    return data;
   },
 );
 

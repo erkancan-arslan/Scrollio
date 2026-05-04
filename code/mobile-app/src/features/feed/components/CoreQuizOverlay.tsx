@@ -35,7 +35,7 @@ import {
   VideoDifficulty,
 } from '../../../services/feed/coreQuizApi';
 import { AppDispatch } from '../../../store/store';
-import { applyXpAward } from '../../profile/store/profileSlice';
+import { applyXpAward, applyPlaygroundCoins } from '../../profile/store/profileSlice';
 import { CoreQuizFeedback } from './CoreQuizFeedback';
 
 const BRAND_ORANGE = '#FF8C42';
@@ -129,6 +129,9 @@ export const CoreQuizOverlay: React.FC<Props> = ({ visible, topic, level, onClos
         levelUp: result.levelUp ?? false,
       }));
     }
+    if (result.correct && result.playgroundCoins != null && (result.coinsAwarded ?? 0) > 0) {
+      dispatch(applyPlaygroundCoins({ playgroundCoins: result.playgroundCoins }));
+    }
   };
 
   const handleContinue = () => {
@@ -179,6 +182,7 @@ export const CoreQuizOverlay: React.FC<Props> = ({ visible, topic, level, onClos
               primaryLabel={feedback.correct ? 'Continue' : 'Try another question'}
               xpAwarded={feedback.xpAwarded}
               levelUp={feedback.levelUp}
+              coinsAwarded={feedback.coinsAwarded}
             />
           ) : question ? (
             <>

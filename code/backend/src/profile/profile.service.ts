@@ -45,11 +45,23 @@ export class ProfileService {
         .eq('follower_id', userId),
     ]);
 
-    return this.transformToProfileDto(
+    const dto = this.transformToProfileDto(
       profile,
       followerResult.count || 0,
       followingResult.count || 0,
     );
+    dto.playgroundCoins = await this.fetchPlaygroundCoinBalance(userId);
+    return dto;
+  }
+
+  private async fetchPlaygroundCoinBalance(userId: string): Promise<number> {
+    const supabase = this.supabaseService.getAdminClient();
+    const { data, error } = await supabase.rpc('get_user_coins', { target_user_id: userId });
+    if (error) {
+      this.logger.warn(`get_user_coins failed for profile: ${error.message}`);
+      return 0;
+    }
+    return typeof data === 'number' ? data : 0;
   }
 
   /**
@@ -205,11 +217,13 @@ export class ProfileService {
         .eq('follower_id', userId),
     ]);
 
-    return this.transformToProfileDto(
+    const dto = this.transformToProfileDto(
       profile,
       followerResult.count || 0,
       followingResult.count || 0,
     );
+    dto.playgroundCoins = await this.fetchPlaygroundCoinBalance(userId);
+    return dto;
   }
 
   /**
@@ -476,6 +490,7 @@ export class ProfileService {
       ageGroup: profile.age_group,
       level: profile.level || 1,
       xp: profile.xp || 0,
+      playgroundCoins: 0,
       totalVideosWatched: profile.total_videos_watched || 0,
       totalWatchTime: profile.total_watch_time || 0,
       totalQuizzesCompleted: profile.total_quizzes_completed || 0,

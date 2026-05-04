@@ -66,6 +66,8 @@ export interface ActionResponse {
   newXp?: number;
   newLevel?: number;
   levelUp?: boolean;
+  coinsAwarded?: number;
+  playgroundCoins?: number;
 }
 
 export interface FeedQueryParams {

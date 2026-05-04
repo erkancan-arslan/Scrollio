@@ -52,6 +52,13 @@ export const ProfileStats: React.FC<ProfileStatsProps> = ({ profile }) => {
         </View>
       </View>
 
+      {/* Playground points */}
+      <View style={styles.playgroundCard}>
+        <Text style={styles.playgroundLabel}>Playground points</Text>
+        <Text style={styles.playgroundValue}>{(profile.playgroundCoins ?? 0).toLocaleString()}</Text>
+        <Text style={styles.playgroundHint}>Earn more by watching videos and passing quizzes.</Text>
+      </View>
+
       {/* XP Progress */}
       <View style={styles.xpCard}>
         <View style={styles.xpHeader}>
@@ -117,6 +124,34 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: '#666666',
+  },
+  playgroundCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  playgroundLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  playgroundValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FF8C42',
+  },
+  playgroundHint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 8,
+    lineHeight: 18,
   },
   xpCard: {
     backgroundColor: '#FFFFFF',

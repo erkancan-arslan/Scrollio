@@ -30,7 +30,7 @@ import { mockVideos } from '../data/mockVideos';
 import { feedService, coreQuizApi } from '../../../services';
 import { colors } from '../../../theme';
 import { AppDispatch } from '../../../store/store';
-import { applyXpAward } from '../../profile/store/profileSlice';
+import { applyXpAward, applyPlaygroundCoins } from '../../profile/store/profileSlice';
 
 interface PendingQuiz {
   topic: string;
@@ -41,6 +41,7 @@ interface PendingQuiz {
 interface XpToastState {
   xpAwarded: number;
   levelUp: boolean;
+  coinsAwarded?: number;
 }
 
 export const FeedScreen: React.FC = () => {
@@ -240,7 +241,14 @@ export const FeedScreen: React.FC = () => {
               newLevel: data.newLevel,
               levelUp: data.levelUp ?? false,
             }));
-            setXpToast({ xpAwarded: data.xpAwarded, levelUp: data.levelUp ?? false });
+            setXpToast({
+              xpAwarded: data.xpAwarded,
+              levelUp: data.levelUp ?? false,
+              coinsAwarded: data.coinsAwarded,
+            });
+          }
+          if (data?.playgroundCoins != null && (data?.coinsAwarded ?? 0) > 0) {
+            dispatch(applyPlaygroundCoins({ playgroundCoins: data.playgroundCoins }));
           }
         })
         .catch(() => {});
@@ -618,6 +626,7 @@ export const FeedScreen: React.FC = () => {
           <XpToast
             xpAwarded={xpToast.xpAwarded}
             levelUp={xpToast.levelUp}
+            coinsAwarded={xpToast.coinsAwarded}
             onDismiss={() => setXpToast(null)}
           />
         </View>

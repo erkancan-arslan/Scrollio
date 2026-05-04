@@ -19,6 +19,7 @@ interface Props {
   onPrimaryAction: () => void;
   xpAwarded?: number;
   levelUp?: boolean;
+  coinsAwarded?: number;
 }
 
 export const CoreQuizFeedback: React.FC<Props> = ({
@@ -28,6 +29,7 @@ export const CoreQuizFeedback: React.FC<Props> = ({
   onPrimaryAction,
   xpAwarded,
   levelUp,
+  coinsAwarded,
 }) => {
   return (
     <View style={styles.container}>
@@ -54,6 +56,11 @@ export const CoreQuizFeedback: React.FC<Props> = ({
           <View style={styles.xpPill}>
             <Text style={styles.xpText}>+{xpAwarded} XP</Text>
           </View>
+          {(coinsAwarded ?? 0) > 0 ? (
+            <View style={styles.coinsPill}>
+              <Text style={styles.xpText}>+{coinsAwarded} pts</Text>
+            </View>
+          ) : null}
           {levelUp && (
             <View style={styles.levelUpPill}>
               <Text style={styles.levelUpText}>LEVEL UP!</Text>
@@ -122,6 +129,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 16,
+  },
+  coinsPill: {
+    backgroundColor: '#2C2C3E',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   xpText: {
     color: '#FFFFFF',

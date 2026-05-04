@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
 import { SubmitAnswerDto } from './dto';
 
+const KIDS_PLAYGROUND_POINTS_QUIZ_CORRECT = 35;
+
 @Injectable()
 export class KidsQuizService {
   private readonly logger = new Logger(KidsQuizService.name);
@@ -130,13 +132,56 @@ export class KidsQuizService {
     // Add XP to progress
     await this.addXp(admin, childId, xpEarned);
 
+    let playgroundPointsAwarded = 0;
+    if (isCorrect) {
+      playgroundPointsAwarded = KIDS_PLAYGROUND_POINTS_QUIZ_CORRECT;
+      await this.addPlaygroundPoints(admin, childId, playgroundPointsAwarded);
+    }
+
+    const playgroundPoints = await this.getPlaygroundPoints(admin, childId);
+
     return {
       correct: isCorrect,
       score,
       xpEarned,
+      playgroundPointsAwarded,
+      playgroundPoints,
       correctAnswer: question.correctAnswer,
       explanation: question.explanation ?? null,
     };
+  }
+
+  private async getPlaygroundPoints(
+    admin: ReturnType<SupabaseService['getAdminClient']>,
+    childId: string,
+  ): Promise<number> {
+    const { data: row } = await admin
+      .from('kids_progress')
+      .select('playground_points')
+      .eq('child_profile_id', childId)
+      .maybeSingle();
+    return (row?.playground_points as number) ?? 0;
+  }
+
+  private async addPlaygroundPoints(
+    admin: ReturnType<SupabaseService['getAdminClient']>,
+    childId: string,
+    amount: number,
+  ) {
+    if (amount <= 0) return;
+    const { data: progress } = await admin
+      .from('kids_progress')
+      .select('playground_points')
+      .eq('child_profile_id', childId)
+      .maybeSingle();
+
+    if (!progress) return;
+
+    const next = (progress.playground_points as number) + amount;
+    await admin
+      .from('kids_progress')
+      .update({ playground_points: next, updated_at: new Date().toISOString() })
+      .eq('child_profile_id', childId);
   }
 
   private async addXp(

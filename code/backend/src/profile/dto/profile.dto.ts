@@ -51,6 +51,8 @@ export class ProfileDto {
   ageGroup: string | null;
   level: number;
   xp: number;
+  /** Scrollio playground balance (`scrollio_coins_ledger`). */
+  playgroundCoins: number;
   totalVideosWatched: number;
   totalWatchTime: number;
   totalQuizzesCompleted: number;

@@ -6,6 +6,9 @@ import { KidsDrawingVideoJobsService } from '../drawing-video/kids-drawing-video
 /** Synthetic id prefix used for the pinned drawing-video at the top of the feed. */
 const PINNED_PREFIX = 'pinned-drawing-video:';
 
+/** Playground points for the first time a child finishes a kids video (≥80% watched). */
+const KIDS_PLAYGROUND_POINTS_VIDEO_COMPLETE = 40;
+
 @Injectable()
 export class KidsFeedService {
   private readonly logger = new Logger(KidsFeedService.name);
@@ -252,7 +255,7 @@ export class KidsFeedService {
    */
   async trackView(childId: string, dto: ViewedEventDto) {
     if (typeof dto.contentId === 'string' && dto.contentId.startsWith(PINNED_PREFIX)) {
-      return { tracked: false, xpEarned: 0, completed: false };
+      return { tracked: false, xpEarned: 0, completed: false, playgroundPointsAwarded: 0 };
     }
     const admin = this.supabaseService.getAdminClient();
 
@@ -268,6 +271,17 @@ export class KidsFeedService {
       duration > 0 && dto.watchedSeconds >= duration * 0.8
         ? new Date().toISOString()
         : null;
+
+    let firstCompletionForContent = false;
+    if (completedAt) {
+      const { count } = await admin
+        .from('kids_feed_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('child_profile_id', childId)
+        .eq('content_id', dto.contentId)
+        .not('completed_at', 'is', null);
+      firstCompletionForContent = (count ?? 0) === 0;
+    }
 
     // 2. Insert feed view
     const { error: viewError } = await admin.from('kids_feed_views').insert({
@@ -298,11 +312,54 @@ export class KidsFeedService {
       await this.addXp(admin, childId, xpEarned);
     }
 
+    let playgroundPointsAwarded = 0;
+    if (firstCompletionForContent && completedAt) {
+      playgroundPointsAwarded = KIDS_PLAYGROUND_POINTS_VIDEO_COMPLETE;
+      await this.addPlaygroundPoints(admin, childId, playgroundPointsAwarded);
+    }
+
+    const playgroundPoints = await this.getPlaygroundPoints(admin, childId);
+
     return {
       tracked: true,
       xpEarned,
       completed: !!completedAt,
+      playgroundPointsAwarded,
+      playgroundPoints,
     };
+  }
+
+  private async getPlaygroundPoints(
+    admin: ReturnType<SupabaseService['getAdminClient']>,
+    childId: string,
+  ): Promise<number> {
+    const { data: row } = await admin
+      .from('kids_progress')
+      .select('playground_points')
+      .eq('child_profile_id', childId)
+      .maybeSingle();
+    return (row?.playground_points as number) ?? 0;
+  }
+
+  private async addPlaygroundPoints(
+    admin: ReturnType<SupabaseService['getAdminClient']>,
+    childId: string,
+    amount: number,
+  ) {
+    if (amount <= 0) return;
+    const { data: progress } = await admin
+      .from('kids_progress')
+      .select('playground_points')
+      .eq('child_profile_id', childId)
+      .maybeSingle();
+
+    if (!progress) return;
+
+    const next = (progress.playground_points as number) + amount;
+    await admin
+      .from('kids_progress')
+      .update({ playground_points: next, updated_at: new Date().toISOString() })
+      .eq('child_profile_id', childId);
   }
 
   /**

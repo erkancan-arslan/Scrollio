@@ -21,6 +21,8 @@ interface SubmitAnswerResponse {
   correct: boolean;
   score: number;
   xpEarned: number;
+  playgroundPointsAwarded?: number;
+  playgroundPoints?: number;
   correctAnswer: string;
   explanation: string | null;
 }

@@ -208,6 +208,11 @@ const profileSlice = createSlice({
         state.profile.level = action.payload.newLevel;
       }
     },
+    applyPlaygroundCoins: (state, action: PayloadAction<{ playgroundCoins: number }>) => {
+      if (state.profile) {
+        state.profile.playgroundCoins = action.payload.playgroundCoins;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Fetch my profile
@@ -218,16 +223,24 @@ const profileSlice = createSlice({
       })
       .addCase(fetchMyProfile.fulfilled, (state, action) => {
         state.profileLoading = false;
-        const incoming = action.payload;
+        const incoming = {
+          ...action.payload,
+          playgroundCoins: action.payload.playgroundCoins ?? 0,
+        };
         // Guard against a stale server snapshot overwriting XP/level that
         // applyXpAward already wrote into Redux with fresher data.
-        // XP only ever increases, so the higher value is always the correct one.
-        if (state.profile && incoming.xp < state.profile.xp) {
-          state.profile = {
-            ...incoming,
-            xp: state.profile.xp,
-            level: state.profile.level,
-          };
+        // XP / playground balances only increase from client awards; prefer the larger snapshot.
+        if (state.profile) {
+          let merged = incoming;
+          if (incoming.xp < state.profile.xp) {
+            merged = { ...merged, xp: state.profile.xp, level: state.profile.level };
+          }
+          const incCoins = incoming.playgroundCoins ?? 0;
+          const prevCoins = state.profile.playgroundCoins ?? 0;
+          if (incCoins < prevCoins) {
+            merged = { ...merged, playgroundCoins: prevCoins };
+          }
+          state.profile = merged;
         } else {
           state.profile = incoming;
         }
@@ -310,7 +323,10 @@ const profileSlice = createSlice({
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
         state.profileLoading = false;
-        state.profile = action.payload;
+        state.profile = {
+          ...action.payload,
+          playgroundCoins: action.payload.playgroundCoins ?? 0,
+        };
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.profileLoading = false;
@@ -341,6 +357,7 @@ export const {
   removeBookmark,
   updateVideoInBookmarks,
   applyXpAward,
+  applyPlaygroundCoins,
 } = profileSlice.actions;
 
 export default profileSlice.reducer;

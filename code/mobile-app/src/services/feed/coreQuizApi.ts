@@ -37,6 +37,8 @@ export interface QuizSubmitResult {
   newXp?: number;
   newLevel?: number;
   levelUp?: boolean;
+  coinsAwarded?: number;
+  playgroundCoins?: number;
 }
 
 class CoreQuizApi {

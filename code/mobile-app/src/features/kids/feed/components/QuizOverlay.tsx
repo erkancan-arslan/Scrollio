@@ -26,6 +26,7 @@ interface QuizOverlayProps {
   result: {
     correct: boolean;
     xpEarned: number;
+    playgroundPointsAwarded?: number;
     correctAnswer: string;
     explanation: string | null;
   } | null;
@@ -77,6 +78,11 @@ export const QuizOverlay: React.FC<QuizOverlayProps> = ({
               {result.correct ? 'Great job!' : 'Almost!'}
             </Text>
             <Text style={styles.resultXp}>+{result.xpEarned} XP</Text>
+            {(result.playgroundPointsAwarded ?? 0) > 0 ? (
+              <Text style={styles.resultGamePts}>
+                +{result.playgroundPointsAwarded} game points
+              </Text>
+            ) : null}
             {!result.correct ? (
               <Text style={styles.resultExplanation}>
                 The correct answer was: {result.correctAnswer}
@@ -235,6 +241,13 @@ const styles = StyleSheet.create({
   resultXp: {
     ...kidsTypography.heading2,
     color: kidsColors.xp,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  resultGamePts: {
+    ...kidsTypography.body,
+    fontWeight: '700',
+    color: kidsColors.primary,
     textAlign: 'center',
     marginBottom: 16,
   },

@@ -35,6 +35,7 @@ export class KidsProgressionService {
       xpToNextLevel,
       progressPercentage,
       progressMap: progress.progress_map,
+      playgroundPoints: (progress.playground_points as number) ?? 0,
     };
   }
 

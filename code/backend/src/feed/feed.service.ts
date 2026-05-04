@@ -10,6 +10,7 @@ import {
 } from './dto/feed-response.dto';
 import { FeedQueryDto, BookmarkedFeedQueryDto, LikedFeedQueryDto, WatchedFeedQueryDto } from './dto/feed-query.dto';
 import { RecordViewDto } from './dto/video-action.dto';
+import { ScrollioCoinsService } from './scrollio-coins.service';
 
 @Injectable()
 export class FeedService {
@@ -19,6 +20,7 @@ export class FeedService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
+    private readonly scrollioCoinsService: ScrollioCoinsService,
   ) {
     // BunnyCDN base URL for video delivery
     this.bunnyCdnBaseUrl = this.configService.get<string>('BUNNY_CDN_URL') || '';
@@ -807,7 +809,13 @@ export class FeedService {
     if (isFirstWatch && userId) {
       try {
         const xpData = await this.awardVideoXp(userId, videoId);
-        return { success: true, message: 'View recorded successfully', ...xpData };
+        const coinData = await this.awardVideoPlaygroundCoins(userId, videoId);
+        return {
+          success: true,
+          message: 'View recorded successfully',
+          ...xpData,
+          ...(coinData ?? {}),
+        };
       } catch (xpErr) {
         this.logger.warn(`Failed to award video XP for ${videoId}: ${xpErr}`);
       }
@@ -847,6 +855,28 @@ export class FeedService {
     if (difficulty === 'intermediate') return 30;
     if (difficulty === 'advanced') return 50;
     return 10;
+  }
+
+  /** Mirror XP tier as playground coins on first qualifying watch. */
+  private async awardVideoPlaygroundCoins(
+    userId: string,
+    videoId: string,
+  ): Promise<{ coinsAwarded: number; playgroundCoins: number } | undefined> {
+    const supabase = this.supabaseService.getAdminClient();
+    const { data: video } = await supabase
+      .from('videos')
+      .select('difficulty_level')
+      .eq('id', videoId)
+      .single();
+
+    const amount = this.videoXpForDifficulty(video?.difficulty_level);
+    const res = await this.scrollioCoinsService.awardCoins(
+      userId,
+      amount,
+      'feed_video_watch',
+      videoId,
+    );
+    return res ?? undefined;
   }
 
   /**

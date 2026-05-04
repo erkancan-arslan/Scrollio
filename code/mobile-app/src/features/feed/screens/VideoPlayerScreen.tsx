@@ -32,10 +32,14 @@ import { feedService } from '../../../services';
 import { FeedVideoItem, ShareToFriendsModal } from '../components';
 import { colors } from '../../../theme';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '../../../store/store';
+import { applyXpAward, applyPlaygroundCoins } from '../../profile/store/profileSlice';
 
 type VideoPlayerRouteProp = RouteProp<RootStackParamList, 'VideoPlayer'>;
 
 export const VideoPlayerScreen: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const route = useRoute<VideoPlayerRouteProp>();
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -72,7 +76,25 @@ export const VideoPlayerScreen: React.FC = () => {
     const startedAt = Date.now();
     return () => {
       const watched = Math.round((Date.now() - startedAt) / 1000);
-      feedService.recordView(video.id, watched, false).catch(() => {});
+      feedService
+        .recordView(video.id, watched, false)
+        .then((res) => {
+          const data = res.data;
+          if (data?.xpAwarded && data.newXp != null && data.newLevel != null) {
+            dispatch(
+              applyXpAward({
+                xpAwarded: data.xpAwarded,
+                newXp: data.newXp,
+                newLevel: data.newLevel,
+                levelUp: data.levelUp ?? false,
+              }),
+            );
+          }
+          if (data?.playgroundCoins != null && (data?.coinsAwarded ?? 0) > 0) {
+            dispatch(applyPlaygroundCoins({ playgroundCoins: data.playgroundCoins }));
+          }
+        })
+        .catch(() => {});
     };
   }, [video]);
 

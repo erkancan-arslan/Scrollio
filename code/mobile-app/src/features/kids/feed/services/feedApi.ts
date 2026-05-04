@@ -71,6 +71,8 @@ interface TrackViewResponse {
   tracked: boolean;
   xpEarned: number;
   completed: boolean;
+  playgroundPointsAwarded?: number;
+  playgroundPoints?: number;
 }
 
 function mapRow(r: KidsFeedApiRow): FeedItem {
