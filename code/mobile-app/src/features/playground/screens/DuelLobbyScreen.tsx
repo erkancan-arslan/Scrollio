@@ -4,7 +4,7 @@
  * cancel option. Navigates to DuelGameScreen on acceptance.
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -17,24 +17,30 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { duelService } from '../services/duelService';
+import { supabase } from '../../../services/supabase/client';
 import { colors, spacing } from '../../../theme';
 
 type DuelLobbyParams = {
     DuelLobby: {
         requestId: string;
         opponentName: string;
+        opponentAvatar: string | null;
+        myUserId: string;
+        opponentId: string;
     };
 };
 
 export const DuelLobbyScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<DuelLobbyParams, 'DuelLobby'>>();
-    const { requestId, opponentName } = route.params;
+    const { requestId, opponentName, opponentAvatar, myUserId, opponentId } = route.params;
 
     const [status, setStatus] = useState<'waiting' | 'accepted' | 'rejected' | 'expired' | 'canceled'>('waiting');
     const [countdown, setCountdown] = useState(30);
     const pulseAnim = useState(new Animated.Value(0.3))[0];
+    const channelRef = useRef<RealtimeChannel | null>(null);
 
     // Pulse animation
     useEffect(() => {
@@ -70,25 +76,51 @@ export const DuelLobbyScreen: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Listen for request updates via realtime
+    // Subscribe to this specific duel request row for status changes
     useEffect(() => {
-        // We need the current user's ID to subscribe, but since the DuelService
-        // already has an active subscription for the user, we rely on the
-        // duel request channel events that are already being handled.
-        // This is a simplified approach.
-        const checkInterval = setInterval(async () => {
-            try {
-                // Poll for the request status (fallback if realtime misses)
-                const response = await duelService.getDuelMatchState(requestId).catch(() => null);
-                // This won't work directly as requestId != matchId
-                // The realtime update will handle navigation
-            } catch {
-                // Ignore polling errors
-            }
-        }, 5000);
+        const channel = supabase
+            .channel(`duel_request:${requestId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'duel_requests',
+                    filter: `id=eq.${requestId}`,
+                },
+                (payload) => {
+                    const record = payload.new as any;
+                    if (record.status === 'accepted' && record.match_id) {
+                        setStatus('accepted');
+                        // Replace lobby with game so back-navigation skips it
+                        navigation.replace('DuelGame', {
+                            matchId: record.match_id,
+                            opponentName,
+                            opponentAvatar,
+                            role: 'A',
+                            seed: 0,
+                            questionSetId: '',
+                            bankVersion: '',
+                            playerAId: myUserId,
+                            playerBId: opponentId,
+                        });
+                    } else if (
+                        record.status === 'rejected' ||
+                        record.status === 'expired' ||
+                        record.status === 'canceled'
+                    ) {
+                        setStatus(record.status);
+                    }
+                },
+            )
+            .subscribe();
 
-        return () => clearInterval(checkInterval);
-    }, [requestId]);
+        channelRef.current = channel;
+        return () => {
+            supabase.removeChannel(channel);
+            channelRef.current = null;
+        };
+    }, [requestId, myUserId, opponentId, opponentName, opponentAvatar, navigation]);
 
     const handleCancel = useCallback(async () => {
         try {

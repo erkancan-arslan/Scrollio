@@ -10,9 +10,9 @@ import {
     View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
 
 import { apiClient } from '../../../../services/api/apiClient';
+import { secureStorage } from '../../../../services/storage/secureStorage';
 import {
     bvfMultiplayerService,
     LobbyPresenceData,
@@ -36,9 +36,14 @@ const SLOT_COLORS: Record<PlayerId, string> = {
 };
 
 export const BilVeFethetMenuScreen: React.FC<Props> = ({ onSinglePlayer, onExit }) => {
-    const user = useSelector((state: any) => state.kidsAuth?.session?.user);
-    const userId: string = user?.id ?? 'anon';
-    const displayName: string = user?.displayName ?? 'Oyuncu';
+    const [userId, setUserId] = useState<string>('anon');
+    const [displayName, setDisplayName] = useState<string>('Oyuncu');
+
+    useEffect(() => {
+        secureStorage.getSession().then(({ userId: uid }) => {
+            if (uid) setUserId(uid);
+        });
+    }, []);
 
     const [screen, setScreen] = useState<ScreenState>('menu');
     const [loading, setLoading] = useState(false);

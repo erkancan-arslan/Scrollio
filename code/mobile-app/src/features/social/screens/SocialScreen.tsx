@@ -359,7 +359,8 @@ export const SocialScreen: React.FC = () => {
   const handleDuelAccepted = (record: DuelRequestItem) => {
     if (!record.match_id || !currentUserId) return;
     setDuelRequests((prev) => prev.filter((r) => r.id !== record.id));
-    const isPlayerA = record.from_user_id !== currentUserId;
+    // Sender (from_user_id) is always Player A; recipient is Player B
+    const isPlayerA = record.from_user_id === currentUserId;
     navigation.navigate('DuelGame', {
       matchId: record.match_id,
       opponentName: record.sender_profile?.display_name || 'Opponent',
@@ -518,6 +519,9 @@ export const SocialScreen: React.FC = () => {
       navigation.navigate('DuelLobby', {
         requestId: result.requestId,
         opponentName: friend.display_name || 'Opponent',
+        opponentAvatar: friend.avatar_url || null,
+        myUserId: currentUserId ?? '',
+        opponentId: friend.id,
       });
     } catch (err: any) {
       setActionInProgress(null);

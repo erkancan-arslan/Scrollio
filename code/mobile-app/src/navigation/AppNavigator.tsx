@@ -51,6 +51,9 @@ export type RootStackParamList = {
     DuelLobby: {
         requestId: string;
         opponentName: string;
+        opponentAvatar: string | null;
+        myUserId: string;
+        opponentId: string;
     };
     DuelGame: {
         matchId: string;

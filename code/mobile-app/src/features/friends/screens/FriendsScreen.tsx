@@ -217,8 +217,8 @@ export const FriendsScreen: React.FC = () => {
     // Remove from list
     setDuelRequests((prev) => prev.filter((r) => r.id !== record.id));
 
-    // Navigate to DuelGame
-    const isPlayerA = record.from_user_id !== currentUserId; // Receiver becomes B
+    // Navigate to DuelGame — sender (from_user_id) is always Player A
+    const isPlayerA = record.from_user_id === currentUserId;
     const opponentName = record.sender_profile?.display_name || 'Opponent';
     const opponentAvatar = record.sender_profile?.avatar_url || null;
 
@@ -375,6 +375,9 @@ export const FriendsScreen: React.FC = () => {
       navigation.navigate('DuelLobby', {
         requestId: result.requestId,
         opponentName: friend.display_name || 'Opponent',
+        opponentAvatar: friend.avatar_url || null,
+        myUserId: currentUserId ?? '',
+        opponentId: friend.id,
       });
     } catch (err: any) {
       setActionInProgress(null);
