@@ -95,10 +95,18 @@ export const FeedScreen: React.FC = () => {
   // shown, the underlying video is paused, and no additional quiz checks
   // fire until the current one resolves.
   const [pendingQuiz, setPendingQuiz] = useState<PendingQuiz | null>(null);
+  // Mirror of pendingQuiz so the in-flight quiz check (a stable callback)
+  // can read the latest value without being recreated each render.
+  const pendingQuizRef = useRef<PendingQuiz | null>(null);
+  // Whether a /feed/quiz/status request is in flight. Used to coalesce
+  // (not drop) rapid checks when the user swipes V1→V2→V3 quickly: a
+  // queued topic is re-checked as soon as the in-flight call returns.
   const quizCheckInFlight = useRef(false);
-  // Topics for which we've already confirmed there is no pending quiz,
-  // so we don't spam `/feed/quiz/status` on every completed video.
-  const topicsWithoutPendingQuiz = useRef<Set<string>>(new Set());
+  // Most recent topic that asked for a quiz check while another was
+  // in flight. Whichever wins, we re-run the check against fresh server
+  // state after the in-flight one finishes — this is what guarantees we
+  // never miss the trigger after the *last* video at a level is watched.
+  const queuedQuizTopic = useRef<string | null>(null);
 
   // Fetch feed from API
   const fetchFeed = useCallback(async (refresh = false) => {
@@ -180,20 +188,34 @@ export const FeedScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       fetchFeedRef.current?.(true);
-      topicsWithoutPendingQuiz.current.clear();
     }, []),
   );
 
+  // Keep the pendingQuiz ref in sync so checkQuizForTopic (defined with an
+  // empty dep array for stability) always sees the freshest value.
+  useEffect(() => {
+    pendingQuizRef.current = pendingQuiz;
+  }, [pendingQuiz]);
+
   // After any completed view we ask the server if the user now owes a
-  // level-up quiz for that topic. We never re-check a topic we've already
-  // confirmed is clean — the server tells us as soon as the last video at
-  // the current level is watched.
+  // level-up quiz for that topic. The server is the source of truth — it
+  // returns `pendingQuizLevel` as soon as the user has watched every video
+  // at their current level.
+  //
+  // Guards:
+  //  - If a quiz is already showing, skip.
+  //  - If a status request is already in flight, queue the latest topic and
+  //    re-check after it returns. This is critical for the swipe-V1→V2→V3
+  //    case: V1's check might still be running when V3's recordView fires,
+  //    so we MUST re-fire after V1 returns or we miss the trigger entirely.
   const checkQuizForTopic = useCallback(
-    async (topic: string | null | undefined) => {
+    async (topic: string | null | undefined): Promise<void> => {
       if (!topic) return;
-      if (pendingQuiz) return;
-      if (quizCheckInFlight.current) return;
-      if (topicsWithoutPendingQuiz.current.has(topic)) return;
+      if (pendingQuizRef.current) return;
+      if (quizCheckInFlight.current) {
+        queuedQuizTopic.current = topic;
+        return;
+      }
 
       quizCheckInFlight.current = true;
       try {
@@ -204,23 +226,28 @@ export const FeedScreen: React.FC = () => {
         if (status.autoUnlocked) {
           // Server auto-unlocked (empty pool) — refetch so new-level
           // videos show up, but don't surface a quiz.
-          topicsWithoutPendingQuiz.current.add(topic);
-          fetchFeed(true);
+          fetchFeedRef.current?.(true);
           return;
         }
 
         if (status.pendingQuizLevel && status.hasQuestions) {
           setPendingQuiz({ topic, level: status.pendingQuizLevel });
-        } else {
-          topicsWithoutPendingQuiz.current.add(topic);
         }
       } catch {
         // Non-blocking — ignore quiz errors
       } finally {
         quizCheckInFlight.current = false;
+        const next = queuedQuizTopic.current;
+        queuedQuizTopic.current = null;
+        // If another video finished while we were querying, re-run against
+        // the fresh server state. Without this, swiping V1→V2→V3 in quick
+        // succession would drop the V3 check and never surface the quiz.
+        if (next && !pendingQuizRef.current) {
+          void checkQuizForTopic(next);
+        }
       }
     },
-    [pendingQuiz, fetchFeed],
+    [],
   );
 
   // Record view for a video that is leaving the viewport
@@ -641,9 +668,6 @@ export const FeedScreen: React.FC = () => {
           onClose={(result) => {
             setPendingQuiz(null);
             if (result.unlockedLevel) {
-              // Clear the cache entry so the next video in that topic
-              // can re-check (the user has progressed).
-              topicsWithoutPendingQuiz.current.delete(pendingQuiz.topic);
               // Refetch so new-level videos enter the stream.
               fetchFeed(true);
             }

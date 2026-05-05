@@ -116,8 +116,13 @@ export class QuizService {
     }
 
     const levelIds = levelVideos.map((v) => v.id);
-    // Deduplicated watch history (see `user_watched_videos` view).
-    const watched = await this.getWatchedVideoIds(userId, levelIds);
+    // Only count videos the user watched while *at this level*. For
+    // beginner that's any watch (the user starts at beginner). For
+    // intermediate we use the `unlocked_at` of the intermediate unlock
+    // as the floor, which makes the trigger insensitive to stale views
+    // from previous test runs / admin resets / chat-shared deep links.
+    const since = unlocks.get(level) ?? null;
+    const watched = await this.getWatchedVideoIds(userId, levelIds, since);
     const allWatched = levelIds.every((id) => watched.has(id));
 
     if (!allWatched) {
@@ -174,9 +179,15 @@ export class QuizService {
       throw error;
     }
 
+    // Mirror the gating in getStatus: only watches accumulated *while at
+    // this level* count toward the question pool, so stale views can't
+    // surface a question the user hasn't actually re-watched.
+    const unlocks = await this.getUnlocks(userId, topic);
+    const since = unlocks.get(level) ?? null;
     const watched = await this.getWatchedVideoIds(
       userId,
       (levelVideos ?? []).map((v) => v.id),
+      since,
     );
 
     // Flatten: [{ videoId, question }]
@@ -339,28 +350,56 @@ export class QuizService {
     return value === 'beginner' || value === 'intermediate';
   }
 
-  private async getUnlocks(userId: string, topic: string): Promise<Set<string>> {
+  /**
+   * Per-level unlock state for a (user, topic). For each unlocked level we
+   * also return the exact `unlocked_at` timestamp — this is used as the
+   * "since" boundary when counting watches at the *current* level so that
+   * stale views from before a re-unlock (e.g. test data, an admin reset,
+   * or a video opened from chat before the level was unlocked) do not
+   * trigger the quiz prematurely.
+   */
+  private async getUnlocks(
+    userId: string,
+    topic: string,
+  ): Promise<Map<string, string>> {
     const admin = this.supabaseService.getAdminClient();
     const { data, error } = await admin
       .from('user_topic_level_unlocks')
-      .select('level')
+      .select('level, unlocked_at')
       .eq('user_id', userId)
       .eq('topic', topic);
     if (error) {
       this.logger.error('Failed to load unlocks', error);
       throw error;
     }
-    return new Set((data ?? []).map((r) => r.level));
+    const out = new Map<string, string>();
+    for (const r of data ?? []) out.set(r.level, r.unlocked_at);
+    return out;
   }
 
-  private async getWatchedVideoIds(userId: string, videoIds: string[]): Promise<Set<string>> {
+  /**
+   * Distinct video ids the user has watched from the given pool.
+   *
+   * When `since` is provided we only count watches that happened on or
+   * after that timestamp. This is critical for level-up quiz gating: we
+   * only want to credit views the user accrued *while at the current
+   * level*, not stale views from a previous unlock cycle or from a
+   * shared-video deep link that bypassed the level guard.
+   */
+  private async getWatchedVideoIds(
+    userId: string,
+    videoIds: string[],
+    since?: string | null,
+  ): Promise<Set<string>> {
     if (videoIds.length === 0) return new Set();
     const admin = this.supabaseService.getAdminClient();
-    const { data, error } = await admin
+    let query = admin
       .from('user_watched_videos')
       .select('video_id')
       .eq('user_id', userId)
       .in('video_id', videoIds);
+    if (since) query = query.gte('watched_at', since);
+    const { data, error } = await query;
     if (error) {
       this.logger.error('Failed to load watched ids from user_watched_videos', error);
       throw error;

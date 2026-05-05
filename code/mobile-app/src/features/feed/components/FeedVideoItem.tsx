@@ -3,7 +3,7 @@
  * Full-screen video item for the TikTok-style feed
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { Video } from '../types';
 import { VideoActions } from './VideoActions';
@@ -63,7 +63,14 @@ export const FeedVideoItem = React.memo<FeedVideoItemProps>(function FeedVideoIt
   // which means the bottom of the item sits behind the absolute tab bar.
   // Pull bottom UI overlays above the tab bar by its full reported height
   // (which already includes the iOS safe-area inset).
-  const tabBarHeight = useBottomTabBarHeight();
+  //
+  // We read the tab-bar height from context directly (instead of the
+  // `useBottomTabBarHeight` hook) so this component can also be rendered
+  // OUTSIDE the bottom-tab navigator — e.g. inside `VideoPlayerScreen`,
+  // which is pushed as a stack screen when a friend taps a shared video
+  // in chat. The hook throws there; the context returns `undefined` and
+  // we fall back to 0.
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
   // Check cache to see if this video has already loaded - skip loading indicator if so
   const [isLoading, setIsLoading] = useState(() => !loadedVideosCache.has(video.videoUrl));
   const [isBuffering, setIsBuffering] = useState(false);
