@@ -251,19 +251,6 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                                 <Text style={styles.termsLink}>Privacy Policy</Text>
                             </Text>
 
-                            {/* Divider */}
-                            <View style={styles.dividerContainer}>
-                                <View style={styles.dividerLine} />
-                                <Text style={styles.dividerText}>OR</Text>
-                                <View style={styles.dividerLine} />
-                            </View>
-
-                            {/* Google Button */}
-                            <TouchableOpacity style={styles.googleButton} activeOpacity={0.8}>
-                                <Text style={styles.googleIcon}>G</Text>
-                                <Text style={styles.googleButtonText}>Continue with Google</Text>
-                            </TouchableOpacity>
-
                             {/* Sign In Link */}
                             <View style={styles.footer}>
                                 <Text style={styles.footerText}>Already have an account? </Text>
@@ -488,43 +475,6 @@ const styles = StyleSheet.create({
     },
     termsLink: {
         color: '#1A1A1A',
-        fontWeight: '500',
-    },
-    dividerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: spacing.xs,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#E5E5E5',
-    },
-    dividerText: {
-        marginHorizontal: spacing.md,
-        fontSize: typography.fontSize.sm,
-        color: '#999999',
-        fontWeight: '500',
-    },
-    googleButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 14,
-        paddingVertical: 14,
-        borderWidth: 1.5,
-        borderColor: '#EEEEEE',
-        gap: spacing.sm,
-    },
-    googleIcon: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#EA4335',
-    },
-    googleButtonText: {
-        fontSize: typography.fontSize.md,
-        color: ACCENT_COLOR,
         fontWeight: '500',
     },
     footer: {
