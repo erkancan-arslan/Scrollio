@@ -303,6 +303,8 @@ export const DuelGameScreen: React.FC = () => {
     const lastPollTimeRef = useRef(0);
     const serverMyMsRef = useRef(30000);
     const serverOpponentMsRef = useRef(30000);
+    // Mirrors iAmAnswered state — readable inside timer loop without stale closure
+    const iAmAnsweredRef = useRef(false);
 
     // Deterministic shuffled questions (same seed as server)
     const shuffledQuestions = useMemo(() => {
@@ -367,6 +369,7 @@ export const DuelGameScreen: React.FC = () => {
 
                 const myAnswered = role === 'A' ? snapshot.playerAAnswered : snapshot.playerBAnswered;
                 setIAmAnswered(myAnswered);
+                iAmAnsweredRef.current = myAnswered;
 
                 console.log('[DuelGameScreen] Snapshot update. Jokers A:', snapshot.playerAJokers, 'Jokers B:', snapshot.playerBJokers);
                 setPlayerAJokers(snapshot.playerAJokers);
@@ -427,7 +430,10 @@ export const DuelGameScreen: React.FC = () => {
         let tickCount = 0;
         const interval = setInterval(() => {
             const elapsed = Date.now() - lastServerUpdateRef.current;
-            const myNewMs = Math.max(0, serverMyMsRef.current - elapsed);
+            // Pause my timer while waiting for opponent (server pauses it too)
+            const myNewMs = iAmAnsweredRef.current
+                ? serverMyMsRef.current
+                : Math.max(0, serverMyMsRef.current - elapsed);
             const oppNewMs = Math.max(0, serverOpponentMsRef.current - elapsed);
 
             setMyRemainingMs(myNewMs);
@@ -481,10 +487,19 @@ export const DuelGameScreen: React.FC = () => {
             return;
         }
 
+        // Check frozen state using ref to avoid stale closure
+        const myJokers = role === 'A' ? playerAJokers : playerBJokers;
+        const frozen = myJokers?.controlsLockedUntil != null && myJokers.controlsLockedUntil > Date.now();
+        if (frozen) {
+            console.log('[DuelGameScreen] handleSwipe blocked: player is frozen');
+            return;
+        }
+
         const answer = direction === 'right'; // Right = True, Left = False
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setIsSubmitting(true);
         setIAmAnswered(true);
+        iAmAnsweredRef.current = true;
 
         console.log('[DuelGameScreen] Submitting Answer:', {
             matchId,
@@ -535,6 +550,7 @@ export const DuelGameScreen: React.FC = () => {
             console.error('Error submitting answer:', err);
             Alert.alert('Submission Failed', err.message || 'Unknown error');
             setIAmAnswered(false);
+            iAmAnsweredRef.current = false;
         } finally {
             setIsSubmitting(false);
         }
@@ -557,6 +573,25 @@ export const DuelGameScreen: React.FC = () => {
     // Determine my user ID
     // ===================================================
     const myUserId = role === 'A' ? playerAId : playerBId;
+
+    // ===================================================
+    // Derived joker state (computed every render — server ticks keep them fresh)
+    // ===================================================
+    const myJokersState = role === 'A' ? playerAJokers : playerBJokers;
+    const oppJokersState = role === 'A' ? playerBJokers : playerAJokers;
+    const now = Date.now();
+
+    const isFrozen =
+        myJokersState?.controlsLockedUntil != null &&
+        myJokersState.controlsLockedUntil > now;
+
+    const hasActiveDebuff =
+        isFrozen ||
+        (myJokersState?.activeEffects || []).some((e: any) => e.type === 'FREEZE');
+
+    const isOpponentFrozen =
+        (oppJokersState?.controlsLockedUntil != null && oppJokersState.controlsLockedUntil > now) ||
+        (oppJokersState?.activeEffects || []).some((e: any) => e.type === 'FREEZE');
     const iWon = winnerId === myUserId;
     const isDraw = winnerId === null && matchState === 'finished';
 
@@ -673,11 +708,11 @@ export const DuelGameScreen: React.FC = () => {
                         onSwipeLeft={() => handleSwipe('left')}
                     />
 
-                    {/* "Answered — waiting" overlay */}
-                    {(iAmAnswered || matchState === 'waiting') && (
+                    {/* "Answered — waiting" or "FROZEN" overlay */}
+                    {(iAmAnswered || matchState === 'waiting' || isFrozen) && (
                         <View style={styles.waitingOverlay}>
                             <Text style={styles.waitingText}>
-                                {matchState === 'waiting' ? 'Waiting for opponent...' : 'Waiting for opponent...'}
+                                {isFrozen ? 'FROZEN!' : matchState === 'waiting' ? 'Waiting for opponent...' : 'Waiting for opponent...'}
                             </Text>
                         </View>
                     )}
@@ -688,34 +723,24 @@ export const DuelGameScreen: React.FC = () => {
             <View style={styles.jokerRow}>
                 <JokerButton
                     type="SHIELD"
-                    available={
-                        role === 'A'
-                            ? (playerAJokers?.remainingUses?.['SHIELD'] ?? 0) > 0
-                            : (playerBJokers?.remainingUses?.['SHIELD'] ?? 0) > 0
-                    }
-                    active={
-                        role === 'A'
-                            ? (playerAJokers?.activeEffects || []).some((e: any) => e.type === 'SHIELD')
-                            : (playerBJokers?.activeEffects || []).some((e: any) => e.type === 'SHIELD')
-                    }
+                    available={(myJokersState?.remainingUses?.['SHIELD'] ?? 0) > 0}
+                    active={(myJokersState?.activeEffects || []).some((e: any) => e.type === 'SHIELD')}
                     onPress={() => handleJoker('SHIELD')}
                 />
                 <JokerButton
                     type="FREEZE"
                     available={
-                        role === 'A'
-                            ? (playerAJokers?.remainingUses?.['FREEZE'] ?? 0) > 0
-                            : (playerBJokers?.remainingUses?.['FREEZE'] ?? 0) > 0
+                        (myJokersState?.remainingUses?.['FREEZE'] ?? 0) > 0 &&
+                        opponentRemainingMs > 3000
                     }
-                    active={false}
+                    active={isOpponentFrozen}
                     onPress={() => handleJoker('FREEZE')}
                 />
                 <JokerButton
                     type="CLEANSE"
                     available={
-                        role === 'A'
-                            ? (playerAJokers?.remainingUses?.['CLEANSE'] ?? 0) > 0
-                            : (playerBJokers?.remainingUses?.['CLEANSE'] ?? 0) > 0
+                        (myJokersState?.remainingUses?.['CLEANSE'] ?? 0) > 0 &&
+                        hasActiveDebuff
                     }
                     active={false}
                     onPress={() => handleJoker('CLEANSE')}
