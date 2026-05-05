@@ -32,8 +32,10 @@ const DUEL_GRACE_MS = 500;
 /** Initial timer for each player in ms */
 const INITIAL_TIMER_MS = 30000;
 
-/** Time bonus/penalty in ms */
-const TIME_DELTA_MS = 1000;
+/** Time added to self on correct answer */
+const TIME_BONUS_MS = 1000;
+/** Time deducted from self on wrong answer */
+const TIME_PENALTY_MS = 2000;
 
 @Injectable()
 export class DuelService {
@@ -655,8 +657,8 @@ export class DuelService {
             let deltaOppMs = 0;
 
             if (isCorrect) {
-                deltaSelfMs = TIME_DELTA_MS;
-                deltaOppMs = -TIME_DELTA_MS;
+                deltaSelfMs = TIME_BONUS_MS;
+                deltaOppMs = -TIME_BONUS_MS;
 
                 // Handle Shield
                 if (hasActiveEffect(opponentJokers, 'SHIELD')) {
@@ -665,7 +667,7 @@ export class DuelService {
                     this.logger.log(`[submitDuelAnswer] SHIELD blocked damage to opponent`);
                 }
             } else {
-                deltaSelfMs = -TIME_DELTA_MS;
+                deltaSelfMs = -TIME_PENALTY_MS;
                 deltaOppMs = 0;
             }
 
