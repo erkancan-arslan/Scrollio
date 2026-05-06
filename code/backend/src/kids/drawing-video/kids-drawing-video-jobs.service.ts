@@ -53,13 +53,18 @@ export class KidsDrawingVideoJobsService {
     return (data as KidsDrawingVideoCycleRow) ?? null;
   }
 
-  /** Lazily upsert a cycle row if one doesn't exist (defensive — trigger should have done this). */
+  /**
+   * Lazily upsert a cycle row if one doesn't exist (defensive — trigger should have done this).
+   * New children start in the "ready" (expired) state — `cycle_due_at = now` — so the
+   * first generation can be triggered immediately by the child without a 48h wait.
+   * The 48h countdown only starts after a generation completes (see `resetCycle`).
+   */
   async ensureCycle(childProfileId: string): Promise<KidsDrawingVideoCycleRow> {
     const existing = await this.getCycle(childProfileId);
     if (existing) return existing;
 
     const admin = this.supabaseService.getAdminClient();
-    const dueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const dueAt = new Date().toISOString();
     const { data, error } = await admin
       .from('kids_drawing_video_cycles')
       .upsert({ child_profile_id: childProfileId, cycle_due_at: dueAt }, { onConflict: 'child_profile_id' })
@@ -178,7 +183,7 @@ export class KidsDrawingVideoJobsService {
 
   async createJob(
     childProfileId: string,
-    drawingId: string,
+    drawingId: string | null,
     sourceImageUrl: string,
   ): Promise<KidsDrawingVideoJobRow> {
     const admin = this.supabaseService.getAdminClient();

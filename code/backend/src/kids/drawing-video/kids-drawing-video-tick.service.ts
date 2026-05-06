@@ -8,6 +8,10 @@ export type TickResult =
   | { status: 'no_drawing'; cycleDueAt: string }
   | { status: 'started'; jobId: string };
 
+export type StartFromImageResult =
+  | { status: 'already_running'; jobId: string }
+  | { status: 'started'; jobId: string };
+
 /**
  * Single-source-of-truth for "is this child due, and should we start a job?".
  * Called by both the controller (lazy-on-read from mobile) and the cron.
@@ -37,12 +41,11 @@ export class KidsDrawingVideoTickService {
     const drawing = await this.jobsService.findLatestDrawingForChild(childProfileId);
     const sourceUrl = drawing?.mentor_image_url || drawing?.image_url || null;
     if (!drawing || !sourceUrl) {
-      this.logger.log(
-        `tick ${childProfileId}: no drawing yet, pushing cycle forward 48h`,
-      );
-      await this.jobsService.resetCycle(childProfileId, null);
-      const refreshed = await this.jobsService.getCycle(childProfileId);
-      return { status: 'no_drawing', cycleDueAt: refreshed?.cycle_due_at ?? cycle.cycle_due_at };
+      // Keep the cycle in its expired/ready state so the child can retry the
+      // moment they have a drawing — don't push 48h forward (was causing the
+      // "timer loops back to start" UX bug).
+      this.logger.log(`tick ${childProfileId}: no drawing yet, leaving cycle ready`);
+      return { status: 'no_drawing', cycleDueAt: cycle.cycle_due_at };
     }
 
     const job = await this.jobsService.createJob(childProfileId, drawing.id, sourceUrl);
@@ -50,6 +53,42 @@ export class KidsDrawingVideoTickService {
 
     // Fire-and-forget pipeline run (mirrors custom-mascot pattern)
     void this.pipeline.run(job.id, childProfileId, sourceUrl).catch((err) => {
+      this.logger.error(
+        `pipeline error for job ${job.id}`,
+        err instanceof Error ? err.stack : err,
+      );
+    });
+
+    return { status: 'started', jobId: job.id };
+  }
+
+  /**
+   * Start the drawing-video pipeline from a freshly captured canvas image
+   * (data URL or hosted URL). The cycle is bypassed — this is what fires
+   * when a child draws and taps "Create" on the overlay-driven canvas.
+   * Pipeline outputs (mentor image → 24h-pinned video, then 48h cycle reset)
+   * are handled by the existing pipeline service.
+   */
+  async startFromImage(
+    childProfileId: string,
+    imageUrlOrDataUrl: string,
+  ): Promise<StartFromImageResult> {
+    // Make sure a cycle row exists so subsequent resetCycle works.
+    await this.jobsService.ensureCycle(childProfileId);
+
+    const active = await this.jobsService.findActiveJobForChild(childProfileId);
+    if (active) {
+      return { status: 'already_running', jobId: active.id };
+    }
+
+    const job = await this.jobsService.createJob(
+      childProfileId,
+      null,
+      imageUrlOrDataUrl,
+    );
+    this.logger.log(`startFromImage ${childProfileId}: started job ${job.id}`);
+
+    void this.pipeline.run(job.id, childProfileId, imageUrlOrDataUrl).catch((err) => {
       this.logger.error(
         `pipeline error for job ${job.id}`,
         err instanceof Error ? err.stack : err,

@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { Platform } from 'react-native';
 import { UserRole } from '../../shared/types';
 import type { ChildProfile } from '../../shared/types';
 import type { AuthSession, AuthState } from '../types/auth.types';
@@ -7,7 +8,7 @@ import * as authApi from '../services/authApi';
 import * as pinApi from '../services/pinApi';
 import * as childProfileApi from '../services/childProfileApi';
 import * as roleApi from '../services/roleApi';
-import { clearAll as clearKidsStorage } from '../../shared/utils/storage';
+import { clearAll as clearKidsStorage, getItem, setItem } from '../../shared/utils/storage';
 
 // ────────────────────── Initial State ──────────────────────
 
@@ -20,6 +21,7 @@ const initialState: AuthState = {
   isPinSet: false,
   isPinVerified: false,
   isLoading: false,
+  isRestoringSession: true,
   error: null,
 };
 
@@ -142,7 +144,43 @@ export const switchChildThunk = createAsyncThunk(
     if (res.error || !res.data) {
       return rejectWithValue(res.error || 'Failed to switch child');
     }
+    await setItem('active_child_id', childId);
     return res.data;
+  },
+);
+
+/**
+ * Called once at app startup. Reads the stored access token and, if valid,
+ * restores session + children + active child into Redux so a web page
+ * refresh doesn't force re-login.
+ */
+export const restoreSessionThunk = createAsyncThunk(
+  'kidsAuth/restoreSession',
+  async (_, { dispatch, rejectWithValue }) => {
+    const stored = await secureStorage.getSession();
+    if (!stored.accessToken) return rejectWithValue('no_session');
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (stored.expiresAt && stored.expiresAt < nowSec + 60) {
+      return rejectWithValue('expired');
+    }
+
+    const meRes = await authApi.getMe();
+    if (meRes.error || !meRes.data) return rejectWithValue('me_failed');
+
+    await dispatch(fetchChildrenThunk());
+
+    const savedChildId = await getItem('active_child_id');
+
+    return {
+      accessToken: stored.accessToken,
+      refreshToken: stored.refreshToken ?? '',
+      expiresAt: stored.expiresAt ?? 0,
+      userId: stored.userId ?? '',
+      role: meRes.data.primaryRole,
+      isPinSet: meRes.data.isPinSet,
+      savedChildId,
+    };
   },
 );
 
@@ -212,6 +250,7 @@ const authSlice = createSlice({
       })
       .addCase(loginThunk.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.isRestoringSession = false;
         state.session = {
           accessToken: action.payload.session.accessToken,
           refreshToken: action.payload.session.refreshToken,
@@ -239,6 +278,7 @@ const authSlice = createSlice({
       })
       .addCase(registerThunk.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.isRestoringSession = false;
         state.session = {
           accessToken: action.payload.session.accessToken,
           refreshToken: action.payload.session.refreshToken,
@@ -259,7 +299,32 @@ const authSlice = createSlice({
       });
 
     // ── Logout ──
-    builder.addCase(logoutThunk.fulfilled, () => initialState);
+    builder.addCase(logoutThunk.fulfilled, () => ({ ...initialState, isRestoringSession: false }));
+
+    // ── Restore Session (web refresh / cold start) ──
+    builder
+      .addCase(restoreSessionThunk.pending, (state) => {
+        state.isRestoringSession = true;
+      })
+      .addCase(restoreSessionThunk.fulfilled, (state, action) => {
+        state.isRestoringSession = false;
+        const p = action.payload;
+        state.session = {
+          accessToken: p.accessToken,
+          refreshToken: p.refreshToken,
+          expiresIn: 0,
+          expiresAt: p.expiresAt,
+          user: { id: p.userId, email: '', displayName: '' },
+        };
+        state.userRole = (p.role as UserRole) || UserRole.USER;
+        state.isPinSet = p.isPinSet;
+        // Skip PIN re-entry on web refresh — user already verified this browser session.
+        state.isPinVerified = Platform.OS === 'web';
+        if (p.savedChildId) state.activeChildProfileId = p.savedChildId;
+      })
+      .addCase(restoreSessionThunk.rejected, (state) => {
+        state.isRestoringSession = false;
+      });
 
     // ── Fetch Me ──
     builder

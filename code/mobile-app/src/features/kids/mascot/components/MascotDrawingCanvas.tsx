@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
@@ -39,9 +39,47 @@ export type MascotDrawingCanvasProps = {
   onCapture: (dataUrl: string) => void;
   /** When true, locks the drawing surface and shows a loading indicator on the submit button. */
   disabled?: boolean;
+  /** Optional override for the submit button label (e.g. "Create mentor"). */
+  submitLabel?: string;
 };
 
-export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapture, disabled = false }) => {
+function exportStrokesToPngWeb(
+  strokes: Stroke[],
+  width: number,
+  height: number,
+): string {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const s of strokes) {
+    if (s.points.length === 0) continue;
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    for (let i = 1; i < s.points.length; i++) {
+      ctx.lineTo(s.points[i].x, s.points[i].y);
+    }
+    ctx.stroke();
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({
+  onCapture,
+  disabled = false,
+  submitLabel,
+}) => {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [current, setCurrent] = useState<Stroke | null>(null);
   const [brushColor, setBrushColor] = useState('#000000');
@@ -103,6 +141,12 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
   };
 
   const captureDataUrl = async (): Promise<string> => {
+    // react-native-view-shot's captureRef doesn't run on web — render the
+    // strokes onto an offscreen HTMLCanvas instead so the web build can
+    // submit a real PNG data URL.
+    if (Platform.OS === 'web') {
+      return exportStrokesToPngWeb(strokes, CANVAS_W, CANVAS_H);
+    }
     if (!viewShotRef.current) throw new Error('Canvas not ready');
     const base64 = await captureRef(viewShotRef, {
       format: 'png',
@@ -114,8 +158,18 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
 
   const handleCreateMascot = async () => {
     if (disabled) return;
-    const dataUrl = await captureDataUrl();
-    onCapture(dataUrl);
+    try {
+      const dataUrl = await captureDataUrl();
+      if (!dataUrl) {
+        // eslint-disable-next-line no-console
+        console.warn('MascotDrawingCanvas: capture returned empty data URL');
+        return;
+      }
+      onCapture(dataUrl);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('MascotDrawingCanvas capture failed', err);
+    }
   };
 
   const allPaths = [...strokes, ...(current ? [current] : [])];
@@ -199,7 +253,7 @@ export const MascotDrawingCanvas: React.FC<MascotDrawingCanvasProps> = ({ onCapt
         style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
       >
         <Text style={styles.primaryBtnText}>
-          {disabled ? 'Uploading…' : 'Create mascot'}
+          {disabled ? 'Uploading…' : submitLabel ?? 'Create mascot'}
         </Text>
       </Pressable>
     </View>

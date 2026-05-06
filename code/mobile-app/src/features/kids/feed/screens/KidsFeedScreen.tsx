@@ -35,6 +35,7 @@ import {
   toggleLikeLocal,
   resetFeed,
 } from '../store/feedSlice';
+import { isJobInFlight } from '../../drawing-video/store/drawingVideoSlice';
 import { kidsColors } from '../../shared/constants/colors';
 import { EmptyState } from '../../shared/components/EmptyState';
 import { ErrorScreen } from '../../shared/components/ErrorScreen';
@@ -66,8 +67,10 @@ export const KidsFeedScreen: React.FC = () => {
   } = useAppSelector((s) => s.kidsFeed);
 
   const activeChildProfileId = useAppSelector((s) => s.kidsAuth.activeChildProfileId);
+  const latestJob = useAppSelector((s) => s.kidsDrawingVideo.latestJob);
 
   const flatListRef = useRef<FlatList>(null);
+  const prevJobInFlightRef = useRef<boolean>(isJobInFlight(latestJob));
   const [refreshing, setRefreshing] = useState(false);
   const isLoadingMore = useRef(false);
 
@@ -92,6 +95,21 @@ export const KidsFeedScreen: React.FC = () => {
     dispatch(resetFeed());
     dispatch(fetchFeedThunk({ page: 1, limit: 10 }));
   }, [dispatch, activeChildProfileId]);
+
+  // When a drawing-video job transitions from in-flight → ready, reload the
+  // feed from page 1 so the newly-pinned video appears at the top automatically.
+  useEffect(() => {
+    const nowInFlight = isJobInFlight(latestJob);
+    const wasInFlight = prevJobInFlightRef.current;
+    prevJobInFlightRef.current = nowInFlight;
+
+    if (wasInFlight && !nowInFlight && latestJob?.status === 'ready') {
+      dispatch(fetchFeedThunk({ page: 1, limit: 10 })).then(() => {
+        dispatch(setCurrentIndex(0));
+        flatListRef.current?.scrollToIndex({ index: 0, animated: true });
+      });
+    }
+  }, [latestJob, dispatch]);
 
   // Track watch time for current video
   useEffect(() => {

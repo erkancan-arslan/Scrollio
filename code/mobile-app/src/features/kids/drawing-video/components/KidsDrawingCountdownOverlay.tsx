@@ -1,11 +1,16 @@
 /**
  * KidsDrawingCountdownOverlay
  *
- * Floating top-left badge that shows "next drawing video in HH:MM:SS".
- * - Pulls cycle status from Redux (loaded by useDrawingVideoCycle hook).
- * - Updates every second using server-time drift compensation.
- * - When the countdown hits zero it dispatches a tick and shows the
- *   in-progress label until the job becomes ready.
+ * Floating top-left badge for the drawing-to-video cycle.
+ * Three visual states:
+ *   1. ready  — child has never generated, or 48h elapsed: tappable pill
+ *               "Click to create your personalized video".
+ *   2. inFlight — pipeline running: pulsing "Creating…/Animating…".
+ *   3. counting down — generation finished, 48h ticking back to 0.
+ *
+ * The cycle is strictly child-initiated: nothing auto-fires. Tapping the
+ * ready pill dispatches `tickCycleThunk`, which starts a job server-side.
+ * The 48h countdown only resets after the pipeline completes (per-child).
  *
  * Render this once at the root of the Kids navigator (above the tab bar).
  */
@@ -22,13 +27,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../../../store/hooks';
 import {
   computeCycleClock,
   isJobInFlight,
   pollJobThunk,
   refreshCycleStatusThunk,
-  tickCycleThunk,
 } from '../store/drawingVideoSlice';
 
 const TICK_MS = 1000;
@@ -50,6 +55,7 @@ function formatRemaining(ms: number): string {
 export const KidsDrawingCountdownOverlay: React.FC = () => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
+  const navigation = useNavigation();
 
   const activeChildProfileId = useAppSelector((s) => s.kidsAuth.activeChildProfileId);
   const state = useAppSelector((s) => s.kidsDrawingVideo);
@@ -63,7 +69,6 @@ export const KidsDrawingCountdownOverlay: React.FC = () => {
   }, []);
 
   const [tickNow, setTickNow] = useState(() => Date.now());
-  const tickRequestedRef = useRef<string | null>(null);
   const pulse = useRef(new Animated.Value(0)).current;
 
   // Refresh status whenever the active child changes, plus a periodic refresh
@@ -85,23 +90,6 @@ export const KidsDrawingCountdownOverlay: React.FC = () => {
 
   const clock = computeCycleClock(state, tickNow);
   const inFlight = isJobInFlight(state.latestJob);
-
-  // When the cycle hits zero (and no job is already in flight) fire one tick.
-  // Guard with a ref so we don't spam the endpoint on every render.
-  useEffect(() => {
-    if (!activeChildProfileId) return;
-    if (!clock?.isDue || inFlight || state.isTicking) return;
-    if (tickRequestedRef.current === activeChildProfileId) return;
-    tickRequestedRef.current = activeChildProfileId;
-    dispatch(tickCycleThunk());
-  }, [activeChildProfileId, clock?.isDue, inFlight, state.isTicking, dispatch]);
-
-  // Reset the tick guard whenever a new cycle begins.
-  useEffect(() => {
-    if (clock && !clock.isDue) {
-      tickRequestedRef.current = null;
-    }
-  }, [clock]);
 
   // Poll the active job until it leaves queued/processing.
   useEffect(() => {
@@ -148,13 +136,28 @@ export const KidsDrawingCountdownOverlay: React.FC = () => {
     return () => loop.stop();
   }, [inFlight, pulse]);
 
-  // All hooks must be called before any early return.
+  // The cycle is "ready" (tappable) when the child has never generated a
+  // video, OR the 48h cycle has elapsed. Treating !lastGeneratedAt as ready
+  // makes the very first visit show the call-to-action immediately, even if
+  // the cycle row was created earlier with a future cycle_due_at.
+  const isReady = !inFlight && (clock?.isDue === true || !state.lastGeneratedAt);
+
+  // Tap handler for the ready pill — opens the drawing canvas in
+  // "drawingVideo" mode. The kid draws, taps Create, and the canvas screen
+  // calls startFromCanvas which kicks off the mentor-photo → mentor-video
+  // pipeline. The 24h pin + 48h cycle reset happen on pipeline completion.
+  const onGeneratePress = useCallback(() => {
+    if (state.isTicking || inFlight) return;
+    (navigation as unknown as {
+      navigate: (n: string, params?: Record<string, unknown>) => void;
+    }).navigate('KidsMascotDraw', { mode: 'drawingVideo' });
+  }, [inFlight, state.isTicking, navigation]);
+
   const caption = useMemo(() => {
-    if (inFlight || clock?.isDue) {
-      return 'Çizimini gerçeğe dönüştürüyoruz…';
-    }
-    return 'Çizimini gerçeğe dönüştürmeye kalan süre';
-  }, [inFlight, clock?.isDue]);
+    if (inFlight) return 'Turning your drawing into a real video…';
+    if (isReady) return 'Your personalized video is ready to be created';
+    return 'Time left to turn your drawing into a real video';
+  }, [inFlight, isReady]);
 
   const label = useMemo(() => {
     if (inFlight) {
@@ -162,14 +165,26 @@ export const KidsDrawingCountdownOverlay: React.FC = () => {
         ? 'Animating…'
         : 'Creating…';
     }
-    if (clock?.isDue) return 'Starting…';
+    if (state.isTicking) return 'Starting…';
+    if (isReady) return 'Click to create your video!';
     return clock ? formatRemaining(clock.remainingMs) : '';
-  }, [inFlight, state.latestJob?.currentStep, clock]);
+  }, [inFlight, state.latestJob?.currentStep, state.isTicking, isReady, clock]);
 
   const animatedOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
   if (!activeChildProfileId) return null;
   if (!clock && !inFlight) return null;
+
+  // The pill is wrapped in a Touchable only in the ready state; while in flight
+  // or counting down, taps are no-ops (TouchableOpacity disabled).
+  const pillCore = (
+    <Animated.View style={[styles.pill, inFlight ? { opacity: animatedOpacity } : null, isReady ? styles.pillReady : null]}>
+      <View style={[styles.dot, isReady ? styles.dotReady : null]} />
+      <Text style={styles.label} numberOfLines={1}>
+        {label}
+      </Text>
+    </Animated.View>
+  );
 
   return (
     <View
@@ -180,12 +195,20 @@ export const KidsDrawingCountdownOverlay: React.FC = () => {
         {caption}
       </Text>
       <View style={styles.timerRow}>
-        <Animated.View style={[styles.pill, inFlight ? { opacity: animatedOpacity } : null]}>
-          <View style={styles.dot} />
-          <Text style={styles.label} numberOfLines={1}>
-            {label}
-          </Text>
-        </Animated.View>
+        {isReady ? (
+          <TouchableOpacity
+            onPress={onGeneratePress}
+            disabled={state.isTicking}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Click to create your personalized video"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            {pillCore}
+          </TouchableOpacity>
+        ) : (
+          pillCore
+        )}
         <TouchableOpacity
           style={styles.lockChip}
           onPress={onKidsPlusLockPress}
@@ -234,6 +257,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     flexShrink: 1,
+  },
+  pillReady: {
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dotReady: {
+    backgroundColor: '#FFFFFF',
   },
   lockChip: {
     flexDirection: 'row',

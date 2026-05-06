@@ -15,6 +15,7 @@
  */
 
 import React, { useRef } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import {
   NavigatorScreenParams,
@@ -76,7 +77,8 @@ export type KidsStackParamList = {
 
   /** Custom drawn mascot demo (2D → pipeline → video). */
   KidsYourMascot: undefined;
-  KidsMascotDraw: undefined;
+  /** Drawing canvas. `mode` selects which pipeline runs on capture. */
+  KidsMascotDraw: { mode?: 'mascot' | 'drawingVideo' } | undefined;
 
   // Classroom
   KidsClassroomLessons: { classroomId: string; classroomName: string };
@@ -113,7 +115,17 @@ export const KidsNavigator: React.FC = () => {
     isPinVerified,
     childProfiles,
     activeChildProfileId,
+    isRestoringSession,
   } = useAppSelector((s) => s.kidsAuth);
+
+  // Wait for restoreSessionThunk to finish before computing the initial route.
+  if (isRestoringSession) {
+    return (
+      <View style={{ flex: 1, backgroundColor: KIDS_BG, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={KIDS_ORANGE} />
+      </View>
+    );
+  }
 
   if (initialRouteRef.current === null) {
     const isLoggedIn = !!session;

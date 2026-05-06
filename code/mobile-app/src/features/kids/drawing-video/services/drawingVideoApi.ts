@@ -39,6 +39,10 @@ export type TickResult =
   | { status: 'no_drawing'; cycleDueAt: string }
   | { status: 'started'; jobId: string };
 
+export type StartFromCanvasResult =
+  | { status: 'already_running'; jobId: string }
+  | { status: 'started'; jobId: string };
+
 export function getCycleStatus() {
   return kidsApi.get<KidsDrawingVideoCycleStatusDto>('/kids/drawing-videos/cycle-status');
 }
@@ -47,6 +51,15 @@ export function tickCycle() {
   return kidsApi.post<TickResult>('/kids/drawing-videos/tick', undefined, true, {
     timeoutMs: TIMEOUT_MS_LONG,
   });
+}
+
+export function startFromCanvas(imageBase64DataUrl: string) {
+  return kidsApi.post<StartFromCanvasResult>(
+    '/kids/drawing-videos/start-from-canvas',
+    { imageBase64DataUrl },
+    true,
+    { timeoutMs: TIMEOUT_MS_LONG },
+  );
 }
 
 export function getJob(jobId: string) {

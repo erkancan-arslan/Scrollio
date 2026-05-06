@@ -11,6 +11,7 @@ import { Provider } from 'react-redux';
 import { store } from './src/store/store';
 import { initializeGameRegistry } from './src/features/playground/registryInit';
 import { syncSupabaseSessionFromStorage } from './src/services/supabase/client';
+import { restoreSessionThunk } from './src/features/kids/auth/store/authSlice';
 
 // Initialize game registry before app renders
 initializeGameRegistry();
@@ -23,6 +24,9 @@ export default function App() {
   // by the social / chat features) silently get nothing because of RLS.
   useEffect(() => {
     void syncSupabaseSessionFromStorage();
+    // Restore Kids auth session from localStorage (web) / SecureStore (native)
+    // so that refreshing the page doesn't send the user back to login.
+    void store.dispatch(restoreSessionThunk());
   }, []);
 
   return (

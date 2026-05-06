@@ -12,9 +12,12 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import {
   getCycleStatus,
   getJob,
+  startFromCanvas,
   tickCycle,
   type KidsDrawingVideoCycleStatusDto,
   type KidsDrawingVideoJobDto,
+  type StartFromCanvasResult,
+  type TickResult,
 } from '../services/drawingVideoApi';
 
 export interface DrawingVideoState {
@@ -63,7 +66,7 @@ export const refreshCycleStatusThunk = createAsyncThunk<
 });
 
 export const tickCycleThunk = createAsyncThunk<
-  void,
+  TickResult | null,
   void,
   { rejectValue: string }
 >('kidsDrawingVideo/tick', async (_, { dispatch, rejectWithValue }) => {
@@ -73,6 +76,20 @@ export const tickCycleThunk = createAsyncThunk<
   }
   // Always refresh status afterwards so the UI sees the new job (if any).
   await dispatch(refreshCycleStatusThunk());
+  return res.data;
+});
+
+export const startFromCanvasThunk = createAsyncThunk<
+  StartFromCanvasResult,
+  { imageBase64DataUrl: string },
+  { rejectValue: string }
+>('kidsDrawingVideo/startFromCanvas', async ({ imageBase64DataUrl }, { dispatch, rejectWithValue }) => {
+  const res = await startFromCanvas(imageBase64DataUrl);
+  if (res.error || !res.data) {
+    return rejectWithValue(res.error ?? 'Could not start the drawing video');
+  }
+  await dispatch(refreshCycleStatusThunk());
+  return res.data;
 });
 
 export const pollJobThunk = createAsyncThunk<

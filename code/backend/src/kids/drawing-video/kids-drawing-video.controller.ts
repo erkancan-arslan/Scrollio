@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Logger,
@@ -89,6 +90,24 @@ export class KidsDrawingVideoController {
     }
     const result = await this.tickService.tickForChild(childId.trim());
     return result;
+  }
+
+  @Post('start-from-canvas')
+  @ApiOperation({
+    summary: 'Start the drawing-video pipeline from a freshly captured canvas image',
+  })
+  async startFromCanvas(
+    @CurrentChild() childId: string | undefined,
+    @Body() body: { imageBase64DataUrl?: string } | undefined,
+  ) {
+    if (!childId?.trim()) {
+      throw new BadRequestException('X-Child-Profile-Id header is required');
+    }
+    const image = body?.imageBase64DataUrl;
+    if (!image || typeof image !== 'string' || image.trim().length === 0) {
+      throw new BadRequestException('imageBase64DataUrl is required');
+    }
+    return this.tickService.startFromImage(childId.trim(), image.trim());
   }
 
   @Get('jobs/:id')

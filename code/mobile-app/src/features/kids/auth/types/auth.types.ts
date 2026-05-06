@@ -34,6 +34,8 @@ export interface AuthState {
   isPinSet: boolean;
   isPinVerified: boolean;
   isLoading: boolean;
+  /** True while restoreSessionThunk is running on app cold-start. */
+  isRestoringSession: boolean;
   error: string | null;
 }
 

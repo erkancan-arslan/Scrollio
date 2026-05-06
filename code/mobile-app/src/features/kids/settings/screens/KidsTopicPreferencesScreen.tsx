@@ -114,11 +114,25 @@ export const KidsTopicPreferencesScreen: React.FC = () => {
     }
   };
 
+  // On web, @react-navigation/stack's CardContainer is `position: absolute` and
+  // a flex:1 child doesn't always produce a measured height for ScrollView,
+  // which leaves the inner div as `overflow: auto` with no bounded height —
+  // i.e. unscrollable. Anchoring the wrapper to all four edges on web gives
+  // ScrollView a concrete frame so its content scrolls as expected.
+  const webWrapperFix =
+    Platform.OS === 'web'
+      ? ({
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflow: 'hidden',
+        } as const)
+      : null;
+
   return (
-    // On web, @react-navigation/stack wraps screens in position:absolute containers
-    // whose height doesn't cascade to flex children, making ScrollView non-scrollable.
-    // Wrapping in an explicit flex:1 View + giving ScrollView its own flex:1 fixes this.
-    <View style={[styles.container, Platform.OS === 'web' && { overflow: 'hidden' }]}>
+    <View style={[styles.container, webWrapperFix]}>
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.content}

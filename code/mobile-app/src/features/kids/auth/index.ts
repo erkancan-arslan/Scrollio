@@ -50,6 +50,7 @@ export {
   createChildThunk,
   switchChildThunk,
   upgradeRoleThunk,
+  restoreSessionThunk,
 } from './store/authSlice';
 
 export { default as kidsAuthReducer } from './store/authSlice';
