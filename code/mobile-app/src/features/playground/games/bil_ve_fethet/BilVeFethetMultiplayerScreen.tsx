@@ -76,6 +76,10 @@ export const BilVeFethetMultiplayerScreen: React.FC<Props> = ({
     const stateRef = useRef<BilVeFethetState>(hostState);
     stateRef.current = hostState;
 
+    // playerMapRef tracks latest playerMap without causing effect re-runs
+    const playerMapRef = useRef<PlayerMap>(playerMap);
+    playerMapRef.current = playerMap;
+
     // Track whether a human player's action was received (prevents double-fire with timeout)
     const humanActionReceivedRef = useRef(false);
 
@@ -150,7 +154,15 @@ export const BilVeFethetMultiplayerScreen: React.FC<Props> = ({
     // ── Subscribe to game channel ────────────────────────────────────────────
     useEffect(() => {
         if (isHost) {
-            bvfMultiplayerService.joinGame(roomCode, () => {}, handleRemotePlayerAction);
+            bvfMultiplayerService.joinGame(
+                roomCode,
+                () => {},
+                handleRemotePlayerAction,
+                () => {
+                    // Non-host has subscribed and requested current state — re-broadcast
+                    bvfMultiplayerService.broadcastGameState(roomCode, stateRef.current, playerMapRef.current);
+                },
+            );
         } else {
             bvfMultiplayerService.joinGame(
                 roomCode,
@@ -161,6 +173,7 @@ export const BilVeFethetMultiplayerScreen: React.FC<Props> = ({
                     setWaitingForAck(false);
                 },
                 () => {},
+                // no onSyncRequest → service will send request_sync on subscribe
             );
         }
     }, [isHost, roomCode, handleRemotePlayerAction]);

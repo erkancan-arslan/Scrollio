@@ -69,14 +69,15 @@ export const BilVeFethetMenuScreen: React.FC<Props> = ({ onSinglePlayer, onExit 
         };
     }, []);
 
-    // Keep playerMap in sync with lobby players
+    // Keep playerMap in sync with lobby players (only during lobby, not once in-game)
     useEffect(() => {
+        if (screen === 'game') return;
         const map: PlayerMap = { player: null, bot1: null, bot2: null };
         for (const p of lobbyPlayers) {
             map[p.slot] = { userId: p.userId, displayName: p.displayName };
         }
         setPlayerMap(map);
-    }, [lobbyPlayers]);
+    }, [lobbyPlayers, screen]);
 
     const enterLobby = useCallback(
         async (code: string, slot: PlayerId, host: boolean) => {

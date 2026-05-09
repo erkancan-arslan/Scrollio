@@ -263,6 +263,8 @@ export class DuelService {
                 remaining_ms_a: INITIAL_TIMER_MS,
                 remaining_ms_b: INITIAL_TIMER_MS,
                 current_question_index: 0,
+                question_index_a: 0,
+                question_index_b: 0,
                 player_a_answered: false,
                 player_b_answered: false,
                 last_tick_at: new Date().toISOString(),
@@ -581,18 +583,21 @@ export class DuelService {
             const role = this.getRole(match, userId);
             const isPlayerA = role === 'A';
 
-            // 3. Idempotency Check
-            const alreadyAnswered = isPlayerA ? match.player_a_answered : match.player_b_answered;
-            if (alreadyAnswered) {
-                this.logger.log(`[submitDuelAnswer] Idempotent hit for match ${matchId} player ${userId}`);
+            // 3. Validate Question Index (per-player in simultaneous mode)
+            const myCurrentIndex = isPlayerA
+                ? (match.question_index_a ?? 0)
+                : (match.question_index_b ?? 0);
+
+            if (questionIndex < myCurrentIndex) {
+                // Already answered this question — idempotent return
+                this.logger.log(`[submitDuelAnswer] Idempotent hit for match ${matchId} player ${userId} (index ${questionIndex} < ${myCurrentIndex})`);
                 return this.buildSnapshot(match);
             }
 
-            // 4. Validate Question Index
-            if (questionIndex !== match.current_question_index) {
-                this.logger.warn(`[submitDuelAnswer] Index mismatch. Server: ${match.current_question_index}, Client: ${questionIndex}`);
+            if (questionIndex !== myCurrentIndex) {
+                this.logger.warn(`[submitDuelAnswer] Index mismatch. Server: ${myCurrentIndex}, Client: ${questionIndex}`);
                 throw new BadRequestException(
-                    `Question index mismatch: expected ${match.current_question_index}, got ${questionIndex}`,
+                    `Question index mismatch: expected ${myCurrentIndex}, got ${questionIndex}`,
                 );
             }
 
@@ -601,30 +606,23 @@ export class DuelService {
             // =================================================================
 
             // 5. SETTLE TIMERS (Account for elapsed time since last server update)
-            // We use the DB's last_tick_at to calculate how much time has passed
-            // and subtract that from the persisted remaining time.
             const now = Date.now();
             const lastTickAt = new Date(match.last_tick_at).getTime();
-            const elapsedMs = Math.max(0, now - lastTickAt); // Prevent negative elapsed
+            const elapsedMs = Math.max(0, now - lastTickAt);
 
             this.logger.log(`[submitDuelAnswer][${matchId}] Settling timers. Now: ${now}, LastTick: ${lastTickAt} (${match.last_tick_at}). Elapsed: ${elapsedMs}ms.`);
 
-            // SAFEGUARD: If elapsed time is suspiciously large (e.g. server restart), ignore it to prevent instant timeout
+            // Both timers run simultaneously — no pausing while waiting for opponent.
             let remainingA: number;
             let remainingB: number;
 
             if (elapsedMs > 5000) {
-                this.logger.warn(`[submitDuelAnswer] Suspect elapsed time (${elapsedMs}ms). Capping to 0ms to prevent restart-timeout.`);
-                // We could set it to 0 or a small tick. Let's use 0 to be safe.
-                // However, we MUST perform the update to advance last_tick_at to now.
-                // Reset variables to match current state without penalty.
+                this.logger.warn(`[submitDuelAnswer] Suspect elapsed time (${elapsedMs}ms). Skipping penalty.`);
                 remainingA = match.remaining_ms_a;
                 remainingB = match.remaining_ms_b;
             } else {
-                // Only subtract time if the player has NOT answered yet.
-                // If they have answered, their clock should be paused while waiting.
-                remainingA = match.player_a_answered ? match.remaining_ms_a : match.remaining_ms_a - elapsedMs;
-                remainingB = match.player_b_answered ? match.remaining_ms_b : match.remaining_ms_b - elapsedMs;
+                remainingA = match.remaining_ms_a - elapsedMs;
+                remainingB = match.remaining_ms_b - elapsedMs;
             }
 
             this.logger.log(`[submitDuelAnswer] Pre-Settle: A=${match.remaining_ms_a}, B=${match.remaining_ms_b}. Post-Settle: A=${remainingA}, B=${remainingB}`);
@@ -645,30 +643,19 @@ export class DuelService {
                 throw new ConflictException('Controls locked — you are frozen');
             }
 
-            // 7. Check Correctness
-            // Note: We used a fixed seed in example, but real implementation uses seed from match
-            const correctAnswer = getCorrectAnswer(match.seed, match.current_question_index);
+            // 7. Check Correctness — use the player's own question index
+            const correctAnswer = getCorrectAnswer(match.seed, myCurrentIndex);
             const isCorrect = answer === correctAnswer;
 
-            // 8. Apply Deltas
-            // Correct: Self +1000, Oppt -1000
-            // Wrong: Self -1000, Oppt 0
+            // 8. Apply Deltas — simultaneous mode: only self-timer is affected
+            // Correct: Self +1s | Wrong: Self -2s | Opponent: unchanged
             let deltaSelfMs = 0;
-            let deltaOppMs = 0;
+            const deltaOppMs = 0;
 
             if (isCorrect) {
                 deltaSelfMs = TIME_BONUS_MS;
-                deltaOppMs = -TIME_BONUS_MS;
-
-                // Handle Shield
-                if (hasActiveEffect(opponentJokers, 'SHIELD')) {
-                    consumeEffect(opponentJokers, 'SHIELD');
-                    deltaOppMs = 0;
-                    this.logger.log(`[submitDuelAnswer] SHIELD blocked damage to opponent`);
-                }
             } else {
                 deltaSelfMs = -TIME_PENALTY_MS;
-                deltaOppMs = 0;
             }
 
             this.logger.log(`[submitDuelAnswer] Result: ${isCorrect ? 'CORRECT' : 'WRONG'}. DeltaSelf: ${deltaSelfMs}, DeltaOpp: ${deltaOppMs}`);
@@ -690,25 +677,21 @@ export class DuelService {
             // Let's NOT clamp yet, check game over, then clamp for DB storage if game continues?
             // Strictly speaking, if remainingA <= 0, game ends.
 
-            // 9. Update State for this Question
+            // 9. Update State — each player advances their own question index independently
             const update: any = {
                 last_tick_at: new Date(now).toISOString(),
                 player_a_jokers: jokersA,
                 player_b_jokers: jokersB,
             };
 
-            if (isPlayerA) update.player_a_answered = true;
-            else update.player_b_answered = true;
-
-            // Check if both answered -> advance
-            const otherAnswered = isPlayerA ? match.player_b_answered : match.player_a_answered;
-            if (otherAnswered) {
-                update.current_question_index = match.current_question_index + 1;
-                update.player_a_answered = false;
-                update.player_b_answered = false;
+            const nextMyIndex = myCurrentIndex + 1;
+            if (isPlayerA) {
+                update.question_index_a = nextMyIndex;
+            } else {
+                update.question_index_b = nextMyIndex;
             }
 
-            // 10. Check Game Over
+            // 10. Check Game Over (timer-based only in simultaneous mode)
             let gameOver = false;
             let finalWinnerId: string | null = null;
             let finishReason: string | null = null;
@@ -716,8 +699,6 @@ export class DuelService {
             if (remainingA <= 0 && remainingB <= 0) {
                 gameOver = true;
                 finishReason = 'timeout_both';
-                // Tiebreaker: who has more time (even if both negative)? or Draw?
-                // Let's say pure draw if both <= 0 in same tick
                 if (remainingA > remainingB) finalWinnerId = match.player_a_id;
                 else if (remainingB > remainingA) finalWinnerId = match.player_b_id;
                 else finalWinnerId = null;
@@ -729,16 +710,6 @@ export class DuelService {
                 gameOver = true;
                 finalWinnerId = match.player_a_id;
                 finishReason = 'timeout_b';
-            }
-
-            // Check max questions
-            const nextIndex = update.current_question_index ?? match.current_question_index;
-            if (!gameOver && nextIndex >= getTotalQuestions()) {
-                gameOver = true;
-                finishReason = 'questions_exhausted';
-                if (remainingA > remainingB) finalWinnerId = match.player_a_id;
-                else if (remainingB > remainingA) finalWinnerId = match.player_b_id;
-                else finalWinnerId = null;
             }
 
             if (gameOver) {
@@ -831,16 +802,12 @@ export class DuelService {
             let remainingA = match.remaining_ms_a;
             let remainingB = match.remaining_ms_b;
 
-            // SAFEGUARD: If server restarted or hanged, elapsedMs might be huge (e.g. 10 mins).
-            // Prevent draining the entire timer in one tick.
+            // Both timers run simultaneously — no pausing for either player.
             if (elapsedMs > 5000) {
                 this.logger.warn(`[settleAndCheckTimers][${matchId}] Suspect large elapsed time (${elapsedMs}ms). Ignoring penalty.`);
-                // Do not subtract elapsedMs. 
-                // We will still update last_tick_at below, effectively "skipping" the downtime.
             } else {
-                // crucial fix: Only subtract time if the player has NOT answered yet.
-                remainingA = match.player_a_answered ? match.remaining_ms_a : match.remaining_ms_a - elapsedMs;
-                remainingB = match.player_b_answered ? match.remaining_ms_b : match.remaining_ms_b - elapsedMs;
+                remainingA = match.remaining_ms_a - elapsedMs;
+                remainingB = match.remaining_ms_b - elapsedMs;
             }
 
             // Expire joker effects during tick
@@ -887,6 +854,8 @@ export class DuelService {
                 remainingMsA: remainingA,
                 remainingMsB: remainingB,
                 currentQuestionIndex: match.current_question_index,
+                questionIndexA: match.question_index_a ?? 0,
+                questionIndexB: match.question_index_b ?? 0,
                 playerAAnswered: match.player_a_answered,
                 playerBAnswered: match.player_b_answered,
                 winnerId: null,
@@ -1086,6 +1055,8 @@ export class DuelService {
             remainingMsA: match.remaining_ms_a,
             remainingMsB: match.remaining_ms_b,
             currentQuestionIndex: match.current_question_index,
+            questionIndexA: match.question_index_a ?? 0,
+            questionIndexB: match.question_index_b ?? 0,
             playerAAnswered: match.player_a_answered,
             playerBAnswered: match.player_b_answered,
             winnerId: match.winner_id || null,

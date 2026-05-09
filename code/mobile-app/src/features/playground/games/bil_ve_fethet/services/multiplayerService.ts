@@ -29,6 +29,7 @@ class BvfMultiplayerService {
   private startGameCallbacks: (() => void)[] = [];
   private gameStateCallbacks: ((payload: GameStatePayload) => void)[] = [];
   private playerActionCallbacks: ((action: PlayerActionPayload) => void)[] = [];
+  private syncRequestCallbacks: (() => void)[] = [];
 
   async joinLobby(
     roomCode: string,
@@ -75,10 +76,14 @@ class BvfMultiplayerService {
     });
   }
 
+  // onSyncRequest: provide this when joining as host. Omit when joining as non-host
+  // (non-host will automatically send a request_sync event once subscribed so the host
+  // can re-broadcast the current game state and unblock the non-host loading screen).
   async joinGame(
     roomCode: string,
     onGameState: (payload: GameStatePayload) => void,
     onPlayerAction: (action: PlayerActionPayload) => void,
+    onSyncRequest?: () => void,
   ): Promise<void> {
     if (this.gameChannel) {
       await supabase.removeChannel(this.gameChannel);
@@ -86,6 +91,7 @@ class BvfMultiplayerService {
 
     this.gameStateCallbacks = [onGameState];
     this.playerActionCallbacks = [onPlayerAction];
+    this.syncRequestCallbacks = onSyncRequest ? [onSyncRequest] : [];
 
     this.gameChannel = supabase.channel(`bvf_game:${roomCode}`);
     this.gameChannel
@@ -95,7 +101,19 @@ class BvfMultiplayerService {
       .on('broadcast', { event: 'player_action' }, (payload) => {
         this.playerActionCallbacks.forEach(cb => cb(payload.payload as PlayerActionPayload));
       })
-      .subscribe();
+      .on('broadcast', { event: 'request_sync' }, () => {
+        this.syncRequestCallbacks.forEach(cb => cb());
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && !onSyncRequest) {
+          // Non-host: ask host to re-broadcast current state
+          await this.gameChannel?.send({
+            type: 'broadcast',
+            event: 'request_sync',
+            payload: {},
+          });
+        }
+      });
   }
 
   async broadcastGameState(roomCode: string, state: BilVeFethetState, playerMap: PlayerMap): Promise<void> {
@@ -136,6 +154,7 @@ class BvfMultiplayerService {
     this.startGameCallbacks = [];
     this.gameStateCallbacks = [];
     this.playerActionCallbacks = [];
+    this.syncRequestCallbacks = [];
   }
 }
 

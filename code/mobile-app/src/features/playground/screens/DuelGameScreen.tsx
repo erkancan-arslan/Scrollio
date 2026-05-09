@@ -286,8 +286,7 @@ export const DuelGameScreen: React.FC = () => {
     // Local timer interpolation state
     const [myRemainingMs, setMyRemainingMs] = useState(30000);
     const [opponentRemainingMs, setOpponentRemainingMs] = useState(30000);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [iAmAnswered, setIAmAnswered] = useState(false);
+    const [myQuestionIndex, setMyQuestionIndex] = useState(0);
     const [matchState, setMatchState] = useState<'waiting' | 'active' | 'finished' | 'canceled'>('waiting');
     const [winnerId, setWinnerId] = useState<string | null>(null);
     const [finishReason, setFinishReason] = useState<string | null>(null);
@@ -295,37 +294,31 @@ export const DuelGameScreen: React.FC = () => {
     const [connectionBanner, setConnectionBanner] = useState(false);
 
     // Joker State
-    const [playerAJokers, setPlayerAJokers] = useState<any>(null); // Use proper type if imported, else any for now
+    const [playerAJokers, setPlayerAJokers] = useState<any>(null);
     const [playerBJokers, setPlayerBJokers] = useState<any>(null);
 
-    // Ref for last server update time (for local timer interpolation)
+    // Refs for local timer interpolation (stale-closure-safe)
     const lastServerUpdateRef = useRef(Date.now());
     const lastPollTimeRef = useRef(0);
     const serverMyMsRef = useRef(30000);
     const serverOpponentMsRef = useRef(30000);
-    // Mirrors iAmAnswered state — readable inside timer loop without stale closure
-    const iAmAnsweredRef = useRef(false);
 
     // Deterministic shuffled questions (same seed as server)
     const shuffledQuestions = useMemo(() => {
         return shuffleWithSeed(INFINITE_FLOW_QUESTIONS_ENGLISH, seed);
     }, [seed]);
 
-    // Current question
-    const currentQuestion = shuffledQuestions[currentQuestionIndex] ?? null;
-    const maxMs = 30000; // For timer bar scaling
+    // Each player has their own question stream — use my index, not a shared one
+    const currentQuestion = shuffledQuestions[myQuestionIndex % shuffledQuestions.length] ?? null;
+    const maxMs = 30000;
 
     // ===================================================
     // Handle Joker Use
     // ===================================================
     const handleJoker = useCallback(async (type: string) => {
-        console.log(`[DuelGameScreen] Attempting to use joker: ${type} for match ${matchId}`);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             const snapshot = await duelService.useJoker(matchId, type);
-            console.log(`[DuelGameScreen] Joker ${type} used successfully.`);
-
-            // Immediate update
             lastServerUpdateRef.current = Date.now();
             const myMs = role === 'A' ? snapshot.remainingMsA : snapshot.remainingMsB;
             const oppMs = role === 'A' ? snapshot.remainingMsB : snapshot.remainingMsA;
@@ -338,12 +331,34 @@ export const DuelGameScreen: React.FC = () => {
         } catch (err) {
             console.error('Failed to use joker:', err);
         }
-    }, [matchId]);
+    }, [matchId, role]);
 
     // ===================================================
     // Subscribe to match updates
     // ===================================================
     useEffect(() => {
+        const applySnapshot = (snapshot: DuelStateSnapshot) => {
+            lastServerUpdateRef.current = Date.now();
+
+            const myMs = role === 'A' ? snapshot.remainingMsA : snapshot.remainingMsB;
+            const oppMs = role === 'A' ? snapshot.remainingMsB : snapshot.remainingMsA;
+            const myIdx = role === 'A'
+                ? (snapshot.questionIndexA ?? snapshot.currentQuestionIndex)
+                : (snapshot.questionIndexB ?? snapshot.currentQuestionIndex);
+
+            serverMyMsRef.current = myMs;
+            serverOpponentMsRef.current = oppMs;
+            setMyRemainingMs(myMs);
+            setOpponentRemainingMs(oppMs);
+            setMyQuestionIndex(myIdx);
+            setPlayerAJokers(snapshot.playerAJokers);
+            setPlayerBJokers(snapshot.playerBJokers);
+            setMatchState(snapshot.state);
+            setWinnerId(snapshot.winnerId);
+            setFinishReason(snapshot.finishReason);
+            dispatch(receiveDuelStateUpdate(snapshot));
+        };
+
         duelService.subscribeToMatch(
             matchId,
             (snapshot: DuelStateSnapshot) => {
@@ -351,38 +366,13 @@ export const DuelGameScreen: React.FC = () => {
                     matchId: snapshot.matchId,
                     remainingA: snapshot.remainingMsA,
                     remainingB: snapshot.remainingMsB,
-                    serverTime: snapshot.serverTime,
-                    questionIndex: snapshot.currentQuestionIndex,
+                    questionIndexA: snapshot.questionIndexA,
+                    questionIndexB: snapshot.questionIndexB,
                     state: snapshot.state,
                 });
-
-                lastServerUpdateRef.current = Date.now();
-                setCurrentQuestionIndex(snapshot.currentQuestionIndex);
-
-                const myMs = role === 'A' ? snapshot.remainingMsA : snapshot.remainingMsB;
-                const oppMs = role === 'A' ? snapshot.remainingMsB : snapshot.remainingMsA;
-
-                serverMyMsRef.current = myMs;
-                serverOpponentMsRef.current = oppMs;
-                setMyRemainingMs(myMs);
-                setOpponentRemainingMs(oppMs);
-
-                const myAnswered = role === 'A' ? snapshot.playerAAnswered : snapshot.playerBAnswered;
-                setIAmAnswered(myAnswered);
-                iAmAnsweredRef.current = myAnswered;
-
-                console.log('[DuelGameScreen] Snapshot update. Jokers A:', snapshot.playerAJokers, 'Jokers B:', snapshot.playerBJokers);
-                setPlayerAJokers(snapshot.playerAJokers);
-                setPlayerBJokers(snapshot.playerBJokers);
-
-                setMatchState(snapshot.state); // waiting -> active -> finished
-                setWinnerId(snapshot.winnerId);
-                setFinishReason(snapshot.finishReason);
-
-                dispatch(receiveDuelStateUpdate(snapshot));
+                applySnapshot(snapshot);
             },
             (snapshot: DuelStateSnapshot) => {
-                // Match ended
                 setMatchState('finished');
                 setWinnerId(snapshot.winnerId);
                 setFinishReason(snapshot.finishReason);
@@ -395,24 +385,8 @@ export const DuelGameScreen: React.FC = () => {
                 matchId: snapshot.matchId,
                 remainingA: snapshot.remainingMsA,
                 remainingB: snapshot.remainingMsB,
-                serverTime: snapshot.serverTime,
             });
-
-            lastServerUpdateRef.current = Date.now();
-            setCurrentQuestionIndex(snapshot.currentQuestionIndex);
-
-            const myMs = role === 'A' ? snapshot.remainingMsA : snapshot.remainingMsB;
-            const oppMs = role === 'A' ? snapshot.remainingMsB : snapshot.remainingMsA;
-
-            serverMyMsRef.current = myMs;
-            serverOpponentMsRef.current = oppMs;
-            setMyRemainingMs(myMs);
-            setOpponentRemainingMs(oppMs);
-
-            setPlayerAJokers(snapshot.playerAJokers);
-            setPlayerBJokers(snapshot.playerBJokers);
-
-            setMatchState(snapshot.state);
+            applySnapshot(snapshot);
         }).catch(console.error);
 
 
@@ -427,36 +401,20 @@ export const DuelGameScreen: React.FC = () => {
     useEffect(() => {
         if (matchState !== 'active') return;
 
-        let tickCount = 0;
         const interval = setInterval(() => {
             const elapsed = Date.now() - lastServerUpdateRef.current;
-            // Pause my timer while waiting for opponent (server pauses it too)
-            const myNewMs = iAmAnsweredRef.current
-                ? serverMyMsRef.current
-                : Math.max(0, serverMyMsRef.current - elapsed);
+            // Both timers run simultaneously — no pausing
+            const myNewMs = Math.max(0, serverMyMsRef.current - elapsed);
             const oppNewMs = Math.max(0, serverOpponentMsRef.current - elapsed);
 
             setMyRemainingMs(myNewMs);
             setOpponentRemainingMs(oppNewMs);
-
-            // Log every ~1 second (10 ticks x 100ms)
-            tickCount++;
-            if (tickCount % 10 === 0) {
-                console.log('[DuelGameScreen] Rendered Timer Check:', {
-                    elapsedDesdeUpdate: elapsed,
-                    myDisplayed: myNewMs,
-                    oppDisplayed: oppNewMs,
-                    baseMy: serverMyMsRef.current,
-                    baseOpp: serverOpponentMsRef.current
-                });
-            }
 
             // Failsafe: if time ran out but state isn't finished, poll server
             if ((myNewMs <= 0 || oppNewMs <= 0) && matchState === 'active') {
                 const now = Date.now();
                 if (now - lastPollTimeRef.current > 3000) {
                     lastPollTimeRef.current = now;
-                    // Only poll if we haven't checked for 3s
                     duelService.getDuelMatchState(matchId).then(snapshot => {
                         if (snapshot.state !== 'active') {
                             setMatchState(snapshot.state);
@@ -475,86 +433,47 @@ export const DuelGameScreen: React.FC = () => {
     // Handle swipe answer
     // ===================================================
     const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
-        console.log('[DuelGameScreen] handleSwipe called:', direction, {
-            isSubmitting,
-            matchState,
-            hasQuestion: !!currentQuestion,
-            iAmAnswered
-        });
+        if (isSubmitting || matchState !== 'active' || !currentQuestion) return;
 
-        if (isSubmitting || matchState !== 'active' || !currentQuestion || iAmAnswered) {
-            console.log('[DuelGameScreen] handleSwipe blocked by guard');
-            return;
-        }
-
-        // Check frozen state using ref to avoid stale closure
         const myJokers = role === 'A' ? playerAJokers : playerBJokers;
         const frozen = myJokers?.controlsLockedUntil != null && myJokers.controlsLockedUntil > Date.now();
-        if (frozen) {
-            console.log('[DuelGameScreen] handleSwipe blocked: player is frozen');
-            return;
-        }
+        if (frozen) return;
 
-        const answer = direction === 'right'; // Right = True, Left = False
+        const answer = direction === 'right';
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setIsSubmitting(true);
-        setIAmAnswered(true);
-        iAmAnsweredRef.current = true;
-
-        console.log('[DuelGameScreen] Submitting Answer:', {
-            matchId,
-            questionIndex: currentQuestionIndex,
-            answer,
-            role
-        });
 
         try {
-            const snapshot = await duelService.submitDuelAnswer(matchId, currentQuestionIndex, answer);
+            const snapshot = await duelService.submitDuelAnswer(matchId, myQuestionIndex, answer);
 
-            console.log('[DuelGameScreen] Answer Accepted. New Snapshot:', {
-                remainingA: snapshot.remainingMsA,
-                remainingB: snapshot.remainingMsB,
-                deltaA: snapshot.remainingMsA - serverMyMsRef.current, // Approximate delta check
-                isCorrect: true // We can infer or log from response if available? 
-                // Actually snapshot doesn't say "correct", but timer jumps reveal it.
-            });
-
-            // Immediate state update from response (faster than Realtime)
+            // Apply snapshot immediately for instant feedback
             lastServerUpdateRef.current = Date.now();
-
-            // Update timers
             const myMs = role === 'A' ? snapshot.remainingMsA : snapshot.remainingMsB;
             const oppMs = role === 'A' ? snapshot.remainingMsB : snapshot.remainingMsA;
+            const myIdx = role === 'A'
+                ? (snapshot.questionIndexA ?? snapshot.currentQuestionIndex)
+                : (snapshot.questionIndexB ?? snapshot.currentQuestionIndex);
 
             serverMyMsRef.current = myMs;
             serverOpponentMsRef.current = oppMs;
             setMyRemainingMs(myMs);
             setOpponentRemainingMs(oppMs);
-
-            // Update jokers
+            setMyQuestionIndex(myIdx);
             setPlayerAJokers(snapshot.playerAJokers);
             setPlayerBJokers(snapshot.playerBJokers);
 
-            // Update match state
             if (snapshot.state !== 'active') {
                 setMatchState(snapshot.state);
                 setWinnerId(snapshot.winnerId);
                 setFinishReason(snapshot.finishReason);
             }
-
-            // Note: We don't need to dispatch receiveDuelStateUpdate here because 
-            // the Realtime subscription will also fire (eventually) and dispatch it.
-            // But updating local state here makes the interaction feel instant.
-
         } catch (err: any) {
             console.error('Error submitting answer:', err);
             Alert.alert('Submission Failed', err.message || 'Unknown error');
-            setIAmAnswered(false);
-            iAmAnsweredRef.current = false;
         } finally {
             setIsSubmitting(false);
         }
-    }, [isSubmitting, matchState, currentQuestion, iAmAnswered, matchId, currentQuestionIndex]);
+    }, [isSubmitting, matchState, currentQuestion, matchId, myQuestionIndex, role, playerAJokers, playerBJokers]);
 
     // ===================================================
     // Handle exit
@@ -639,7 +558,7 @@ export const DuelGameScreen: React.FC = () => {
                         <View style={styles.resultStatBox}>
                             <Text style={styles.resultStatLabel}>Questions</Text>
                             <Text style={styles.resultStatValue}>
-                                {currentQuestionIndex}
+                                {myQuestionIndex}
                             </Text>
                         </View>
                     </View>
@@ -686,7 +605,7 @@ export const DuelGameScreen: React.FC = () => {
                 {/* Question counter */}
                 <View style={styles.questionCounter}>
                     <Text style={styles.questionCounterText}>
-                        Q{currentQuestionIndex + 1} / {shuffledQuestions.length}
+                        Q{myQuestionIndex + 1}
                     </Text>
                 </View>
             </View>
@@ -695,7 +614,7 @@ export const DuelGameScreen: React.FC = () => {
             {currentQuestion && (
                 <View style={styles.cardArea}>
                     <SwipeableCardStack
-                        data={shuffledQuestions.slice(currentQuestionIndex)}
+                        data={shuffledQuestions.slice(myQuestionIndex % shuffledQuestions.length)}
                         renderItem={(item) => (
                             <View style={styles.questionCard}>
                                 <Text style={styles.questionText}>{item.question}</Text>
@@ -708,11 +627,11 @@ export const DuelGameScreen: React.FC = () => {
                         onSwipeLeft={() => handleSwipe('left')}
                     />
 
-                    {/* "Answered — waiting" or "FROZEN" overlay */}
-                    {(iAmAnswered || matchState === 'waiting' || isFrozen) && (
+                    {/* FROZEN or waiting-for-start overlay */}
+                    {(matchState === 'waiting' || isFrozen) && (
                         <View style={styles.waitingOverlay}>
                             <Text style={styles.waitingText}>
-                                {isFrozen ? 'FROZEN!' : matchState === 'waiting' ? 'Waiting for opponent...' : 'Waiting for opponent...'}
+                                {isFrozen ? 'FROZEN!' : 'Waiting for opponent...'}
                             </Text>
                         </View>
                     )}

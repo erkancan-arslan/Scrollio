@@ -9,6 +9,8 @@ export interface DuelStateSnapshot {
     remainingMsA: number;
     remainingMsB: number;
     currentQuestionIndex: number;
+    questionIndexA: number;
+    questionIndexB: number;
     playerAAnswered: boolean;
     playerBAnswered: boolean;
     winnerId: string | null;

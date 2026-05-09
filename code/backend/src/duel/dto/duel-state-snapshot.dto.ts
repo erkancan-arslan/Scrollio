@@ -10,12 +10,14 @@ export interface DuelStateSnapshotDto {
     remainingMsA: number;
     remainingMsB: number;
     currentQuestionIndex: number;
+    questionIndexA: number;
+    questionIndexB: number;
     playerAAnswered: boolean;
     playerBAnswered: boolean;
     winnerId: string | null;
     finishReason: string | null;
     serverTime: number;
-    startTime: number | null; // Server timestamp of match start
+    startTime: number | null;
     playerAId: string;
     playerBId: string;
     readyA: boolean;
